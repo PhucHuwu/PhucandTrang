@@ -31,22 +31,12 @@ function updateCounterDisplay() {
 // Fetch anniversary data from API (only once on page load)
 async function fetchAnniversaryData() {
     try {
-        console.log("📡 Fetching anniversary data from API (one-time call)...");
         const response = await fetch("/api/anniversary");
         const data = await response.json();
-
-        // You can use API data if needed, or just rely on client-side calculation
-        console.log("✅ Anniversary data loaded:", data);
-        console.log(
-            "💡 From now on, counter will update automatically without API calls!"
-        );
 
         // Update display immediately
         updateCounterDisplay();
     } catch (error) {
-        console.error("❌ Error fetching anniversary data:", error);
-        console.log("🔄 Using fallback: client-side calculation");
-
         // Fallback to client-side calculation if API fails
         updateCounterDisplay();
     }
@@ -67,7 +57,6 @@ fetchAnniversaryData();
 // Check for day change every hour instead of every second (reduces load)
 // This checks if the day has changed and updates accordingly
 setInterval(() => {
-    console.log("⏰ Hourly check - updating counter...");
     updateCounterDisplay();
 }, 60 * 60 * 1000); // Every hour
 
@@ -79,15 +68,8 @@ function scheduleNextMidnightCheck() {
     tomorrow.setHours(0, 0, 1, 0); // 00:00:01 tomorrow
 
     const timeUntilMidnight = tomorrow - now;
-    const hours = Math.floor(timeUntilMidnight / (1000 * 60 * 60));
-    const minutes = Math.floor(
-        (timeUntilMidnight % (1000 * 60 * 60)) / (1000 * 60)
-    );
-
-    console.log(`🌙 Next midnight update scheduled in ${hours}h ${minutes}m`);
 
     setTimeout(() => {
-        console.log("🎉 Midnight! Updating counter for new day...");
         updateCounterDisplay();
         scheduleNextMidnightCheck(); // Schedule next midnight check
     }, timeUntilMidnight);

@@ -1,2 +1,5 @@
 package-lock.json
 node_modules/
+.vercel
+.env*.local
+.DS_Store

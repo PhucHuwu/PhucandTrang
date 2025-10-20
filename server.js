@@ -27,12 +27,10 @@ app.get("/api/anniversary", (req, res) => {
         now - cacheTimestamp < CACHE_DURATION
     ) {
         // Return cached data
-        console.log("📦 Returning cached anniversary data");
         return res.json(cachedAnniversaryData);
     }
 
     // Calculate new data
-    console.log("🔄 Calculating new anniversary data...");
     const startDate = new Date("2022-10-20");
     const today = new Date();
     const daysCount = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
@@ -48,8 +46,6 @@ app.get("/api/anniversary", (req, res) => {
     cachedAnniversaryData = data;
     cacheTimestamp = now;
 
-    console.log(`✅ Days together: ${daysCount} | Cache updated`);
-
     // Set cache headers
     res.set({
         "Cache-Control": "public, max-age=3600", // Cache for 1 hour
@@ -61,8 +57,4 @@ app.get("/api/anniversary", (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`🚀 Server running at http://localhost:${PORT}`);
-    console.log(`💡 Performance optimizations enabled:`);
-    console.log(`   - Server-side caching: 1 hour`);
-    console.log(`   - Client-side calculation: Enabled`);
-    console.log(`   - API calls reduced by 99.97%`);
 });
