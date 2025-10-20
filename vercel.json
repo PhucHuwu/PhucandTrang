@@ -1,11 +1,4 @@
 {
-    "version": 2,
-    "buildCommand": "echo 'Static site - no build needed'",
-    "outputDirectory": "public",
-    "routes": [
-        {
-            "src": "/api/(.*)",
-            "dest": "/api/$1"
-        }
-    ]
+    "buildCommand": "npm run build",
+    "outputDirectory": "public"
 }
