@@ -1,23 +1,11 @@
 {
     "version": 2,
-    "builds": [
-        {
-            "src": "public/**",
-            "use": "@vercel/static"
-        },
-        {
-            "src": "api/**/*.js",
-            "use": "@vercel/node"
-        }
-    ],
+    "buildCommand": "echo 'Static site - no build needed'",
+    "outputDirectory": "public",
     "routes": [
         {
             "src": "/api/(.*)",
             "dest": "/api/$1"
-        },
-        {
-            "src": "/(.*)",
-            "dest": "/public/$1"
         }
     ]
 }
