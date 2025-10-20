@@ -28,19 +28,7 @@ function updateCounterDisplay() {
     }
 }
 
-// Fetch anniversary data from API (only once on page load)
-async function fetchAnniversaryData() {
-    try {
-        const response = await fetch("/api/anniversary");
-        const data = await response.json();
-
-        // Update display immediately
-        updateCounterDisplay();
-    } catch (error) {
-        // Fallback to client-side calculation if API fails
-        updateCounterDisplay();
-    }
-} // Add pulse animation
+// Add pulse animation
 const style = document.createElement("style");
 style.textContent = `
   @keyframes pulse {
@@ -52,7 +40,7 @@ style.textContent = `
 document.head.appendChild(style);
 
 // Initialize counter on page load
-fetchAnniversaryData();
+updateCounterDisplay();
 
 // Check for day change every hour instead of every second (reduces load)
 // This checks if the day has changed and updates accordingly
