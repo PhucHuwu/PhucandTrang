@@ -1,8 +1,5 @@
 {
-    "routes": [
-        {
-            "src": "/(.*)",
-            "dest": "/public/$1"
-        }
-    ]
+    "buildCommand": null,
+    "outputDirectory": "public",
+    "framework": null
 }
