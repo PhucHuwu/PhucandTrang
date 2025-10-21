@@ -122,3 +122,46 @@ document.querySelectorAll(".gallery-item, .timeline-item").forEach((el) => {
     el.style.transition = "opacity 0.6s ease, transform 0.6s ease";
     observer.observe(el);
 });
+
+// Background Music Control
+const bgMusic = document.getElementById("bgMusic");
+const musicToggle = document.getElementById("musicToggle");
+const playIcon = document.querySelector(".play-icon");
+const pauseIcon = document.querySelector(".pause-icon");
+
+let isPlaying = false;
+
+// Function to toggle music
+function toggleMusic() {
+    if (isPlaying) {
+        bgMusic.pause();
+        playIcon.classList.remove("hidden");
+        pauseIcon.classList.add("hidden");
+        musicToggle.classList.remove("playing");
+    } else {
+        bgMusic.play().catch((error) => {
+            console.log("Autoplay prevented:", error);
+        });
+        playIcon.classList.add("hidden");
+        pauseIcon.classList.remove("hidden");
+        musicToggle.classList.add("playing");
+    }
+    isPlaying = !isPlaying;
+}
+
+// Add click event to toggle button
+if (musicToggle && bgMusic) {
+    musicToggle.addEventListener("click", toggleMusic);
+
+    // Try to autoplay when user first interacts with the page
+    document.addEventListener(
+        "click",
+        function initMusic() {
+            if (!isPlaying) {
+                toggleMusic();
+            }
+            document.removeEventListener("click", initMusic);
+        },
+        { once: true }
+    );
+}

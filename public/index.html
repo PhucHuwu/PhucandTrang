@@ -130,6 +130,29 @@
         <p class="footer-date">From October 20, 2022 until eternity</p>
     </footer>
 
+    <!-- Background Music Player -->
+    <audio id="bgMusic" loop>
+        <source src="music/van-vat-nhu-muon-ta-ben-nhau.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+
+    <!-- Music Control Button -->
+    <button id="musicToggle" class="music-toggle" aria-label="Toggle music">
+        <!-- Play Icon (Music Note) -->
+        <svg class="music-icon play-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+        </svg>
+
+        <!-- Pause Icon (Sound Waves) -->
+        <svg class="music-icon pause-icon hidden" viewBox="0 0 24 24" fill="currentColor">
+            <g class="wave-group">
+                <rect class="wave wave-1" x="4" y="8" width="3" height="8" rx="1.5" />
+                <rect class="wave wave-2" x="10" y="5" width="3" height="14" rx="1.5" />
+                <rect class="wave wave-3" x="16" y="8" width="3" height="8" rx="1.5" />
+            </g>
+        </svg>
+    </button>
+
     <script src="script.js"></script>
 </body>
 
