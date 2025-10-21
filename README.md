@@ -82,7 +82,7 @@ git branch -M main
 git push -u origin main
 ```
 
-## �🚀 How to Deploy Your Own Website
+## 🚀 How to Deploy Your Own Website
 
 Now that your code is on GitHub, let's make it live on the internet!
 
