@@ -12,7 +12,7 @@ This is a personal love story website that includes:
 -   📖 A timeline of our love story
 -   🎵 Background music to set the mood
 
-## � Getting Started (For Beginners)
+## 📦 Getting Started (For Beginners)
 
 ### Step 1: Download This Project
 
