@@ -258,7 +258,8 @@ img {
         inset 0 1px 0 rgba(255, 255, 255, 0.3);
     backdrop-filter: blur(15px);
     transition: all 0.4s ease;
-    animation: slideInLeft 1s ease-out 0.2s both;
+    animation: slideInLeft 1s ease-out 0.2s both,
+        floatGentle 3.5s ease-in-out 1.2s infinite;
     position: relative;
     z-index: 5;
     display: flex;
@@ -270,6 +271,7 @@ img {
     transform: translateY(-3px);
     box-shadow: 0 12px 40px rgba(255, 212, 236, 0.15),
         inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    animation-play-state: paused;
 }
 .proposal-text {
     font-size: 1.6rem;
@@ -301,7 +303,8 @@ img {
         inset 0 1px 0 rgba(255, 255, 255, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.2);
     transition: all 0.4s ease;
-    animation: slideInLeft 1s ease-out 0.4s both;
+    animation: slideInLeft 1s ease-out 0.4s both,
+        floatMedium 3s ease-in-out 1.4s infinite;
     position: relative;
     overflow: hidden;
 }
@@ -330,6 +333,7 @@ img {
     box-shadow: 0 16px 40px rgba(255, 212, 236, 0.2),
         inset 0 1px 0 rgba(255, 255, 255, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.3);
+    animation-play-state: paused;
 }
 .counter-number {
     font-size: 3rem;
@@ -359,6 +363,12 @@ img {
     box-shadow: 0 16px 48px rgba(255, 212, 236, 0.1);
     object-fit: contain;
     transition: all 0.4s ease;
+    animation: floatSlow 4s ease-in-out infinite;
+}
+
+.hero-img:hover {
+    animation-play-state: paused;
+    transform: scale(1.02);
 } /* Gallery Section */
 .gallery {
     background: linear-gradient(
@@ -431,6 +441,23 @@ img {
     border: 1px solid rgba(255, 212, 236, 0.15);
     background: white;
     padding: 0;
+    animation: floatGentle 3s ease-in-out infinite;
+}
+
+.gallery-item:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.gallery-item:nth-child(2) {
+    animation-delay: 0.5s;
+}
+
+.gallery-item:nth-child(3) {
+    animation-delay: 1s;
+}
+
+.gallery-item:nth-child(4) {
+    animation-delay: 1.5s;
 }
 
 .gallery-item:hover {
@@ -439,6 +466,7 @@ img {
     transform: translateY(-8px) scale(1.01);
     border: 1px solid rgba(255, 212, 236, 0.25);
     background: white;
+    animation-play-state: paused;
 }
 
 .gallery-item img {
@@ -572,6 +600,7 @@ img {
     box-shadow: 0 0 0 4px rgba(255, 240, 247, 0.6),
         0 0 12px rgba(255, 212, 236, 0.15);
     transition: all 0.4s ease;
+    animation: floatMedium 2.5s ease-in-out infinite;
 }
 
 .timeline-item:hover .timeline-marker {
@@ -717,6 +746,36 @@ img {
     }
     50% {
         transform: translateY(-6px);
+    }
+}
+
+@keyframes floatSlow {
+    0%,
+    100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+@keyframes floatMedium {
+    0%,
+    100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-8px);
+    }
+}
+
+@keyframes floatGentle {
+    0%,
+    100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-5px);
     }
 }
 
