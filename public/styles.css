@@ -354,7 +354,7 @@ img {
 }
 
 .hero-img {
-    width: 100%;
+    width: 80%;
     border-radius: 30px;
     box-shadow: 0 16px 48px rgba(255, 212, 236, 0.1);
     object-fit: contain;
