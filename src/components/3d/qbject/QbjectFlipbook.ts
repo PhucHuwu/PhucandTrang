@@ -56,6 +56,9 @@ export class QbjectFlipbook {
       this.group.add(page.pivot);
       this.pages.push(page);
     });
+
+    // Initialize immediate page positions (progress = 0: front cover on top)
+    this.update(0.016);
   }
 
   public setPageIndex(targetIndex: number) {
@@ -67,8 +70,12 @@ export class QbjectFlipbook {
     const currentProg = this.progress.value;
 
     this.pages.forEach((page, index) => {
-      // Map progress to turn progress: 1 = right (unturned), -1 = left (turned)
-      const pageTurn = clamp((index + 1 - currentProg), -1, 1);
+      // At progress = 0:
+      // index = 0 (front cover): pageTurn = 1 (resting on top of right stack, facing camera)
+      // index > 0: pageTurn = 1 (under the cover)
+      // As progress advances past index:
+      // When progress > index, page turns from 1 to -1 (swings to left)
+      const pageTurn = clamp((index - currentProg) + 1, -1, 1);
       page.turnProgress = pageTurn;
       page.update(dt);
     });

@@ -31,8 +31,8 @@ export class QbjectPage {
   public mesh: THREE.Mesh;
   public pivot: THREE.Group;
 
-  public turnProgress: number = 0; // -1 (open left) to 1 (resting right)
-  public turnProgressLag: number = 0;
+  public turnProgress: number = 1; // 1 = closed on right, -1 = opened on left
+  public turnProgressLag: number = 1;
   private xSegments = 1;
   private ySegments = 1;
   private zSegments = 24;
@@ -74,13 +74,16 @@ export class QbjectPage {
       metalness: this.isCover ? 0.2 : 0.02,
     });
 
+    // BoxGeometry materials: [+x, -x, +y, -y, +z, -z]
+    // In BoxGeometry, +z and -z are the largest front/back faces
+    // params.frontTexture -> +z, params.backTexture -> -z
     const materials = [
-      backMat,
-      frontMat,
-      edgeMat,
-      edgeMat,
-      edgeMat,
-      edgeMat,
+      edgeMat, // +x (outer edge)
+      edgeMat, // -x (inner spine edge)
+      edgeMat, // +y (top edge)
+      edgeMat, // -y (bottom edge)
+      frontMat, // +z (front page / front cover facing viewer)
+      backMat,  // -z (back page / inside cover)
     ];
 
     const geometry = new THREE.BoxGeometry(
@@ -134,9 +137,11 @@ export class QbjectPage {
     if (this.isCover) {
       const backShift = this.rootThickness;
       const leftShift = (this.rootThickness / 2) * (this.isFrontCover ? 1 : -1);
-      const angle = (-this.turnProgress + 1) * (Math.PI / 2);
+      // turnProgress: 1 -> angle = 0 (resting flat on right)
+      // turnProgress: -1 -> angle = PI (resting flat on left)
+      const angle = (1 - this.turnProgress) * (Math.PI / 2);
 
-      const direction = new THREE.Vector2(Math.cos(angle), Math.sin(angle));
+      const direction = new THREE.Vector2(Math.sin(angle), Math.cos(angle));
       const perpendicular = new THREE.Vector2(-direction.y, direction.x);
 
       const p0 = new THREE.Vector2()
@@ -179,13 +184,13 @@ export class QbjectPage {
 
   public update(dt: number) {
     let straightenTarget = this.turnProgress;
-    if (this.bendingEnabled) {
+    if (this.bendingEnabled && !this.isCover) {
       straightenTarget = clamp(straightenTarget * 1.15, -1, 1);
     }
     this.turnProgressLag = approach(
       this.turnProgressLag,
       straightenTarget,
-      this.bendingEnabled ? 6 : 28,
+      (this.bendingEnabled && !this.isCover) ? 6 : 28,
       dt
     );
 
@@ -207,7 +212,6 @@ export class QbjectPage {
       const finalZ = pos.y + Math.sin(direction) * halfThickness;
       const finalX = pos.x + Math.cos(direction) * halfThickness;
 
-      // Ensure no NaN values propagate into BufferGeometry
       if (!isNaN(finalX) && !isNaN(finalZ)) {
         position.setZ(i, finalZ);
         position.setX(i, finalX);

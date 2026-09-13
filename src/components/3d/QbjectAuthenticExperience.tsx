@@ -16,7 +16,6 @@ export default function QbjectAuthenticExperience() {
   const flipbookRef = useRef<QbjectFlipbook | null>(null);
   const mousePos = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
 
-  // Drag state
   const dragRef = useRef({
     isDown: false,
     startX: 0,
@@ -43,7 +42,8 @@ export default function QbjectAuthenticExperience() {
       0.1,
       100
     );
-    camera.position.set(0, 0.2, 7.8);
+    // Camera positioned slightly above facing book
+    camera.position.set(0, 0.4, 7.8);
     camera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({
@@ -61,7 +61,7 @@ export default function QbjectAuthenticExperience() {
 
     container.appendChild(renderer.domElement);
 
-    // 2. Warm Studio Lighting Setup from the-book-of-qbject
+    // 2. Warm Studio Lighting
     const ambientLight = new THREE.AmbientLight(0xFFFAF2, 1.25);
     scene.add(ambientLight);
 
@@ -80,15 +80,14 @@ export default function QbjectAuthenticExperience() {
     fillLight.position.set(-6, 3, 4);
     scene.add(fillLight);
 
-    // 3. Atmospheric System (Butterflies & Dust particles)
+    // 3. Atmospheric System
     const atmospheric = new AtmosphericSystem(scene);
 
-    // 4. Qbject Flipbook Instance
+    // 4. Qbject Flipbook
     const flipbook = new QbjectFlipbook(scene);
     flipbookRef.current = flipbook;
 
     const loadBookPages = async () => {
-      // Cover textures
       const coverFront = PageTextureGenerator.createCoverTexture(
         'CHÚNG MÌNH',
         'Phúc & Trang',
@@ -101,7 +100,7 @@ export default function QbjectAuthenticExperience() {
         side: 'left',
       });
 
-      // Chapter I: The Beginning
+      // Chapter I
       const p1Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 1,
         chapter: 'Chapter I',
@@ -125,7 +124,7 @@ export default function QbjectAuthenticExperience() {
         side: 'left',
       });
 
-      // Chapter II: Confession 20.10.2022
+      // Chapter II
       const p2Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 3,
         chapter: 'Chapter II',
@@ -148,7 +147,7 @@ export default function QbjectAuthenticExperience() {
         side: 'left',
       });
 
-      // Chapter III: Cherished Moments
+      // Chapter III
       const p3Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 5,
         chapter: 'Chapter III',
@@ -167,7 +166,7 @@ export default function QbjectAuthenticExperience() {
         side: 'left',
       });
 
-      // Chapter IV: Love Letter & Eternity
+      // Chapter IV
       const p4Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 7,
         chapter: 'Chapter IV',
@@ -237,11 +236,14 @@ export default function QbjectAuthenticExperience() {
       const mx = mousePos.current.x;
       const my = mousePos.current.y;
 
-      // Gentle book tilt
       flipbook.group.rotation.x = my * 0.04;
       flipbook.group.rotation.y = mx * 0.06;
 
-      // Update Flipbook physics & curve calculations
+      // Center the book nicely: when closed (progress = 0), center cover in middle of screen
+      // When opened (progress > 0), center spread
+      const targetGroupX = flipbook.progress.value === 0 ? -1.1 : 0;
+      flipbook.group.position.x += (targetGroupX - flipbook.group.position.x) * 0.08;
+
       flipbook.update(dt);
       atmospheric.update(elapsed, { x: mx, y: my });
 
@@ -297,20 +299,16 @@ export default function QbjectAuthenticExperience() {
         turnToPage(currentPage - 1);
       }
     } else {
-      // Click interaction: Click right side -> turn next, Click left side -> turn prev
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const clickX = e.clientX - rect.left;
       const mid = rect.width / 2;
 
       if (currentPage === 0) {
-        // Closed book: clicking anywhere opens it
         turnToPage(1);
       } else {
         if (clickX > mid) {
-          // Clicked right page -> flip forward
           turnToPage(currentPage + 1);
         } else {
-          // Clicked left page -> flip backward
           turnToPage(currentPage - 1);
         }
       }
