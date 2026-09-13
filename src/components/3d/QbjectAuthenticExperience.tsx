@@ -119,6 +119,22 @@ export default function QbjectAuthenticExperience() {
         side: 'left',
       });
 
+      // Page 5: Ending Inside Page & Back Cover
+      const p5Inside = await PageTextureGenerator.createInsidePageTexture({
+        pageNumber: 9,
+        chapter: 'The End',
+        title: 'Cảm Ơn Em',
+        quote: 'Hạnh phúc là hành trình, không phải đích đến.',
+        textLines: [
+          'Cảm ơn em vì đã cùng tớ tạo nên những kỷ niệm tuyệt vời.',
+          'Cuốn sách này có thể khép lại,',
+          'nhưng tình yêu của chúng mình sẽ luôn tiếp diễn.',
+        ],
+        side: 'right',
+      });
+
+      const coverBack = PageTextureGenerator.createBackCoverTexture();
+
       if (destroyed) return;
 
       // Convert CanvasTextures to data URLs for the original Flipbook engine
@@ -133,6 +149,8 @@ export default function QbjectAuthenticExperience() {
         p3Back.image as HTMLCanvasElement,
         p4Front.image as HTMLCanvasElement,
         p4Back.image as HTMLCanvasElement,
+        p5Inside.image as HTMLCanvasElement,
+        coverBack.image as HTMLCanvasElement,
       ];
 
       const pageUrls = textureCanvases.map((canvas) => canvas.toDataURL('image/jpeg', 0.92));

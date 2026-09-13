@@ -91,6 +91,64 @@ export class PageTextureGenerator {
     return texture;
   }
 
+  static createBackCoverTexture(): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 1360;
+    const ctx = canvas.getContext('2d')!;
+
+    // Rich Wine Leather
+    const gradient = ctx.createLinearGradient(0, 0, 1024, 1360);
+    gradient.addColorStop(0, '#38161E');
+    gradient.addColorStop(0.5, '#280F15');
+    gradient.addColorStop(1, '#1A070B');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 1024, 1360);
+
+    // Leather grain
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+    for (let i = 0; i < 4000; i++) {
+      const x = Math.random() * 1024;
+      const y = Math.random() * 1360;
+      ctx.fillRect(x, y, 2, 2);
+    }
+
+    // Gilded Frame
+    ctx.strokeStyle = '#D4AF37';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(40, 40, 944, 1280);
+
+    ctx.setLineDash([8, 6]);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(60, 60, 904, 1240);
+    ctx.setLineDash([]);
+
+    // Center Gold Emblem
+    ctx.beginPath();
+    ctx.arc(512, 600, 60, 0, Math.PI * 2);
+    ctx.strokeStyle = '#D4AF37';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    ctx.fillStyle = '#D4AF37';
+    ctx.font = '36px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('✦', 512, 612);
+
+    ctx.fillStyle = '#E8BCC6';
+    ctx.font = 'italic 48px "Alex Brush", cursive, serif';
+    ctx.fillText('Forever & Always', 512, 730);
+
+    ctx.fillStyle = '#B49A6A';
+    ctx.font = '22px Montserrat, sans-serif';
+    ctx.letterSpacing = '6px';
+    ctx.fillText('TO BE CONTINUED...', 512, 800);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }
+
   static createInsidePageTexture(params: {
     pageNumber: number;
     chapter?: string;
