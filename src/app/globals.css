@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --paper-bg: #FDFBF7;
+    --paper-texture: #F9F5EC;
+    --paper-border: rgba(182, 86, 109, 0.15);
+  }
+
+  body {
+    background-color: #12100E;
+    color: #2E2925;
+    font-family: var(--font-montserrat), sans-serif;
+    overflow-x: hidden;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Vintage Paper Texture & Lighting */
+.paper-texture {
+  background-color: #FDFBF7;
+  background-image: radial-gradient(#D58E9F 0.5px, transparent 0.5px), radial-gradient(#645B51 0.4px, #FDFBF7 0.4px);
+  background-size: 24px 24px;
+  background-position: 0 0, 12px 12px;
+}
+
+/* Journal Spine & Book Shadow */
+.book-spine {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.12) 0%,
+    rgba(255, 255, 255, 0.4) 40%,
+    rgba(0, 0, 0, 0.08) 50%,
+    rgba(255, 255, 255, 0.3) 60%,
+    rgba(0, 0, 0, 0.15) 100%
+  );
+}
+
+.perspective-1000 {
+  perspective: 1200px;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+.shadow-book-deep {
+  box-shadow: 0 25px 50px -12px rgba(25, 18, 14, 0.45), 0 0 0 1px rgba(212, 175, 55, 0.2);
+}
+
+.shadow-polaroid {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+/* Notebook Lined Paper effect */
+.lined-paper {
+  background-image: repeating-linear-gradient(
+    transparent,
+    transparent 27px,
+    rgba(213, 142, 159, 0.15) 28px
+  );
+  line-height: 28px;
+}
+
+/* Polaroid Paper tape */
+.washi-tape {
+  background: rgba(255, 238, 217, 0.7);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transform: rotate(-3deg);
+  backdrop-filter: blur(1px);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #1E1B18;
+}
+::-webkit-scrollbar-thumb {
+  background: #94384F;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #B6566D;
+}

@@ -1,5 +1,3 @@
 {
-    "buildCommand": null,
-    "outputDirectory": "public",
-    "framework": null
+  "framework": "nextjs"
 }
