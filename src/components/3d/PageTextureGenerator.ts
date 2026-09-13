@@ -81,11 +81,6 @@ export class PageTextureGenerator {
     ctx.letterSpacing = '4px';
     ctx.fillText(date, 512, 820);
 
-    // Hint
-    ctx.fillStyle = 'rgba(244, 237, 226, 0.7)';
-    ctx.font = 'italic 26px "Cormorant Garamond", serif';
-    ctx.fillText('Chạm để mở cuốn sổ', 512, 1150);
-
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     return texture;
