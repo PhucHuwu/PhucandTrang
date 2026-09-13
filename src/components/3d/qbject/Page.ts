@@ -1,289 +1,319 @@
-import * as THREE from 'three';
+import * as THREE from "three";
+import {
+	approach,
+	cosineInterpolate,
+	vectorToRadians,
+	lerp,
+	clamp,
+} from "./util";
 
-export interface PageParams {
-  textureUrls: {
-    front: string;
-    back: string;
-    edgeTop?: string;
-    edgeBottom?: string;
-    edgeLeft?: string;
-    edgeRight?: string;
-  };
-  width: number;
-  height: number;
-  thickness?: number;
-  rootThickness?: number;
-  isCover?: boolean;
-  isFrontCover?: boolean;
-  edgeColor?: number;
-  textureLoader?: THREE.TextureLoader;
-}
+export default class Page {
+	public textureUrls;
+	public width: number;
+	public height: number;
+	public thickness: number;
+	public rootThickness: number;
+	public elevationLeft = 0;
+	public elevationRight = 0;
+	public isCover = false;
+	public edgeColor = 0xffffff;
 
-export function approach(current: number, target: number, speed: number, dt: number): number {
-  return current + (target - current) * (1 - Math.exp(-speed * dt));
-}
+	public mesh: THREE.Mesh;
+	public pivot: THREE.Group;
 
-export function cosineInterpolate(a: number, b: number, t: number): number {
-  const ft = t * Math.PI;
-  const f = (1 - Math.cos(ft)) * 0.5;
-  return a * (1 - f) + b * f;
-}
+	public turnProgress: number = 0;
+	public turnProgressLag: number = 0;
+	private xSegments = 1;
+	private ySegments = 1;
+	private zSegments = 20;
+	private vertexRelCoords: THREE.Vector3[] = [];
+	public bendingEnabled: boolean = true;
+	private textureLoader: THREE.TextureLoader;
+	private isFrontCover: boolean;
+	private hasTurnProgressUpdated = false;
 
-export function vectorToRadians(v: THREE.Vector2): number {
-  return Math.atan2(v.y, v.x);
-}
+	constructor(pageParams: PageParams) {
+		this.textureUrls = pageParams.textureUrls;
+		this.width = pageParams.width;
+		this.height = pageParams.height;
+		this.thickness = pageParams.thickness || 2;
+		this.rootThickness = pageParams.rootThickness || 4;
+		this.isCover = !!pageParams.isCover;
+		this.edgeColor = pageParams.edgeColor || 0xffffff;
+		this.textureLoader = pageParams.textureLoader;
+		this.isFrontCover = pageParams.isFrontCover;
 
-export function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
+		if (this.isCover) {
+			this.zSegments = 1;
+		}
 
-export function clamp(val: number, min: number, max: number): number {
-  return Math.min(Math.max(val, min), max);
-}
+		// Load front and back textures
+		const _texture = (url: string) => {
+			const texture = this.textureLoader.load(url);
+			texture.colorSpace = THREE.SRGBColorSpace;
+			texture.minFilter = THREE.LinearFilter;
+			texture.generateMipmaps = false;
+			// texture.anisotropy = 16;
+			return { map: texture, vertexColors: !this.isCover };
+		};
+		const _color = (hex: number) => ({
+			color: new THREE.Color(hex),
+		});
 
-export function rotateY(point: THREE.Vector3, pivot: THREE.Vector3, angle: number): THREE.Vector3 {
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  const dx = point.x - pivot.x;
-  const dz = point.z - pivot.z;
-  return new THREE.Vector3(
-    cos * dx - sin * dz + pivot.x,
-    point.y,
-    sin * dx + cos * dz + pivot.z
-  );
-}
+		const textures: Record<
+			string,
+			{ map?: THREE.Texture; color?: THREE.Color }
+		> = {
+			front: _texture(this.textureUrls.front),
+			back: _texture(this.textureUrls.back),
+			edgeTop: _color(this.edgeColor),
+			edgeBottom: _color(this.edgeColor),
+			edgeLeft: _color(this.edgeColor),
+			edgeRight: _color(this.edgeColor),
+		};
 
-export class Page {
-  public width: number;
-  public height: number;
-  public thickness: number;
-  public rootThickness: number;
-  public elevationLeft = 0;
-  public elevationRight = 0;
-  public isCover = false;
-  public edgeColor = 0xffffff;
+		if (this.textureUrls.edgeTB) {
+			textures.edgeTop = _texture(this.textureUrls.edgeTB);
+			textures.edgeBottom = _texture(this.textureUrls.edgeTB);
+		}
+		if (this.textureUrls.edgeLR) {
+			textures.edgeLeft = _texture(this.textureUrls.edgeLR);
+			textures.edgeRight = _texture(this.textureUrls.edgeLR);
+		}
 
-  public mesh: THREE.Mesh;
-  public pivot: THREE.Group;
+		const materials = [
+			new THREE.MeshStandardMaterial(textures.back),
+			new THREE.MeshStandardMaterial(textures.front),
+			new THREE.MeshStandardMaterial(textures.edgeTop),
+			new THREE.MeshStandardMaterial(textures.edgeBottom),
+			new THREE.MeshStandardMaterial(textures.edgeRight),
+			new THREE.MeshStandardMaterial(textures.edgeLeft),
+		];
 
-  public turnProgress: number = 0;
-  public turnProgressLag: number = 0;
-  private xSegments = 1;
-  private ySegments = 1;
-  private zSegments = 20;
-  private vertexRelCoords: THREE.Vector3[] = [];
-  public bendingEnabled: boolean = true;
-  private isFrontCover: boolean;
-  private hasTurnProgressUpdated = false;
+		const geometry = new THREE.BoxGeometry(
+			this.thickness,
+			this.height,
+			this.width,
+			this.xSegments,
+			this.ySegments,
+			this.zSegments,
+		);
 
-  constructor(
-    pageParams: {
-      frontTexture: THREE.Texture;
-      backTexture: THREE.Texture;
-      width: number;
-      height: number;
-      thickness?: number;
-      rootThickness?: number;
-      isCover?: boolean;
-      isFrontCover?: boolean;
-      edgeColor?: number;
-    }
-  ) {
-    this.width = pageParams.width;
-    this.height = pageParams.height;
-    this.thickness = pageParams.thickness || 2;
-    this.rootThickness = pageParams.rootThickness || 4;
-    this.isCover = !!pageParams.isCover;
-    this.edgeColor = pageParams.edgeColor || 0xffffff;
-    this.isFrontCover = !!pageParams.isFrontCover;
+		this.mesh = new THREE.Mesh(geometry, materials);
+		this.mesh.receiveShadow = true;
+		this.mesh.castShadow = true;
+		// this.mesh = new THREE.Mesh(
+		// 	geometry,
+		// 	new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true }),
+		// );
 
-    if (this.isCover) {
-      this.zSegments = 1;
-    }
+		this.pivot = new THREE.Group();
+		this.pivot.add(this.mesh);
 
-    const _color = (hex: number) => ({
-      color: new THREE.Color(hex),
-    });
+		const position = geometry.attributes.position;
+		const uv = geometry.attributes.uv;
 
-    const materials = [
-      new THREE.MeshStandardMaterial({ map: pageParams.backTexture, vertexColors: !this.isCover }),
-      new THREE.MeshStandardMaterial({ map: pageParams.frontTexture, vertexColors: !this.isCover }),
-      new THREE.MeshStandardMaterial(_color(this.edgeColor)),
-      new THREE.MeshStandardMaterial(_color(this.edgeColor)),
-      new THREE.MeshStandardMaterial(_color(this.edgeColor)),
-      new THREE.MeshStandardMaterial(_color(this.edgeColor)),
-    ];
+		const colors = new Float32Array(position.count * 3);
 
-    const geometry = new THREE.BoxGeometry(
-      this.thickness,
-      this.height,
-      this.width,
-      this.xSegments,
-      this.ySegments,
-      this.zSegments,
-    );
+		for (let i = 0; i < position.count; i++) {
+			const coord = new THREE.Vector3(
+				position.getX(i) / this.thickness + 0.5,
+				position.getY(i) / this.height + 0.5,
+				position.getZ(i) / this.width + 0.5,
+			);
 
-    this.mesh = new THREE.Mesh(geometry, materials);
-    this.mesh.receiveShadow = true;
-    this.mesh.castShadow = true;
+			if (!this.isCover) {
+				// increase vertex density closer to the spine for better bending
+				coord.z = cosineInterpolate(0, 2, coord.z / 2);
+				uv.setXY(i, coord.x > 0.5 ? 1 - coord.z : coord.z, coord.y);
+			}
 
-    this.pivot = new THREE.Group();
-    this.pivot.add(this.mesh);
+			this.vertexRelCoords[i] = coord;
 
-    const position = geometry.attributes.position;
-    const uv = geometry.attributes.uv;
-    const colors = new Float32Array(position.count * 3);
+			// apply artificial ambient occlusion using vertex colors
+			const darken = clamp((1 - coord.z) ** 4 - 0.6, 0, 1);
+			colors[i * 3] = 1 - darken; // Red channel
+			colors[i * 3 + 1] = 1 - darken; // Green channel
+			colors[i * 3 + 2] = 1 - darken; // Blue channel
+		}
 
-    for (let i = 0; i < position.count; i++) {
-      const coord = new THREE.Vector3(
-        position.getX(i) / this.thickness + 0.5,
-        position.getY(i) / this.height + 0.5,
-        position.getZ(i) / this.width + 0.5,
-      );
+		// Add the colors attribute to the geometry
+		geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
-      if (!this.isCover) {
-        coord.z = cosineInterpolate(0, 2, coord.z / 2);
-        uv.setXY(i, coord.x > 0.5 ? 1 - coord.z : coord.z, coord.y);
-      }
+		uv.needsUpdate = true;
+	}
 
-      this.vertexRelCoords[i] = coord;
+	public getCurve() {
+		if (this.isCover) {
+			const backShift = this.rootThickness;
+			const leftShift =
+				(this.rootThickness / 2) * (this.isFrontCover ? 1 : -1);
+			const angle = (-this.turnProgress + 1) * (Math.PI / 2);
 
-      const darken = clamp(Math.pow(1 - coord.z, 4) - 0.6, 0, 1);
-      colors[i * 3] = 1 - darken;
-      colors[i * 3 + 1] = 1 - darken;
-      colors[i * 3 + 2] = 1 - darken;
-    }
+			const direction = new THREE.Vector2(
+				Math.cos(angle),
+				Math.sin(angle),
+			);
 
-    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    uv.needsUpdate = true;
-  }
+			const perpendicular = new THREE.Vector2(-direction.y, direction.x);
 
-  public getCurve() {
-    if (this.isCover) {
-      const backShift = this.rootThickness;
-      const leftShift = (this.rootThickness / 2) * (this.isFrontCover ? 1 : -1);
-      const angle = (-this.turnProgress + 1) * (Math.PI / 2);
+			const p0 = new THREE.Vector2()
+				.addScaledVector(direction, -backShift)
+				.addScaledVector(perpendicular, leftShift);
 
-      const direction = new THREE.Vector2(
-        Math.cos(angle),
-        Math.sin(angle),
-      );
+			const p2 = new THREE.Vector2()
+				.addScaledVector(direction, this.width - backShift)
+				.addScaledVector(perpendicular, leftShift);
 
-      const perpendicular = new THREE.Vector2(-direction.y, direction.x);
+			const p1 = new THREE.Vector2()
+				.addVectors(p0, p2)
+				.multiplyScalar(0.5);
 
-      const p0 = new THREE.Vector2()
-        .addScaledVector(direction, -backShift)
-        .addScaledVector(perpendicular, leftShift);
+			return new THREE.QuadraticBezierCurve(p0, p1, p2);
+		} else {
+			const piProgress = Math.abs(this.turnProgress) * (Math.PI / 2);
+			const eFactorSin = Math.sin(piProgress);
+			const eFactorCos = -Math.cos(piProgress) + 1;
 
-      const p2 = new THREE.Vector2()
-        .addScaledVector(direction, this.width - backShift)
-        .addScaledVector(perpendicular, leftShift);
+			const isRight = this.turnProgress > 0;
+			const maxHeight = isRight
+				? this.elevationRight
+				: this.elevationLeft;
 
-      const p1 = new THREE.Vector2()
-        .addVectors(p0, p2)
-        .multiplyScalar(0.5);
+			// elevation of the second control point
+			const p2baseElevation = 30;
+			const p2elev = eFactorSin * (maxHeight + p2baseElevation) * 2;
+			// elevation of the 3rd and the 4th control points
+			const p34elev = eFactorCos * maxHeight;
 
-      return new THREE.QuadraticBezierCurve(p0, p1, p2);
-    } else {
-      const piProgress = Math.abs(this.turnProgress) * (Math.PI / 2);
-      const eFactorSin = Math.sin(piProgress);
-      const eFactorCos = -Math.cos(piProgress) + 1;
+			// calculates positions for the 3rd and the 4th control points
+			const calcP34 = (tp: number, dist: number) =>
+				new THREE.Vector2(
+					Math.sin(tp * (Math.PI / 2)) * dist,
+					Math.cos(tp * (Math.PI / 2)) * dist + p34elev,
+				);
 
-      const isRight = this.turnProgress > 0;
-      const maxHeight = isRight ? this.elevationRight : this.elevationLeft;
+			const p0 = new THREE.Vector2();
+			const p1 = new THREE.Vector2(0, p2elev);
+			const p2 = calcP34(this.turnProgress, this.width * 0.5);
+			const p3 = calcP34(this.turnProgressLag, this.width);
 
-      const p2baseElevation = 30;
-      const p2elev = eFactorSin * (maxHeight + p2baseElevation) * 2;
-      const p34elev = eFactorCos * maxHeight;
+			return new THREE.CubicBezierCurve(p0, p1, p2, p3);
+		}
+	}
 
-      const calcP34 = (tp: number, dist: number) =>
-        new THREE.Vector2(
-          Math.sin(tp * (Math.PI / 2)) * dist,
-          Math.cos(tp * (Math.PI / 2)) * dist + p34elev,
-        );
+	public update(dt: number) {
+		// straighten
+		let straightenTarget = this.turnProgress;
+		if (this.bendingEnabled) {
+			// gravity bend
+			straightenTarget = clamp(straightenTarget * 1.1, -1, 1);
+		}
+		this.turnProgressLag = approach(
+			this.turnProgressLag,
+			straightenTarget,
+			this.bendingEnabled ? 5 : 25,
+			dt,
+		);
 
-      const p0 = new THREE.Vector2();
-      const p1 = new THREE.Vector2(0, p2elev);
-      const p2 = calcP34(this.turnProgress, this.width * 0.5);
-      const p3 = calcP34(this.turnProgressLag, this.width);
+		const curve = this.getCurve();
+		const curveStretch = Math.max(curve.getLength() / this.width, 1);
 
-      return new THREE.CubicBezierCurve(p0, p1, p2, p3);
-    }
-  }
+		const position = this.mesh.geometry.attributes.position;
+		for (let i = 0; i < position.count; i++) {
+			const relCoord = this.vertexRelCoords[i];
 
-  public update(dt: number) {
-    let straightenTarget = this.turnProgress;
-    if (this.bendingEnabled) {
-      straightenTarget = clamp(straightenTarget * 1.1, -1, 1);
-    }
-    this.turnProgressLag = approach(
-      this.turnProgressLag,
-      straightenTarget,
-      this.bendingEnabled ? 5 : 25,
-      dt,
-    );
+			// const pos = curve.getPoint(relCoord.z * (1 / curveStretch));
+			const pos = curve.getPointAt(relCoord.z * (1 / curveStretch));
 
-    const curve = this.getCurve();
-    const curveStretch = Math.max(curve.getLength() / this.width, 1);
+			// TODO: get direction from previous point?
+			// const direction =
+			// 	vectorToRadians(curve.getTangent(relCoord.z)) + Math.PI / 2;
+			const direction =
+				vectorToRadians(curve.getTangentAt(relCoord.z)) + Math.PI / 2;
 
-    const position = this.mesh.geometry.attributes.position;
-    for (let i = 0; i < position.count; i++) {
-      const relCoord = this.vertexRelCoords[i];
+			const thickness = lerp(
+				this.rootThickness,
+				this.thickness,
+				relCoord.z,
+			);
 
-      const pos = curve.getPointAt(relCoord.z * (1 / curveStretch));
-      const direction = vectorToRadians(curve.getTangentAt(relCoord.z)) + Math.PI / 2;
+			const sign = -Math.sign(relCoord.x - 0.5);
+			const newX = pos.x + Math.cos(direction) * (thickness / 2) * sign;
+			const newZ = pos.y + Math.sin(direction) * (thickness / 2) * sign;
+			position.setX(i, newX);
+			position.setZ(i, newZ);
+		}
 
-      const thickness = lerp(
-        this.rootThickness,
-        this.thickness,
-        relCoord.z,
-      );
+		position.needsUpdate = true;
+		// TODO: calculate normals manually?
+		this.mesh.geometry.computeVertexNormals();
+		this.mesh.geometry.computeBoundingSphere();
 
-      const sign = -Math.sign(relCoord.x - 0.5);
-      const newX = pos.x + Math.cos(direction) * (thickness / 2) * sign;
-      const newZ = pos.y + Math.sin(direction) * (thickness / 2) * sign;
-      position.setX(i, newX);
-      position.setZ(i, newZ);
-    }
+		this.hasTurnProgressUpdated = true;
+	}
 
-    position.needsUpdate = true;
-    this.mesh.geometry.computeVertexNormals();
-    this.mesh.geometry.computeBoundingSphere();
+	public needsUpdate() {
+		if (!this.hasTurnProgressUpdated) return true;
+		return (
+			(this.turnProgress !== 1 &&
+				this.turnProgress !== -1 &&
+				this.turnProgress !== 0) ||
+			this.turnProgress !== this.turnProgressLag
+		);
+	}
 
-    this.hasTurnProgressUpdated = true;
-  }
+	public setTurnProgress(turnProgress: number) {
+		if (turnProgress === this.turnProgress) return;
 
-  public needsUpdate() {
-    if (!this.hasTurnProgressUpdated) return true;
-    return (
-      (this.turnProgress !== 1 &&
-        this.turnProgress !== -1 &&
-        this.turnProgress !== 0) ||
-      this.turnProgress !== this.turnProgressLag
-    );
-  }
+		if (!this.bendingEnabled) {
+			const delta = turnProgress - this.turnProgress;
+			this.turnProgressLag += delta;
+		}
 
-  public setTurnProgress(turnProgress: number) {
-    if (turnProgress === this.turnProgress) return;
+		this.turnProgress = turnProgress;
+		this.hasTurnProgressUpdated = false;
+	}
 
-    if (!this.bendingEnabled) {
-      const delta = turnProgress - this.turnProgress;
-      this.turnProgressLag += delta;
-    }
+	public setElevation(elevationLeft: number, elevationRight: number) {
+		if (this.isCover) return;
+		this.elevationLeft = elevationLeft;
+		this.elevationRight = elevationRight;
+	}
 
-    this.turnProgress = turnProgress;
-    this.hasTurnProgressUpdated = false;
-  }
+	public getElevation() {
+		const turnProgress = this.turnProgress + 1 / 2;
+		return lerp(this.elevationLeft, this.elevationRight, turnProgress);
+	}
 
-  public setElevation(elevationLeft: number, elevationRight: number) {
-    if (this.isCover) return;
-    this.elevationLeft = elevationLeft;
-    this.elevationRight = elevationRight;
-  }
+	public getPageAreaCorners(area: PageArea, backside = false) {
+		const top = area.top;
+		const bottom = area.top + area.height;
+		let left = area.left;
+		let right = area.left + area.width;
+		if (backside) [left, right] = [1 - left, 1 - right];
 
-  public destroy() {
-    this.mesh.geometry.dispose();
-    (this.mesh.material as THREE.Material[]).forEach((m) => m.dispose());
-    this.pivot.remove(this.mesh);
-  }
+		const curve = this.getCurve();
+		const curveStretch = Math.max(curve.getLength() / this.width, 1);
+		const unstretch = 1 / curveStretch;
+
+		const [lx, lz] = curve.getPointAt(left * unstretch);
+		const [rx, rz] = curve.getPointAt(right * unstretch);
+
+		const ty = (top - 0.5) * -this.height;
+		const by = (bottom - 0.5) * -this.height;
+
+		const cornerTL = new THREE.Vector3(lx, ty, lz);
+		const cornerTR = new THREE.Vector3(rx, ty, rz);
+		const cornerBL = new THREE.Vector3(lx, by, lz);
+		const cornerBR = new THREE.Vector3(rx, by, rz);
+
+		// Transform corners to global space
+		this.pivot.localToWorld(cornerTL);
+		this.pivot.localToWorld(cornerTR);
+		this.pivot.localToWorld(cornerBL);
+		this.pivot.localToWorld(cornerBR);
+
+		return [cornerTL, cornerTR, cornerBL, cornerBR];
+	}
 }

@@ -1,10 +1,8 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import * as THREE from 'three';
-import { QbjectFlipbook } from './qbject/QbjectFlipbook';
+import Flipbook from './qbject/flipbook';
 import { PageTextureGenerator } from './PageTextureGenerator';
-import { AtmosphericSystem } from './AtmosphericSystem';
 import { ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
 import VintageMusicPlayer from '@/components/VintageMusicPlayer';
 
@@ -13,67 +11,16 @@ export default function QbjectAuthenticExperience() {
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [isReady, setIsReady] = useState(false);
-  const flipbookRef = useRef<QbjectFlipbook | null>(null);
-  const mousePos = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
-
-  const turnToPage = useCallback((index: number) => {
-    if (!flipbookRef.current) return;
-    const clamped = Math.max(0, Math.min(index, totalPages));
-    setCurrentPage(clamped);
-    flipbookRef.current.turnToPage(clamped);
-  }, [totalPages]);
+  const flipbookInstanceRef = useRef<Flipbook | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    // 1. Scene, Camera (fov 14, cameraDistance exact settings from the-book-of-qbject)
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(
-      14,
-      window.innerWidth / window.innerHeight,
-      1200,
-      9000
-    );
-    // Exact camera position from the-book-of-qbject
-    camera.position.set(0, 0, 5200);
-    camera.lookAt(0, 0, 0);
+    let destroyed = false;
 
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: true,
-      powerPreference: 'high-performance',
-    });
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-    container.appendChild(renderer.domElement);
-
-    // 2. Studio Lighting Setup matching the-book-of-qbject
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.45);
-    scene.add(ambientLight);
-
-    const spotLight = new THREE.SpotLight(0xffffff, 60);
-    spotLight.position.set(250, 500, 1500);
-    spotLight.angle = 0.7;
-    spotLight.penumbra = 0.6;
-    spotLight.decay = 0.4;
-    spotLight.castShadow = true;
-    spotLight.shadow.mapSize.width = 2048;
-    spotLight.shadow.mapSize.height = 2048;
-    spotLight.shadow.bias = -0.0001;
-    scene.add(spotLight);
-
-    const atmospheric = new AtmosphericSystem(scene);
-
-    // 3. Initialize Flipbook with swipe listener
-    const flipbook = new QbjectFlipbook(scene, container);
-    flipbookRef.current = flipbook;
-
-    const loadBookPages = async () => {
+    const initOriginalFlipbook = async () => {
+      // 1. Generate High-Res 764x1080 textures matching Qbject Book Aspect Ratio
       const coverFront = PageTextureGenerator.createCoverTexture(
         'CHÚNG MÌNH',
         'Phúc & Trang',
@@ -86,7 +33,6 @@ export default function QbjectAuthenticExperience() {
         side: 'left',
       });
 
-      // Chapter I
       const p1Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 1,
         chapter: 'Chapter I',
@@ -110,7 +56,6 @@ export default function QbjectAuthenticExperience() {
         side: 'left',
       });
 
-      // Chapter II
       const p2Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 3,
         chapter: 'Chapter II',
@@ -133,7 +78,6 @@ export default function QbjectAuthenticExperience() {
         side: 'left',
       });
 
-      // Chapter III
       const p3Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 5,
         chapter: 'Chapter III',
@@ -152,7 +96,6 @@ export default function QbjectAuthenticExperience() {
         side: 'left',
       });
 
-      // Chapter IV
       const p4Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 7,
         chapter: 'Chapter IV',
@@ -176,119 +119,105 @@ export default function QbjectAuthenticExperience() {
         side: 'left',
       });
 
-      const pages = [
-        { frontTexture: coverFront, backTexture: insideBlank, isCover: true },
-        { frontTexture: p1Front, backTexture: p1Back },
-        { frontTexture: p2Front, backTexture: p2Back },
-        { frontTexture: p3Front, backTexture: p3Back },
-        { frontTexture: p4Front, backTexture: p4Back },
+      if (destroyed) return;
+
+      // Convert CanvasTextures to data URLs for the original Flipbook engine
+      const textureCanvases = [
+        coverFront.image as HTMLCanvasElement,
+        insideBlank.image as HTMLCanvasElement,
+        p1Front.image as HTMLCanvasElement,
+        p1Back.image as HTMLCanvasElement,
+        p2Front.image as HTMLCanvasElement,
+        p2Back.image as HTMLCanvasElement,
+        p3Front.image as HTMLCanvasElement,
+        p3Back.image as HTMLCanvasElement,
+        p4Front.image as HTMLCanvasElement,
+        p4Back.image as HTMLCanvasElement,
       ];
 
-      flipbook.addPages(pages);
-      setTotalPages(pages.length);
+      const pageUrls = textureCanvases.map((canvas) => canvas.toDataURL('image/jpeg', 0.92));
+
+      // 2. Instantiate 100% Original Flipbook from Qbject
+      const flipbook = new Flipbook({
+        containerEl: container,
+        pageWidth: 764,
+        pageHeight: 1080,
+        pageThickness: 1,
+        pageRootThickness: 5,
+        coverThickness: 5,
+        coverMarginX: 8,
+        coverMarginY: 10,
+        pageEdgeColor: 0xb1a283,
+        textureUrls: {
+          pages: pageUrls,
+          spineInner: pageUrls[0],
+          spineOuter: pageUrls[0],
+          coverEdgeTB: pageUrls[0],
+          coverEdgeLR: pageUrls[0],
+          spineEdgeTB: pageUrls[0],
+          spineEdgeLR: pageUrls[0],
+          desk: '',
+        },
+      });
+
+      flipbookInstanceRef.current = flipbook;
+      setTotalPages(pageUrls.length / 2);
       setIsReady(true);
+
+      // Listen to page changes
+      const checkProgress = () => {
+        if (!destroyed && flipbook) {
+          const current = Math.round((flipbook as any).progress?.getValue?.() || 0);
+          setCurrentPage(current);
+          requestAnimationFrame(checkProgress);
+        }
+      };
+      requestAnimationFrame(checkProgress);
     };
 
-    loadBookPages();
-
-    // 4. Mouse Move
-    const handleMouseMove = (e: MouseEvent) => {
-      mousePos.current.targetX = (e.clientX / window.innerWidth) * 2 - 1;
-      mousePos.current.targetY = -(e.clientY / window.innerHeight) * 2 + 1;
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-
-    // 5. Resize
-    const handleResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    };
-    window.addEventListener('resize', handleResize);
-
-    // 6. Animation Loop
-    let animId: number;
-    let previousTime = performance.now();
-
-    const animate = (currentTime: number) => {
-      animId = requestAnimationFrame(animate);
-      const dt = Math.min((currentTime - previousTime) / 1000, 0.1);
-      previousTime = currentTime;
-
-      mousePos.current.x += (mousePos.current.targetX - mousePos.current.x) * 0.05;
-      mousePos.current.y += (mousePos.current.targetY - mousePos.current.y) * 0.05;
-
-      flipbook.update(dt);
-      setCurrentPage(Math.round(flipbook.progress.getValue()));
-
-      renderer.render(scene, camera);
-    };
-
-    animId = requestAnimationFrame(animate);
+    initOriginalFlipbook();
 
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('resize', handleResize);
-      cancelAnimationFrame(animId);
-      flipbook.destroy();
-      atmospheric.destroy();
-      renderer.dispose();
-      if (container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
+      destroyed = true;
+      if (container) {
+        container.innerHTML = '';
       }
     };
   }, []);
 
-  // Wheel & Arrow keys
-  useEffect(() => {
-    let lastWheelTime = 0;
-    const handleWheel = (e: WheelEvent) => {
-      const now = Date.now();
-      if (now - lastWheelTime < 450) return;
-      if (e.deltaY > 25) {
-        lastWheelTime = now;
-        turnToPage(currentPage + 1);
-      } else if (e.deltaY < -25) {
-        lastWheelTime = now;
-        turnToPage(currentPage - 1);
-      }
-    };
-
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
-        turnToPage(currentPage + 1);
-      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-        turnToPage(currentPage - 1);
-      }
-    };
-
-    window.addEventListener('wheel', handleWheel, { passive: true });
-    window.addEventListener('keydown', handleKey);
-    return () => {
-      window.removeEventListener('wheel', handleWheel);
-      window.removeEventListener('keydown', handleKey);
-    };
-  }, [currentPage, turnToPage]);
+  const turnToPage = (index: number) => {
+    if (!flipbookInstanceRef.current) return;
+    const progress = (flipbookInstanceRef.current as any).progress;
+    if (progress) {
+      progress.unlock();
+      progress.setMin(0);
+      progress.setMax(totalPages);
+      progress.setValue(index);
+      setCurrentPage(index);
+    }
+  };
 
   return (
-    <div
-      ref={containerRef}
-      className="relative w-screen h-screen overflow-hidden select-none bg-[#110D0E] cursor-grab active:cursor-grabbing"
-      style={{
-        background: 'radial-gradient(ellipse at center, #24161B 0%, #150D11 55%, #0A0608 100%)',
-      }}
-    >
+    <div className="relative w-screen h-screen overflow-hidden select-none bg-black">
+      {/* Container where the original Flipbook Canvas is injected */}
+      <div
+        ref={containerRef}
+        id="flipbook-container"
+        className="absolute inset-0 z-0"
+      >
+        <div className="intro-overlay" style={{ display: isReady ? 'none' : 'block' }}>
+          <div className="centered-box">
+            <div className="progress">
+              <div className="progress-inner" style={{ width: '100%' }}></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Romantic Music Player */}
       <VintageMusicPlayer autoPlayTrigger={currentPage > 0} />
 
-      {/* Loading Overlay */}
-      {!isReady && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#110D0E] text-parchment-200 font-serif italic text-sm">
-          Đang chuẩn bị cuốn nhật ký tình yêu...
-        </div>
-      )}
-
-      {/* UI Controls Overlay */}
+      {/* HUD Navigation Overlay */}
       {isReady && (
         <div className="absolute inset-0 z-10 pointer-events-none flex flex-col justify-between p-4 sm:p-8">
           {/* Header */}
@@ -297,7 +226,7 @@ export default function QbjectAuthenticExperience() {
               <BookOpen className="w-4 h-4 text-champagne-400" />
               <span>
                 {currentPage === 0
-                  ? 'Bìa Sách — Kéo chuột hoặc chạm để lật mở'
+                  ? 'Bìa Sách — Kéo vuốt chuột để lật trang'
                   : `Trang ${currentPage} / ${totalPages}`}
               </span>
             </div>
@@ -327,7 +256,7 @@ export default function QbjectAuthenticExperience() {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                turnToPage(currentPage - 1);
+                turnToPage(Math.max(0, currentPage - 1));
               }}
               disabled={currentPage === 0}
               className={`flex items-center gap-1 px-4 py-2 rounded-full bg-parchment-100/80 backdrop-blur-sm font-serif text-xs sm:text-sm text-ink-800 shadow-md transition-all ${
@@ -341,13 +270,13 @@ export default function QbjectAuthenticExperience() {
             </button>
 
             <span className="text-[11px] font-serif italic text-stone-400 hidden sm:inline">
-              Kéo chuột sang trái/phải hoặc cuộn con lăn để lật trang
+              Kéo chuột sang trái/phải trên sách để trải nghiệm lật trang nguyên bản của Qbject
             </span>
 
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                turnToPage(currentPage + 1);
+                turnToPage(Math.min(totalPages, currentPage + 1));
               }}
               disabled={currentPage === totalPages}
               className={`flex items-center gap-1 px-4 py-2 rounded-full bg-rosewood-500 text-white font-serif text-xs sm:text-sm shadow-md transition-all ${

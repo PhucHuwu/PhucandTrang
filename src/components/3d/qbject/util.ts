@@ -1,51 +1,122 @@
-import * as THREE from 'three';
+import * as THREE from "three";
+import { MathUtils } from "three";
 
-export function clamp(val: number, min: number, max: number): number {
-  return Math.min(Math.max(val, min), max);
+export function clamp(value: number, min: number, max: number) {
+	return Math.min(Math.max(value, min), max);
+}
+
+export function rotateY(
+	point: THREE.Vector3,
+	pivot: THREE.Vector3,
+	angle: number,
+): THREE.Vector3 {
+	// Translate point back to origin
+	const translatedX = point.x - pivot.x;
+	const translatedZ = point.z - pivot.z;
+
+	// Perform rotation around the Y axis
+	const rotatedX =
+		translatedX * Math.cos(angle) - translatedZ * Math.sin(angle);
+	const rotatedZ =
+		translatedX * Math.sin(angle) + translatedZ * Math.cos(angle);
+
+	// Translate point back to pivot
+	const resultX = rotatedX + pivot.x;
+	const resultZ = rotatedZ + pivot.z;
+
+	return new THREE.Vector3(resultX, point.y, resultZ);
+}
+
+// TODO: remove
+export function simulateHeavyLoad(durationMsec: number) {
+	const endTime = performance.now() + durationMsec;
+	while (performance.now() < endTime) {
+		// Busy loop
+	}
 }
 
 export function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
+	t = clamp(t, 0, 1);
+	return a + (b - a) * t;
 }
 
-export function approach(current: number, target: number, speed: number, dt: number): number {
-  return current + (target - current) * (1 - Math.exp(-speed * dt));
+export function cosineInterpolate(a: number, b: number, t: number) {
+	const cosT = (1 - Math.cos(Math.PI * t)) / 2;
+	return a + (b - a) * cosT;
 }
 
-export function cosineInterpolate(a: number, b: number, t: number): number {
-  const ft = t * Math.PI;
-  const f = (1 - Math.cos(ft)) * 0.5;
-  return a * (1 - f) + b * f;
+export function vectorToRadians(direction: THREE.Vector2) {
+	return Math.atan2(direction.y, direction.x);
 }
 
-export function vectorToRadians(v: THREE.Vector2): number {
-  return Math.atan2(v.y, v.x);
+export function approach(
+	val: number,
+	target: number,
+	speed: number,
+	dt: number,
+): number {
+	let difference = target - val;
+	if (Math.abs(difference) < 0.0001) {
+		return target;
+	}
+	let change = difference * (1 - Math.exp(-speed * dt));
+	val += change;
+	return val;
 }
 
-export class SlidingNumber {
-  public value: number;
-  public target: number;
-  public speed: number;
-  public maxSpeed: number;
+export function sleep(ms: number) {
+	return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-  constructor(initialValue: number = 0, speed: number = 0.15, maxSpeed: number = 4) {
-    this.value = initialValue;
-    this.target = initialValue;
-    this.speed = speed;
-    this.maxSpeed = maxSpeed;
-  }
+export function lerpedSmoothstep(value: number, min: number, max: number) {
+	const t = MathUtils.smoothstep(value, min, max);
+	return lerp(min, max, t);
+}
 
-  public setTarget(newTarget: number) {
-    this.target = newTarget;
-  }
+export function removeArrayItem<T>(array: T[], item: T): boolean {
+	const index = array.indexOf(item);
 
-  public update(dt: number): boolean {
-    const diff = this.target - this.value;
-    if (Math.abs(diff) < 0.0001) {
-      this.value = this.target;
-      return false;
-    }
-    this.value += Math.sign(diff) * Math.min(Math.abs(diff) * this.speed * 60 * dt, this.maxSpeed * dt);
-    return true;
-  }
+	if (index > -1) {
+		array.splice(index, 1);
+	}
+
+	return index !== -1;
+}
+
+export const toggleVisibility = (el: HTMLElement) => {
+	if (el.style.display === "none") {
+		el.style.display = "";
+	} else {
+		el.style.display = "none";
+	}
+};
+
+export function scaleRectangle(
+	corners: THREE.Vector3[],
+	scale: number,
+): THREE.Vector3[] {
+	// Calculate the center of the rectangle
+	const center = new THREE.Vector3();
+	corners.forEach(corner => center.add(corner));
+	center.multiplyScalar(1 / 4);
+
+	// Scale each corner point
+	const scaledCorners = corners.map(corner => {
+		const direction = new THREE.Vector3().subVectors(corner, center);
+		direction.multiplyScalar(scale);
+		return new THREE.Vector3().addVectors(center, direction);
+	});
+
+	return scaledCorners;
+}
+
+export function lerpRectangles(
+	rect1: THREE.Vector3[],
+	rect2: THREE.Vector3[],
+	t: number,
+): THREE.Vector3[] {
+	return rect1.map((corner1, i) => {
+		const corner2 = rect2[i];
+		return new THREE.Vector3().lerpVectors(corner1, corner2, t);
+	});
 }
