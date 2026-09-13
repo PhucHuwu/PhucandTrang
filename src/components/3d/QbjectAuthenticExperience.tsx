@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { QbjectFlipbook } from './qbject/QbjectFlipbook';
 import { PageTextureGenerator } from './PageTextureGenerator';
 import { AtmosphericSystem } from './AtmosphericSystem';
-import { ChevronLeft, ChevronRight, BookOpen, Volume2, VolumeX, Music, Heart, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
 import VintageMusicPlayer from '@/components/VintageMusicPlayer';
 
 export default function QbjectAuthenticExperience() {
@@ -15,6 +15,21 @@ export default function QbjectAuthenticExperience() {
   const [isReady, setIsReady] = useState(false);
   const flipbookRef = useRef<QbjectFlipbook | null>(null);
   const mousePos = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
+
+  // Drag state
+  const dragRef = useRef({
+    isDown: false,
+    startX: 0,
+    startY: 0,
+    hasMoved: false,
+  });
+
+  const turnToPage = useCallback((index: number) => {
+    if (!flipbookRef.current) return;
+    const clamped = Math.max(0, Math.min(index, totalPages));
+    setCurrentPage(clamped);
+    flipbookRef.current.setPageIndex(clamped);
+  }, [totalPages]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -248,10 +263,58 @@ export default function QbjectAuthenticExperience() {
     };
   }, []);
 
-  const turnToPage = (index: number) => {
-    if (!flipbookRef.current) return;
-    setCurrentPage(index);
-    flipbookRef.current.setPageIndex(index);
+  // Handle Mouse Click / Drag on Book
+  const handlePointerDown = (e: React.PointerEvent) => {
+    dragRef.current = {
+      isDown: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      hasMoved: false,
+    };
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!dragRef.current.isDown) return;
+    const diffX = e.clientX - dragRef.current.startX;
+    if (Math.abs(diffX) > 10) {
+      dragRef.current.hasMoved = true;
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (!dragRef.current.isDown) return;
+    const diffX = e.clientX - dragRef.current.startX;
+    const isDrag = dragRef.current.hasMoved && Math.abs(diffX) > 40;
+
+    dragRef.current.isDown = false;
+
+    if (isDrag) {
+      // Swiped left -> Next page
+      if (diffX < 0) {
+        turnToPage(currentPage + 1);
+      } else {
+        // Swiped right -> Previous page
+        turnToPage(currentPage - 1);
+      }
+    } else {
+      // Click interaction: Click right side -> turn next, Click left side -> turn prev
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const mid = rect.width / 2;
+
+      if (currentPage === 0) {
+        // Closed book: clicking anywhere opens it
+        turnToPage(1);
+      } else {
+        if (clickX > mid) {
+          // Clicked right page -> flip forward
+          turnToPage(currentPage + 1);
+        } else {
+          // Clicked left page -> flip backward
+          turnToPage(currentPage - 1);
+        }
+      }
+    }
   };
 
   // Wheel & Arrow keys
@@ -262,18 +325,18 @@ export default function QbjectAuthenticExperience() {
       if (now - lastWheelTime < 450) return;
       if (e.deltaY > 25) {
         lastWheelTime = now;
-        turnToPage(Math.min(totalPages, currentPage + 1));
+        turnToPage(currentPage + 1);
       } else if (e.deltaY < -25) {
         lastWheelTime = now;
-        turnToPage(Math.max(0, currentPage - 1));
+        turnToPage(currentPage - 1);
       }
     };
 
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
-        turnToPage(Math.min(totalPages, currentPage + 1));
+        turnToPage(currentPage + 1);
       } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-        turnToPage(Math.max(0, currentPage - 1));
+        turnToPage(currentPage - 1);
       }
     };
 
@@ -283,17 +346,19 @@ export default function QbjectAuthenticExperience() {
       window.removeEventListener('wheel', handleWheel);
       window.removeEventListener('keydown', handleKey);
     };
-  }, [currentPage, totalPages]);
+  }, [currentPage, turnToPage]);
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden select-none bg-[#110D0E]">
+    <div
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      className="relative w-screen h-screen overflow-hidden select-none bg-[#110D0E] cursor-grab active:cursor-grabbing"
+    >
       {/* 3D WebGL Canvas Layer */}
       <div
         ref={containerRef}
-        onClick={() => {
-          if (currentPage === 0) turnToPage(1);
-        }}
-        className="absolute inset-0 z-0 cursor-pointer"
+        className="absolute inset-0 z-0 pointer-events-none"
         style={{
           background: 'radial-gradient(ellipse at center, #24161B 0%, #150D11 55%, #0A0608 100%)',
         }}
@@ -318,7 +383,7 @@ export default function QbjectAuthenticExperience() {
               <BookOpen className="w-4 h-4 text-champagne-400" />
               <span>
                 {currentPage === 0
-                  ? 'Bìa Sách — Chạm hoặc cuộn chuột để mở'
+                  ? 'Bìa Sách — Chạm, vuốt hoặc cuộn chuột để mở'
                   : `Trang ${currentPage} / ${totalPages}`}
               </span>
             </div>
@@ -328,7 +393,10 @@ export default function QbjectAuthenticExperience() {
               {Array.from({ length: totalPages + 1 }).map((_, idx) => (
                 <button
                   key={idx}
-                  onClick={() => turnToPage(idx)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    turnToPage(idx);
+                  }}
                   className={`w-2 h-2 rounded-full transition-all ${
                     currentPage === idx
                       ? 'bg-rosewood-500 scale-125'
@@ -343,7 +411,10 @@ export default function QbjectAuthenticExperience() {
           {/* Bottom Flip Navigation Bar */}
           <div className="flex items-center justify-between max-w-5xl w-full mx-auto pointer-events-auto">
             <button
-              onClick={() => turnToPage(Math.max(0, currentPage - 1))}
+              onClick={(e) => {
+                e.stopPropagation();
+                turnToPage(currentPage - 1);
+              }}
               disabled={currentPage === 0}
               className={`flex items-center gap-1 px-4 py-2 rounded-full bg-parchment-100/80 backdrop-blur-sm font-serif text-xs sm:text-sm text-ink-800 shadow-md transition-all ${
                 currentPage === 0
@@ -356,11 +427,14 @@ export default function QbjectAuthenticExperience() {
             </button>
 
             <span className="text-[11px] font-serif italic text-stone-400 hidden sm:inline">
-              Cuộn chuột hoặc bấm mũi tên ← / → để lật trang
+              Click trang trái/phải, kéo vuốt chuột hoặc cuộn để lật trang
             </span>
 
             <button
-              onClick={() => turnToPage(Math.min(totalPages, currentPage + 1))}
+              onClick={(e) => {
+                e.stopPropagation();
+                turnToPage(currentPage + 1);
+              }}
               disabled={currentPage === totalPages}
               className={`flex items-center gap-1 px-4 py-2 rounded-full bg-rosewood-500 text-white font-serif text-xs sm:text-sm shadow-md transition-all ${
                 currentPage === totalPages
