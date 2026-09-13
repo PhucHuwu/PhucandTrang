@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Flipbook from './qbject/flipbook';
 import { PageTextureGenerator } from './PageTextureGenerator';
-import { ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
 import VintageMusicPlayer from '@/components/VintageMusicPlayer';
 
 export default function QbjectAuthenticExperience() {
@@ -234,81 +233,6 @@ export default function QbjectAuthenticExperience() {
 
       {/* Romantic Music Player */}
       <VintageMusicPlayer autoPlayTrigger={currentPage > 0} />
-
-      {/* HUD Navigation Overlay */}
-      {isReady && (
-        <div className="absolute inset-0 z-10 pointer-events-none flex flex-col justify-between p-4 sm:p-8">
-          {/* Header */}
-          <div className="flex items-center justify-between max-w-5xl w-full mx-auto pointer-events-auto">
-            <div className="flex items-center gap-2 text-rosewood-400 font-serif text-xs sm:text-sm">
-              <BookOpen className="w-4 h-4 text-champagne-400" />
-              <span>
-                {currentPage === 0
-                  ? 'Bìa Sách — Kéo vuốt chuột để lật trang'
-                  : `Trang ${currentPage} / ${totalPages}`}
-              </span>
-            </div>
-
-            {/* Quick Page Tab Ribbon */}
-            <div className="flex items-center gap-1.5">
-              {Array.from({ length: totalPages + 1 }).map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    turnToPage(idx);
-                  }}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    currentPage === idx
-                      ? 'bg-rosewood-500 scale-125'
-                      : 'bg-parchment-300/40 hover:bg-rosewood-300'
-                  }`}
-                  title={idx === 0 ? 'Bìa sách' : `Trang ${idx}`}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Bottom Flip Navigation Bar */}
-          <div className="flex items-center justify-between max-w-5xl w-full mx-auto pointer-events-auto">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                turnToPage(Math.max(0, currentPage - 1));
-              }}
-              disabled={currentPage === 0}
-              className={`flex items-center gap-1 px-4 py-2 rounded-full bg-parchment-100/80 backdrop-blur-sm font-serif text-xs sm:text-sm text-ink-800 shadow-md transition-all ${
-                currentPage === 0
-                  ? 'opacity-20 cursor-not-allowed'
-                  : 'hover:bg-rosewood-100 hover:scale-105 active:scale-95'
-              }`}
-            >
-              <ChevronLeft className="w-4 h-4" />
-              <span>Lật lùi</span>
-            </button>
-
-            <span className="text-[11px] font-serif italic text-stone-400 hidden sm:inline">
-              Kéo chuột sang trái/phải trên sách để trải nghiệm lật trang nguyên bản của Qbject
-            </span>
-
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                turnToPage(Math.min(totalPages, currentPage + 1));
-              }}
-              disabled={currentPage === totalPages}
-              className={`flex items-center gap-1 px-4 py-2 rounded-full bg-rosewood-500 text-white font-serif text-xs sm:text-sm shadow-md transition-all ${
-                currentPage === totalPages
-                  ? 'opacity-20 cursor-not-allowed'
-                  : 'hover:bg-rosewood-600 hover:scale-105 active:scale-95'
-              }`}
-            >
-              <span>{currentPage === 0 ? 'Mở sách' : 'Lật tiếp'}</span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
