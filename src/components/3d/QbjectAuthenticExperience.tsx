@@ -16,34 +16,27 @@ export default function QbjectAuthenticExperience() {
   const flipbookRef = useRef<QbjectFlipbook | null>(null);
   const mousePos = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
 
-  const dragRef = useRef({
-    isDown: false,
-    startX: 0,
-    startY: 0,
-    hasMoved: false,
-  });
-
   const turnToPage = useCallback((index: number) => {
     if (!flipbookRef.current) return;
     const clamped = Math.max(0, Math.min(index, totalPages));
     setCurrentPage(clamped);
-    flipbookRef.current.setPageIndex(clamped);
+    flipbookRef.current.turnToPage(clamped);
   }, [totalPages]);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    // 1. Scene, Camera & Renderer
+    // 1. Scene, Camera (fov 14, cameraDistance exact settings from the-book-of-qbject)
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(
-      28,
+      14,
       window.innerWidth / window.innerHeight,
-      0.1,
-      100
+      1200,
+      9000
     );
-    // Camera positioned slightly above facing book
-    camera.position.set(0, 0.4, 7.8);
+    // Exact camera position from the-book-of-qbject
+    camera.position.set(0, 0, 5200);
     camera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({
@@ -52,8 +45,6 @@ export default function QbjectAuthenticExperience() {
       powerPreference: 'high-performance',
     });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
@@ -61,30 +52,25 @@ export default function QbjectAuthenticExperience() {
 
     container.appendChild(renderer.domElement);
 
-    // 2. Warm Studio Lighting
-    const ambientLight = new THREE.AmbientLight(0xFFFAF2, 1.25);
+    // 2. Studio Lighting Setup matching the-book-of-qbject
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.45);
     scene.add(ambientLight);
 
-    const spotLight = new THREE.SpotLight(0xFFE8D0, 120);
-    spotLight.position.set(4, 9, 8);
-    spotLight.angle = 0.65;
+    const spotLight = new THREE.SpotLight(0xffffff, 60);
+    spotLight.position.set(250, 500, 1500);
+    spotLight.angle = 0.7;
     spotLight.penumbra = 0.6;
-    spotLight.decay = 1.2;
+    spotLight.decay = 0.4;
     spotLight.castShadow = true;
     spotLight.shadow.mapSize.width = 2048;
     spotLight.shadow.mapSize.height = 2048;
     spotLight.shadow.bias = -0.0001;
     scene.add(spotLight);
 
-    const fillLight = new THREE.DirectionalLight(0xE8BCC6, 0.7);
-    fillLight.position.set(-6, 3, 4);
-    scene.add(fillLight);
-
-    // 3. Atmospheric System
     const atmospheric = new AtmosphericSystem(scene);
 
-    // 4. Qbject Flipbook
-    const flipbook = new QbjectFlipbook(scene);
+    // 3. Initialize Flipbook with swipe listener
+    const flipbook = new QbjectFlipbook(scene, container);
     flipbookRef.current = flipbook;
 
     const loadBookPages = async () => {
@@ -205,14 +191,14 @@ export default function QbjectAuthenticExperience() {
 
     loadBookPages();
 
-    // 5. Mouse Parallax
+    // 4. Mouse Move
     const handleMouseMove = (e: MouseEvent) => {
       mousePos.current.targetX = (e.clientX / window.innerWidth) * 2 - 1;
       mousePos.current.targetY = -(e.clientY / window.innerHeight) * 2 + 1;
     };
     window.addEventListener('mousemove', handleMouseMove);
 
-    // 6. Resize handler
+    // 5. Resize
     const handleResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
@@ -220,37 +206,25 @@ export default function QbjectAuthenticExperience() {
     };
     window.addEventListener('resize', handleResize);
 
-    // 7. Animation Loop
+    // 6. Animation Loop
     let animId: number;
-    const clock = new THREE.Clock();
+    let previousTime = performance.now();
 
-    const animate = () => {
+    const animate = (currentTime: number) => {
       animId = requestAnimationFrame(animate);
-      const dt = clock.getDelta();
-      const elapsed = clock.getElapsedTime();
+      const dt = Math.min((currentTime - previousTime) / 1000, 0.1);
+      previousTime = currentTime;
 
-      // Smooth mouse interpolation
       mousePos.current.x += (mousePos.current.targetX - mousePos.current.x) * 0.05;
       mousePos.current.y += (mousePos.current.targetY - mousePos.current.y) * 0.05;
 
-      const mx = mousePos.current.x;
-      const my = mousePos.current.y;
-
-      flipbook.group.rotation.x = my * 0.04;
-      flipbook.group.rotation.y = mx * 0.06;
-
-      // Center the book nicely: when closed (progress = 0), center cover in middle of screen
-      // When opened (progress > 0), center spread
-      const targetGroupX = flipbook.progress.value === 0 ? -1.1 : 0;
-      flipbook.group.position.x += (targetGroupX - flipbook.group.position.x) * 0.08;
-
       flipbook.update(dt);
-      atmospheric.update(elapsed, { x: mx, y: my });
+      setCurrentPage(Math.round(flipbook.progress.getValue()));
 
       renderer.render(scene, camera);
     };
 
-    animate();
+    animId = requestAnimationFrame(animate);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
@@ -264,56 +238,6 @@ export default function QbjectAuthenticExperience() {
       }
     };
   }, []);
-
-  // Handle Mouse Click / Drag on Book
-  const handlePointerDown = (e: React.PointerEvent) => {
-    dragRef.current = {
-      isDown: true,
-      startX: e.clientX,
-      startY: e.clientY,
-      hasMoved: false,
-    };
-  };
-
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (!dragRef.current.isDown) return;
-    const diffX = e.clientX - dragRef.current.startX;
-    if (Math.abs(diffX) > 10) {
-      dragRef.current.hasMoved = true;
-    }
-  };
-
-  const handlePointerUp = (e: React.PointerEvent) => {
-    if (!dragRef.current.isDown) return;
-    const diffX = e.clientX - dragRef.current.startX;
-    const isDrag = dragRef.current.hasMoved && Math.abs(diffX) > 40;
-
-    dragRef.current.isDown = false;
-
-    if (isDrag) {
-      // Swiped left -> Next page
-      if (diffX < 0) {
-        turnToPage(currentPage + 1);
-      } else {
-        // Swiped right -> Previous page
-        turnToPage(currentPage - 1);
-      }
-    } else {
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const mid = rect.width / 2;
-
-      if (currentPage === 0) {
-        turnToPage(1);
-      } else {
-        if (clickX > mid) {
-          turnToPage(currentPage + 1);
-        } else {
-          turnToPage(currentPage - 1);
-        }
-      }
-    }
-  };
 
   // Wheel & Arrow keys
   useEffect(() => {
@@ -348,20 +272,12 @@ export default function QbjectAuthenticExperience() {
 
   return (
     <div
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
+      ref={containerRef}
       className="relative w-screen h-screen overflow-hidden select-none bg-[#110D0E] cursor-grab active:cursor-grabbing"
+      style={{
+        background: 'radial-gradient(ellipse at center, #24161B 0%, #150D11 55%, #0A0608 100%)',
+      }}
     >
-      {/* 3D WebGL Canvas Layer */}
-      <div
-        ref={containerRef}
-        className="absolute inset-0 z-0 pointer-events-none"
-        style={{
-          background: 'radial-gradient(ellipse at center, #24161B 0%, #150D11 55%, #0A0608 100%)',
-        }}
-      />
-
       {/* Romantic Music Player */}
       <VintageMusicPlayer autoPlayTrigger={currentPage > 0} />
 
@@ -381,7 +297,7 @@ export default function QbjectAuthenticExperience() {
               <BookOpen className="w-4 h-4 text-champagne-400" />
               <span>
                 {currentPage === 0
-                  ? 'Bìa Sách — Chạm, vuốt hoặc cuộn chuột để mở'
+                  ? 'Bìa Sách — Kéo chuột hoặc chạm để lật mở'
                   : `Trang ${currentPage} / ${totalPages}`}
               </span>
             </div>
@@ -425,7 +341,7 @@ export default function QbjectAuthenticExperience() {
             </button>
 
             <span className="text-[11px] font-serif italic text-stone-400 hidden sm:inline">
-              Click trang trái/phải, kéo vuốt chuột hoặc cuộn để lật trang
+              Kéo chuột sang trái/phải hoặc cuộn con lăn để lật trang
             </span>
 
             <button
