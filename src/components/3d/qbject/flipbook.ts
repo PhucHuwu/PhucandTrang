@@ -1201,8 +1201,11 @@ export default class Flipbook {
 		this.spotLight.intensity = 0;
 		this.ambientLight.intensity = 0;
 
-		if (!this.introOverlay) {
+		if (!this.introOverlay || !this.introOverlay.dom.logo) {
 			this.introPhase = "COMPLETED";
+			this.update(1);
+			this.runAnimation();
+			this.applySettings(this.settings, true);
 			this.restoreCamera(1000);
 			return;
 		}
