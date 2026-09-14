@@ -87,6 +87,7 @@ export default class Flipbook {
 	private cameraSideShift = new SlidingNumber(1, 0.2);
 	private isVerticalMode = false;
 	private swipeHandler: SwipeHandler;
+	public atmospheric?: any;
 
 	// if this code is running, means the scripts are already loaded
 	private scriptProgressWeight = 0.4;
@@ -297,7 +298,7 @@ export default class Flipbook {
 						return t;
 					})(),
 			  })
-			: new THREE.MeshStandardMaterial({ color: 0x1A1215, roughness: 0.95 });
+			: new THREE.MeshStandardMaterial({ color: 0x1F1218, roughness: 0.92 });
 		const deskMesh = new THREE.Mesh(deskGeometry, deskMaterial);
 		deskMesh.receiveShadow = true;
 		deskMesh.castShadow = true;
@@ -643,6 +644,10 @@ export default class Flipbook {
 
 		if (!this.focusedActiveArea || this.isChangingFocus) {
 			this.render();
+		}
+
+		if (this.atmospheric) {
+			this.atmospheric.update(performance.now() / 1000, this.sceneMousePos);
 		}
 	}
 

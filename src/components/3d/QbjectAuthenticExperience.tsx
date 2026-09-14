@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Flipbook from './qbject/flipbook';
 import { PageTextureGenerator, PageMediaItem } from './PageTextureGenerator';
+import { AtmosphericSystem } from './AtmosphericSystem';
 import VintageMusicPlayer from '@/components/VintageMusicPlayer';
 import { getMediaUrl } from '@/data/mediaConfig';
 
@@ -524,6 +525,11 @@ export default function QbjectAuthenticExperience() {
       });
 
       flipbookInstanceRef.current = flipbook;
+
+      // Attach 3D atmospheric effects (18 butterflies, floating petals, glowing hearts, fairy dust) directly into Flipbook's 3D Scene
+      const atmospheric = new AtmosphericSystem((flipbook as any).scene);
+      flipbook.atmospheric = atmospheric;
+
       setTotalPages(pageUrls.length / 2);
       setIsReady(true);
 

@@ -5,50 +5,54 @@ export interface ButterflyEntity {
   leftWing: THREE.Mesh;
   rightWing: THREE.Mesh;
   baseY: number;
+  baseX: number;
+  baseZ: number;
   phase: number;
   speed: number;
   radiusX: number;
   radiusZ: number;
-  targetX: number;
-  targetZ: number;
-  isResting: boolean;
-  restTimer: number;
+  wingSpeed: number;
+  color: string;
 }
 
 export class AtmosphericSystem {
   scene: THREE.Scene;
   dustParticles: THREE.Points | null = null;
+  glowingHearts: THREE.Group | null = null;
   petals: THREE.Group | null = null;
   butterflies: ButterflyEntity[] = [];
-  butterflyCount = 5;
+  butterflyCount = 18;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
     this.initDust();
     this.initPetals();
+    this.initGlowingHearts();
     this.initButterflies();
   }
 
-  // 1. Paper dust & subtle warm light specks
+  // 1. Magic Golden & Pink Fairy Dust
   initDust() {
-    const count = 75;
+    const count = 380;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
 
-    const warmPalette = [
-      new THREE.Color(0xF9F5EC), // Warm cream
-      new THREE.Color(0xD8C5AA), // Warm beige
-      new THREE.Color(0xB49A6A), // Gold accent
-      new THREE.Color(0xE8C7C7), // Soft pink
+    const romanticPalette = [
+      new THREE.Color(0xFFE8EE), // Soft pink
+      new THREE.Color(0xFFD1DC), // Pastel rose
+      new THREE.Color(0xFFF0BD), // Warm fairy gold
+      new THREE.Color(0xFFFFFF), // Shimmer white
+      new THREE.Color(0xE8BCC6), // Blush
     ];
 
     for (let i = 0; i < count; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 20;
-      positions[i * 3 + 1] = Math.random() * 10 - 2;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 14;
+      // Scaled to the 764x1080 book world coordinate system (-2500 to 2500)
+      positions[i * 3] = (Math.random() - 0.5) * 4500;
+      positions[i * 3 + 1] = (Math.random() - 0.5) * 3200;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 2000 + 300;
 
-      const col = warmPalette[Math.floor(Math.random() * warmPalette.length)];
+      const col = romanticPalette[Math.floor(Math.random() * romanticPalette.length)];
       colors[i * 3] = col.r;
       colors[i * 3 + 1] = col.g;
       colors[i * 3 + 2] = col.b;
@@ -58,10 +62,10 @@ export class AtmosphericSystem {
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
-      size: 0.045,
+      size: 16,
       vertexColors: true,
       transparent: true,
-      opacity: 0.55,
+      opacity: 0.7,
       blending: THREE.AdditiveBlending,
     });
 
@@ -69,38 +73,41 @@ export class AtmosphericSystem {
     this.scene.add(this.dustParticles);
   }
 
-  // 2. Gentle drifting rose petals
+  // 2. Drifting Romantic Rose Petals & Cherry Blossoms
   initPetals() {
     this.petals = new THREE.Group();
-    const petalCount = 12;
-    const petalGeo = new THREE.PlaneGeometry(0.12, 0.16, 2, 2);
-    // slight curve on petal
+    const petalCount = 50;
+    const petalGeo = new THREE.PlaneGeometry(32, 42, 2, 2);
     const pos = petalGeo.attributes.position;
     for (let i = 0; i < pos.count; i++) {
-      pos.setZ(i, Math.sin(pos.getY(i) * 10) * 0.02);
+      pos.setZ(i, Math.sin(pos.getY(i) * 0.1) * 4);
     }
     petalGeo.computeVertexNormals();
 
-    const petalMat = new THREE.MeshStandardMaterial({
-      color: 0xC99A9A, // Dusty rose
-      roughness: 0.85,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.8,
-    });
+    const petalColors = [0xFFA8B8, 0xFFCAD4, 0xF4ACB7, 0xFFE5EC];
 
     for (let i = 0; i < petalCount; i++) {
-      const mesh = new THREE.Mesh(petalGeo, petalMat);
+      const col = petalColors[i % petalColors.length];
+      const mat = new THREE.MeshStandardMaterial({
+        color: col,
+        roughness: 0.8,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.75,
+      });
+
+      const mesh = new THREE.Mesh(petalGeo, mat);
       mesh.position.set(
-        (Math.random() - 0.5) * 14,
-        Math.random() * 8 + 2,
-        (Math.random() - 0.5) * 10
+        (Math.random() - 0.5) * 3600,
+        Math.random() * 2200 - 600,
+        Math.random() * 1600 - 200
       );
       mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
       mesh.userData = {
-        speedY: 0.008 + Math.random() * 0.012,
-        rotSpeedX: (Math.random() - 0.5) * 0.02,
-        rotSpeedZ: (Math.random() - 0.5) * 0.02,
+        speedY: 1.2 + Math.random() * 2.0,
+        speedX: (Math.random() - 0.5) * 1.5,
+        rotSpeedX: (Math.random() - 0.5) * 0.03,
+        rotSpeedZ: (Math.random() - 0.5) * 0.03,
       };
       this.petals.add(mesh);
     }
@@ -108,31 +115,73 @@ export class AtmosphericSystem {
     this.scene.add(this.petals);
   }
 
-  // 3. Ethereal 3D Butterflies with procedural wing flapping
+  // 3. Floating Tiny Glowing Hearts
+  initGlowingHearts() {
+    this.glowingHearts = new THREE.Group();
+    const heartShape = new THREE.Shape();
+    heartShape.moveTo(0, 0);
+    heartShape.bezierCurveTo(0, -6, -12, -6, -12, 6);
+    heartShape.bezierCurveTo(-12, 16, 0, 24, 0, 30);
+    heartShape.bezierCurveTo(0, 24, 12, 16, 12, 6);
+    heartShape.bezierCurveTo(12, -6, 0, -6, 0, 0);
+
+    const heartGeo = new THREE.ShapeGeometry(heartShape);
+    heartGeo.center();
+
+    const heartColors = [0xFF6B8B, 0xFFA0B4, 0xFFD1DC, 0xFF85A1];
+
+    for (let i = 0; i < 24; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: heartColors[i % heartColors.length],
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(heartGeo, mat);
+      mesh.position.set(
+        (Math.random() - 0.5) * 3200,
+        (Math.random() - 0.5) * 2000,
+        (Math.random() - 0.5) * 1200 + 300
+      );
+      mesh.scale.set(0.6 + Math.random() * 0.5, -(0.6 + Math.random() * 0.5), 1);
+      mesh.userData = {
+        baseY: mesh.position.y,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.015 + Math.random() * 0.02,
+      };
+      this.glowingHearts.add(mesh);
+    }
+    this.scene.add(this.glowingHearts);
+  }
+
+  // 4. Fluttering 3D Butterflies dancing around the open book
   initButterflies() {
-    // Wing shape geometry
     const wingShape = new THREE.Shape();
     wingShape.moveTo(0, 0);
-    wingShape.bezierCurveTo(0.1, 0.15, 0.25, 0.25, 0.35, 0.2);
-    wingShape.bezierCurveTo(0.4, 0.1, 0.3, -0.05, 0.2, -0.12);
-    wingShape.bezierCurveTo(0.1, -0.18, 0.02, -0.05, 0, 0);
+    wingShape.bezierCurveTo(18, 25, 42, 45, 60, 35);
+    wingShape.bezierCurveTo(70, 18, 55, -8, 35, -20);
+    wingShape.bezierCurveTo(18, -30, 4, -8, 0, 0);
 
     const wingGeo = new THREE.ShapeGeometry(wingShape);
     wingGeo.center();
-    // Offset pivot to wing base
-    wingGeo.translate(0.16, 0, 0);
+    wingGeo.translate(28, 0, 0); // pivot at wing base
 
-    const wingMat = new THREE.MeshStandardMaterial({
-      color: 0xE8C7C7,
-      roughness: 0.7,
-      metalness: 0.1,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.85,
-    });
+    const butterflyColors = [
+      '#FFA8BA', '#FFD1DC', '#FFE5B4', '#E8BCC6', '#FF8FA3', '#F4B0C0'
+    ];
 
     for (let i = 0; i < this.butterflyCount; i++) {
       const bGroup = new THREE.Group();
+      const colorHex = butterflyColors[i % butterflyColors.length];
+
+      const wingMat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(colorHex),
+        roughness: 0.6,
+        metalness: 0.1,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.88,
+      });
 
       const leftWing = new THREE.Mesh(wingGeo, wingMat);
       const rightWing = new THREE.Mesh(wingGeo, wingMat);
@@ -142,35 +191,39 @@ export class AtmosphericSystem {
       bGroup.add(rightWing);
 
       // Body
-      const bodyGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.18, 4);
-      const bodyMat = new THREE.MeshBasicMaterial({ color: 0x3A302B });
+      const bodyGeo = new THREE.CylinderGeometry(2, 2, 32, 6);
+      const bodyMat = new THREE.MeshBasicMaterial({ color: 0x5C2434 });
       const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
       bodyMesh.rotation.x = Math.PI / 2;
       bGroup.add(bodyMesh);
 
-      const scale = 0.5 + Math.random() * 0.35;
+      const scale = 0.55 + Math.random() * 0.45;
       bGroup.scale.set(scale, scale, scale);
 
       const startAngle = (i / this.butterflyCount) * Math.PI * 2;
+      const radiusX = 850 + Math.random() * 1100;
+      const radiusZ = 600 + Math.random() * 900;
+      const baseY = (Math.random() - 0.5) * 1200;
+
       const bEntity: ButterflyEntity = {
         group: bGroup,
         leftWing,
         rightWing,
-        baseY: 1.5 + Math.random() * 2.2,
-        phase: Math.random() * Math.PI * 2,
-        speed: 0.01 + Math.random() * 0.01,
-        radiusX: 2.5 + Math.random() * 3,
-        radiusZ: 2.0 + Math.random() * 2.5,
-        targetX: 0,
-        targetZ: 0,
-        isResting: false,
-        restTimer: 0,
+        baseY,
+        baseX: (Math.random() - 0.5) * 400,
+        baseZ: 200 + Math.random() * 400,
+        phase: startAngle,
+        speed: 0.008 + Math.random() * 0.012,
+        radiusX,
+        radiusZ,
+        wingSpeed: 16 + Math.random() * 6,
+        color: colorHex,
       };
 
       bGroup.position.set(
-        Math.cos(startAngle) * bEntity.radiusX,
-        bEntity.baseY,
-        Math.sin(startAngle) * bEntity.radiusZ
+        Math.cos(startAngle) * radiusX,
+        baseY,
+        Math.sin(startAngle) * radiusZ + bEntity.baseZ
       );
 
       this.butterflies.push(bEntity);
@@ -181,10 +234,10 @@ export class AtmosphericSystem {
   update(time: number, mouseParallax: { x: number; y: number }) {
     // 1. Dust motion
     if (this.dustParticles) {
-      const positions = this.dustParticles.geometry.attributes.position.array as Float32Array;
-      for (let i = 0; i < positions.length / 3; i++) {
-        positions[i * 3 + 1] += Math.sin(time * 0.5 + i) * 0.002;
-        positions[i * 3] += Math.cos(time * 0.3 + i) * 0.001 + mouseParallax.x * 0.0005;
+      const pos = this.dustParticles.geometry.attributes.position.array as Float32Array;
+      for (let i = 0; i < pos.length / 3; i++) {
+        pos[i * 3 + 1] += Math.sin(time * 0.5 + i) * 0.8;
+        pos[i * 3] += Math.cos(time * 0.3 + i) * 0.5 + mouseParallax.x * 0.4;
       }
       this.dustParticles.geometry.attributes.position.needsUpdate = true;
     }
@@ -193,30 +246,38 @@ export class AtmosphericSystem {
     if (this.petals) {
       this.petals.children.forEach((mesh) => {
         mesh.position.y -= mesh.userData.speedY;
+        mesh.position.x += Math.sin(time * 1.2 + mesh.position.y * 0.01) * 0.8 + mesh.userData.speedX;
         mesh.rotation.x += mesh.userData.rotSpeedX;
         mesh.rotation.z += mesh.userData.rotSpeedZ;
 
-        if (mesh.position.y < -3) {
-          mesh.position.y = 8;
-          mesh.position.x = (Math.random() - 0.5) * 14;
+        if (mesh.position.y < -1200) {
+          mesh.position.y = 1400;
+          mesh.position.x = (Math.random() - 0.5) * 3600;
         }
       });
     }
 
-    // 3. Butterflies flight & wing flapping
-    this.butterflies.forEach((b, idx) => {
+    // 3. Floating Hearts bobbing
+    if (this.glowingHearts) {
+      this.glowingHearts.children.forEach((mesh) => {
+        mesh.userData.phase += mesh.userData.speed;
+        mesh.position.y = mesh.userData.baseY + Math.sin(mesh.userData.phase) * 60;
+        mesh.rotation.z = Math.sin(mesh.userData.phase * 0.7) * 0.2;
+      });
+    }
+
+    // 4. Butterflies dancing & wing flapping
+    this.butterflies.forEach((b) => {
       b.phase += b.speed;
-      const flap = Math.sin(time * 18 + b.phase * 2);
+      const flap = Math.sin(time * b.wingSpeed);
 
-      b.leftWing.rotation.y = flap * 0.65;
-      b.rightWing.rotation.y = -flap * 0.65;
+      b.leftWing.rotation.y = flap * 0.75;
+      b.rightWing.rotation.y = -flap * 0.75;
 
-      // Flight path along ellipse with gentle elevation variation
-      const nextX = Math.cos(b.phase) * b.radiusX;
-      const nextZ = Math.sin(b.phase * 0.8) * b.radiusZ;
-      const nextY = b.baseY + Math.sin(b.phase * 1.5) * 0.45;
+      const nextX = b.baseX + Math.cos(b.phase) * b.radiusX;
+      const nextZ = b.baseZ + Math.sin(b.phase * 0.9) * b.radiusZ;
+      const nextY = b.baseY + Math.sin(b.phase * 2) * 160;
 
-      // Orient toward flight direction
       const dx = nextX - b.group.position.x;
       const dz = nextZ - b.group.position.z;
       const targetAngle = Math.atan2(dx, dz);
@@ -225,7 +286,7 @@ export class AtmosphericSystem {
       b.group.position.z = nextZ;
       b.group.position.y = nextY;
       b.group.rotation.y = targetAngle + Math.PI / 2;
-      b.group.rotation.z = Math.sin(b.phase) * 0.15;
+      b.group.rotation.z = Math.sin(b.phase) * 0.2;
     });
   }
 
@@ -242,6 +303,14 @@ export class AtmosphericSystem {
         (m.material as THREE.Material).dispose();
       });
       this.scene.remove(this.petals);
+    }
+    if (this.glowingHearts) {
+      this.glowingHearts.children.forEach((h) => {
+        const m = h as THREE.Mesh;
+        m.geometry.dispose();
+        (m.material as THREE.Material).dispose();
+      });
+      this.scene.remove(this.glowingHearts);
     }
     this.butterflies.forEach((b) => {
       this.scene.remove(b.group);
