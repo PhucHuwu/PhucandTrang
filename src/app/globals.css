@@ -77,6 +77,35 @@
   line-height: 28px;
 }
 
+/* Loading Screen Animations */
+@keyframes heartFloat {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.06);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(1.1);
+  }
+}
+
+.animate-heart-float {
+  animation: heartFloat 2.5s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
 /* Polaroid Paper tape */
 .washi-tape {
   background: rgba(255, 238, 217, 0.7);

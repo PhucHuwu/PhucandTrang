@@ -565,20 +565,43 @@ export default function QbjectAuthenticExperience() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden select-none bg-black">
+      {/* Romantic Warm Loading Screen with floating heart and fairy glow */}
+      {!isReady && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-b from-[#1E1116] via-[#140B0E] to-[#0A0507] text-parchment-100 transition-opacity duration-700">
+          {/* Ambient Warm Glow Aura */}
+          <div className="absolute w-[420px] h-[420px] rounded-full bg-gradient-to-r from-rosewood-400/20 via-pink-400/25 to-champagne-400/20 blur-3xl animate-pulse-glow pointer-events-none" />
+
+          {/* Center Floating Icon & Title */}
+          <div className="relative z-10 flex flex-col items-center text-center px-6">
+            <div className="w-20 h-20 rounded-full bg-white/5 border border-pink-300/30 backdrop-blur-md flex items-center justify-center mb-5 shadow-xl animate-heart-float">
+              <span className="text-3xl select-none">📖</span>
+            </div>
+
+            <h2 className="font-serif text-2xl sm:text-3xl tracking-widest text-[#FFF0F4] font-medium mb-1">
+              CHÚNG MÌNH
+            </h2>
+            <p className="font-script text-2xl sm:text-3xl text-rosewood-200 mb-6">
+              Phúc &amp; Trang
+            </p>
+
+            {/* Elegant Loading Progress Line */}
+            <div className="w-48 sm:w-64 h-[2px] bg-white/10 rounded-full overflow-hidden relative mb-4">
+              <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-transparent via-[#F0B6C3] to-transparent w-1/2 animate-[pulse_1.5s_ease-in-out_infinite]" />
+            </div>
+
+            <p className="font-serif italic text-xs sm:text-sm text-stone-400 tracking-wider">
+              Đang chuẩn bị cuốn nhật ký tình yêu...
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Container where the original Flipbook Canvas is injected */}
       <div
         ref={containerRef}
         id="flipbook-container"
         className="absolute inset-0 z-0"
-      >
-        <div className="intro-overlay" style={{ display: isReady ? 'none' : 'block' }}>
-          <div className="centered-box">
-            <div className="progress">
-              <div className="progress-inner" style={{ width: '100%' }}></div>
-            </div>
-          </div>
-        </div>
-      </div>
+      />
 
       {/* Romantic Music Player */}
       <VintageMusicPlayer autoPlayTrigger={currentPage > 0} />
