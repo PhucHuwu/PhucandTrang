@@ -110,8 +110,8 @@ export class PageTextureGenerator {
 
         ctx.restore();
 
-        // Apply realistic tactile paper grain & linen texture over the entire front cover photo
-        PageTextureGenerator.applyPaperGrainTexture(ctx, 1024, 1360, 0.14);
+        // Apply subtle tactile paper grain over front cover
+        PageTextureGenerator.applyPaperGrainTexture(ctx, 1024, 1360, 0.035);
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
@@ -223,43 +223,27 @@ export class PageTextureGenerator {
     return texture;
   }
 
-  // High-visibility, tactile handmade paper grain, pulp fibers & cross-weave linen
-  static applyPaperGrainTexture(ctx: CanvasRenderingContext2D, width: number, height: number, intensity: number = 0.12) {
+  // Subtle, elegant paper grain & fine pulp texture (delicate, natural, not overwhelming)
+  static applyPaperGrainTexture(ctx: CanvasRenderingContext2D, width: number, height: number, intensity: number = 0.035) {
     ctx.save();
-    
-    // 1. Cross-weave subtle linen texture grid (đường đan sợi giấy thủ công)
-    ctx.strokeStyle = `rgba(120, 95, 75, ${intensity * 0.4})`;
-    ctx.lineWidth = 0.6;
-    for (let x = 0; x < width; x += 8) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-      ctx.stroke();
-    }
-    for (let y = 0; y < height; y += 8) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-      ctx.stroke();
-    }
 
-    // 2. Visible organic fiber speckles (đốm xơ giấy đậm nét)
-    ctx.fillStyle = `rgba(95, 70, 55, ${intensity * 1.8})`;
-    for (let i = 0; i < 4500; i++) {
+    // 1. Soft organic fiber speckles (chấm nhỏ li ti nhẹ nhàng)
+    ctx.fillStyle = `rgba(140, 115, 100, ${intensity * 1.0})`;
+    for (let i = 0; i < 1800; i++) {
       const rx = Math.random() * width;
       const ry = Math.random() * height;
-      const rw = Math.random() * 3.5 + 1.0;
-      const rh = Math.random() * 2.0 + 0.8;
+      const rw = Math.random() * 1.8 + 0.5;
+      const rh = Math.random() * 1.2 + 0.5;
       ctx.fillRect(rx, ry, rw, rh);
     }
 
-    // 3. Clear pulp lines / parchment hairs (sợi giấy dài vắt ngang)
-    ctx.strokeStyle = `rgba(80, 55, 40, ${intensity * 1.6})`;
-    ctx.lineWidth = 1.2;
-    for (let i = 0; i < 700; i++) {
+    // 2. Very fine pulp hairs (sợi tơ giấy mảnh bay nhẹ)
+    ctx.strokeStyle = `rgba(130, 105, 90, ${intensity * 0.8})`;
+    ctx.lineWidth = 0.6;
+    for (let i = 0; i < 180; i++) {
       const fx = Math.random() * width;
       const fy = Math.random() * height;
-      const length = Math.random() * 24 + 8;
+      const length = Math.random() * 12 + 4;
       const angle = Math.random() * Math.PI * 2;
       ctx.beginPath();
       ctx.moveTo(fx, fy);
@@ -267,10 +251,10 @@ export class PageTextureGenerator {
       ctx.stroke();
     }
 
-    // 4. White fiber highlight specks (sợi sáng phản quang)
-    ctx.fillStyle = `rgba(255, 255, 255, ${intensity * 1.5})`;
-    for (let i = 0; i < 4000; i++) {
-      ctx.fillRect(Math.random() * width, Math.random() * height, 2.0, 2.0);
+    // 3. Very subtle paper highlights
+    ctx.fillStyle = `rgba(255, 255, 255, ${intensity * 0.7})`;
+    for (let i = 0; i < 1500; i++) {
+      ctx.fillRect(Math.random() * width, Math.random() * height, 1.0, 1.0);
     }
 
     ctx.restore();
@@ -373,8 +357,8 @@ export class PageTextureGenerator {
         ctx.textAlign = 'center';
         ctx.fillText(`— ${params.pageNumber} —`, 512, 1315);
 
-        // Apply realistic tactile paper fiber grain overlay on all inside pages
-        PageTextureGenerator.applyPaperGrainTexture(ctx, 1024, 1360, 0.16);
+        // Apply subtle tactile paper grain overlay on inside pages
+        PageTextureGenerator.applyPaperGrainTexture(ctx, 1024, 1360, 0.04);
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
