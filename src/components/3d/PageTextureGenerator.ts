@@ -21,7 +21,7 @@ export class PageTextureGenerator {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 1024, 1360);
 
-    // Leather texture grain
+    // Leather grain
     ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
     for (let i = 0; i < 4000; i++) {
       ctx.fillRect(Math.random() * 1024, Math.random() * 1360, 2, 2);
@@ -188,21 +188,21 @@ export class PageTextureGenerator {
       ctx.stroke();
 
       // 3. Title & Quote
-      let curY = 165;
+      let curY = 160;
       if (params.title) {
         ctx.textAlign = 'left';
         ctx.fillStyle = '#292522';
-        ctx.font = 'bold 40px "Cormorant Garamond", Georgia, serif';
+        ctx.font = 'bold 38px "Cormorant Garamond", Georgia, serif';
         ctx.letterSpacing = '1px';
         ctx.fillText(params.title, 80, curY);
-        curY += 45;
+        curY += 42;
       }
 
       if (params.quote) {
         ctx.fillStyle = '#94384F';
-        ctx.font = 'italic 28px "Alex Brush", cursive';
+        ctx.font = 'italic 26px "Alex Brush", cursive';
         ctx.fillText(`"${params.quote}"`, 80, curY);
-        curY += 40;
+        curY += 38;
       }
 
       // 4. Text Lines
@@ -211,18 +211,18 @@ export class PageTextureGenerator {
         ctx.font = '22px "Cormorant Garamond", Georgia, serif';
         params.textLines.forEach((line) => {
           ctx.fillText(line, 80, curY);
-          curY += 32;
+          curY += 30;
         });
-        curY += 15;
+        curY += 10;
       }
 
       const completeRendering = () => {
         if (params.handwriting) {
           ctx.fillStyle = '#38161E';
-          ctx.font = 'italic 34px "Alex Brush", cursive';
+          ctx.font = 'italic 32px "Alex Brush", cursive';
           ctx.textAlign = params.side === 'left' ? 'right' : 'center';
           const hX = params.side === 'left' ? 920 : 512;
-          ctx.fillText(params.handwriting, hX, 1245);
+          ctx.fillText(params.handwriting, hX, 1250);
         }
 
         ctx.fillStyle = '#8A7E71';
@@ -235,8 +235,12 @@ export class PageTextureGenerator {
         resolve(texture);
       };
 
+      /**
+       * Draws an image onto a Polaroid card with intelligent object-fit: contain/cover
+       * so that photos NEVER get squished or distorted!
+       */
       const drawPolaroid = (
-        img: HTMLImageElement | HTMLCanvasElement,
+        source: HTMLImageElement | HTMLCanvasElement,
         x: number,
         y: number,
         w: number,
@@ -249,7 +253,7 @@ export class PageTextureGenerator {
         ctx.translate(x + w / 2, y + h / 2);
         ctx.rotate((rotationDeg * Math.PI) / 180);
 
-        // Shadow & Card
+        // Polaroid Frame Shadow & Card
         ctx.shadowColor = 'rgba(0, 0, 0, 0.16)';
         ctx.shadowBlur = 18;
         ctx.shadowOffsetX = 0;
@@ -258,41 +262,65 @@ export class PageTextureGenerator {
         ctx.fillRect(-w / 2, -h / 2, w, h);
         ctx.shadowColor = 'transparent';
 
-        // Image area
-        const padding = 14;
-        const bottomArea = 48;
-        const imgW = w - padding * 2;
-        const imgH = h - padding * 2 - bottomArea;
+        // Inner Image Dimensions
+        const padding = 12;
+        const captionHeight = caption ? 36 : 22;
+        const destW = w - padding * 2;
+        const destH = h - padding * 2 - captionHeight;
+        const destX = -w / 2 + padding;
+        const destY = -h / 2 + padding;
 
-        // Draw image clipped inside
-        ctx.drawImage(img, -w / 2 + padding, -h / 2 + padding, imgW, imgH);
+        // Black/Warm backing inside image container
+        ctx.fillStyle = '#F5EFE6';
+        ctx.fillRect(destX, destY, destW, destH);
 
-        // If Video: draw sweet video badge overlay
+        // Aspect-ratio calculation with OBJECT-FIT: COVER (no distortion, cropped cleanly from center)
+        const srcW = (source as HTMLImageElement).naturalWidth || source.width || 400;
+        const srcH = (source as HTMLImageElement).naturalHeight || source.height || 300;
+
+        const srcRatio = srcW / srcH;
+        const destRatio = destW / destH;
+
+        let sX = 0, sY = 0, sW = srcW, sH = srcH;
+
+        if (srcRatio > destRatio) {
+          // Source is wider than destination: crop sides
+          sW = srcH * destRatio;
+          sX = (srcW - sW) / 2;
+        } else {
+          // Source is taller than destination: crop top/bottom
+          sH = srcW / destRatio;
+          sY = (srcH - sH) / 2;
+        }
+
+        ctx.drawImage(source, sX, sY, sW, sH, destX, destY, destW, destH);
+
+        // Video badge overlay if video
         if (isVideo) {
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
           ctx.beginPath();
-          ctx.arc(0, (-h / 2 + padding + imgH / 2), 24, 0, Math.PI * 2);
+          ctx.arc(destX + destW / 2, destY + destH / 2, 22, 0, Math.PI * 2);
           ctx.fill();
 
           ctx.fillStyle = '#FFFFFF';
           ctx.beginPath();
-          ctx.moveTo(-6, (-h / 2 + padding + imgH / 2) - 10);
-          ctx.lineTo(12, (-h / 2 + padding + imgH / 2));
-          ctx.lineTo(-6, (-h / 2 + padding + imgH / 2) + 10);
+          ctx.moveTo(destX + destW / 2 - 5, destY + destH / 2 - 9);
+          ctx.lineTo(destX + destW / 2 + 10, destY + destH / 2);
+          ctx.lineTo(destX + destW / 2 - 5, destY + destH / 2 + 9);
           ctx.closePath();
           ctx.fill();
         }
 
-        // Washi tape on top
+        // Decorative Washi Tape on top
         ctx.fillStyle = 'rgba(235, 225, 205, 0.85)';
-        ctx.fillRect(-45, -h / 2 - 8, 90, 18);
+        ctx.fillRect(-42, -h / 2 - 8, 84, 16);
 
-        // Caption
+        // Caption text
         if (caption) {
           ctx.fillStyle = '#4A1523';
-          ctx.font = 'italic 20px "Alex Brush", cursive';
+          ctx.font = 'italic 19px "Alex Brush", cursive';
           ctx.textAlign = 'center';
-          ctx.fillText(caption, 0, h / 2 - 16);
+          ctx.fillText(caption, 0, h / 2 - 12);
         }
 
         ctx.restore();
@@ -310,23 +338,36 @@ export class PageTextureGenerator {
 
       mediaItems.forEach((item, idx) => {
         if (item.isVideo) {
-          // For video, generate a clean frame canvas placeholder
-          const vCanvas = document.createElement('canvas');
-          vCanvas.width = 400;
-          vCanvas.height = 300;
-          const vCtx = vCanvas.getContext('2d')!;
-          vCtx.fillStyle = '#2A181E';
-          vCtx.fillRect(0, 0, 400, 300);
-          vCtx.fillStyle = '#E8BCC6';
-          vCtx.font = '22px Montserrat, sans-serif';
-          vCtx.textAlign = 'center';
-          vCtx.fillText('▶ Video Kỷ Niệm', 200, 155);
+          const vImg = new Image();
+          vImg.crossOrigin = 'anonymous';
+          vImg.onload = () => {
+            loadedElements[idx] = { elem: vImg, item };
+            loadedCount++;
+            if (loadedCount === mediaItems.length) {
+              renderMediaGrid();
+            }
+          };
+          vImg.onerror = () => {
+            // fallback canvas placeholder with exact ratio if thumb fails
+            const vCanvas = document.createElement('canvas');
+            vCanvas.width = 400;
+            vCanvas.height = 300;
+            const vCtx = vCanvas.getContext('2d')!;
+            vCtx.fillStyle = '#2A181E';
+            vCtx.fillRect(0, 0, 400, 300);
+            vCtx.fillStyle = '#E8BCC6';
+            vCtx.font = '22px Montserrat, sans-serif';
+            vCtx.textAlign = 'center';
+            vCtx.fillText('▶ Video Kỷ Niệm', 200, 155);
 
-          loadedElements[idx] = { elem: vCanvas, item };
-          loadedCount++;
-          if (loadedCount === mediaItems.length) {
-            renderMediaGrid();
-          }
+            loadedElements[idx] = { elem: vCanvas, item };
+            loadedCount++;
+            if (loadedCount === mediaItems.length) {
+              renderMediaGrid();
+            }
+          };
+          // Use the real thumbnail extracted from video
+          vImg.src = item.src;
         } else {
           const img = new Image();
           img.crossOrigin = 'anonymous';
@@ -338,7 +379,6 @@ export class PageTextureGenerator {
             }
           };
           img.onerror = () => {
-            // fallback canvas if load fails
             const errCanvas = document.createElement('canvas');
             errCanvas.width = 300;
             errCanvas.height = 300;
@@ -363,42 +403,84 @@ export class PageTextureGenerator {
       const renderMediaGrid = () => {
         const count = loadedElements.length;
         const availableTop = curY + 10;
-        const availableHeight = 1200 - availableTop;
+        const availableHeight = 1205 - availableTop;
+
+        // Check aspect ratio of first photo to optimize layout
+        const firstW = (loadedElements[0].elem as HTMLImageElement).naturalWidth || loadedElements[0].elem.width || 400;
+        const firstH = (loadedElements[0].elem as HTMLImageElement).naturalHeight || loadedElements[0].elem.height || 300;
+        const isLandscape = firstW / firstH > 1.15;
 
         if (count === 1) {
-          const el = loadedElements[0];
-          drawPolaroid(el.elem, 172, availableTop + 20, 680, availableHeight - 40, el.item.caption, 0, el.item.isVideo);
+          // Single photo: adapt card shape to orientation
+          if (isLandscape) {
+            const cardW = 840;
+            const cardH = cardW * 0.72;
+            const leftX = (1024 - cardW) / 2;
+            const topY = availableTop + (availableHeight - cardH) / 2;
+            drawPolaroid(loadedElements[0].elem, leftX, topY, cardW, cardH, loadedElements[0].item.caption, 0, loadedElements[0].item.isVideo);
+          } else {
+            const cardH = availableHeight - 30;
+            const cardW = Math.min(cardH * 0.82, 800);
+            const leftX = (1024 - cardW) / 2;
+            drawPolaroid(loadedElements[0].elem, leftX, availableTop + 15, cardW, cardH, loadedElements[0].item.caption, 0, loadedElements[0].item.isVideo);
+          }
         } else if (count === 2) {
-          const cardH = (availableHeight - 40) / 2;
-          const cardW = 600;
-          const leftX = (1024 - cardW) / 2;
-          drawPolaroid(loadedElements[0].elem, leftX, availableTop, cardW, cardH, loadedElements[0].item.caption, -1.2, loadedElements[0].item.isVideo);
-          drawPolaroid(loadedElements[1].elem, leftX + 15, availableTop + cardH + 15, cardW, cardH, loadedElements[1].item.caption, 1.5, loadedElements[1].item.isVideo);
+          if (isLandscape) {
+            // 2 Landscape photos: stack vertically
+            const cardW = 820;
+            const cardH = (availableHeight - 30) / 2;
+            const leftX = (1024 - cardW) / 2;
+            drawPolaroid(loadedElements[0].elem, leftX, availableTop, cardW, cardH, loadedElements[0].item.caption, -1.0, loadedElements[0].item.isVideo);
+            drawPolaroid(loadedElements[1].elem, leftX, availableTop + cardH + 15, cardW, cardH, loadedElements[1].item.caption, 1.2, loadedElements[1].item.isVideo);
+          } else {
+            // 2 Portrait photos: side-by-side! (Fits 3:4 & 9:16 perfectly)
+            const cardW = 415;
+            const cardH = availableHeight - 20;
+            const x1 = 75;
+            const x2 = 535;
+            drawPolaroid(loadedElements[0].elem, x1, availableTop + 10, cardW, cardH, loadedElements[0].item.caption, -1.2, loadedElements[0].item.isVideo);
+            drawPolaroid(loadedElements[1].elem, x2, availableTop + 10, cardW, cardH, loadedElements[1].item.caption, 1.5, loadedElements[1].item.isVideo);
+          }
         } else if (count === 3) {
-          // 1 top center, 2 bottom side-by-side
-          const topH = availableHeight * 0.46;
-          const topW = 540;
-          const topX = (1024 - topW) / 2;
-          drawPolaroid(loadedElements[0].elem, topX, availableTop, topW, topH, loadedElements[0].item.caption, 0.8, loadedElements[0].item.isVideo);
+          // 3 photos layout:
+          // If first is landscape: 1 wide top + 2 portrait bottom
+          if (isLandscape) {
+            const topW = 820;
+            const topH = availableHeight * 0.46;
+            const topX = (1024 - topW) / 2;
+            drawPolaroid(loadedElements[0].elem, topX, availableTop, topW, topH, loadedElements[0].item.caption, 0.5, loadedElements[0].item.isVideo);
 
-          const btmW = 420;
-          const btmH = availableHeight * 0.44;
-          const btmY = availableTop + topH + 20;
-          drawPolaroid(loadedElements[1].elem, 75, btmY, btmW, btmH, loadedElements[1].item.caption, -1.8, loadedElements[1].item.isVideo);
-          drawPolaroid(loadedElements[2].elem, 525, btmY, btmW, btmH, loadedElements[2].item.caption, 2.0, loadedElements[2].item.isVideo);
+            const btmW = 390;
+            const btmH = availableHeight * 0.48;
+            const btmY = availableTop + topH + 18;
+            drawPolaroid(loadedElements[1].elem, 85, btmY, btmW, btmH, loadedElements[1].item.caption, -1.8, loadedElements[1].item.isVideo);
+            drawPolaroid(loadedElements[2].elem, 545, btmY, btmW, btmH, loadedElements[2].item.caption, 2.0, loadedElements[2].item.isVideo);
+          } else {
+            // 2 side-by-side top + 1 wide centered bottom
+            const topW = 410;
+            const topH = availableHeight * 0.48;
+            drawPolaroid(loadedElements[0].elem, 75, availableTop, topW, topH, loadedElements[0].item.caption, -1.5, loadedElements[0].item.isVideo);
+            drawPolaroid(loadedElements[1].elem, 535, availableTop, topW, topH, loadedElements[1].item.caption, 1.8, loadedElements[1].item.isVideo);
+
+            const btmW = 680;
+            const btmH = availableHeight * 0.46;
+            const btmX = (1024 - btmW) / 2;
+            const btmY = availableTop + topH + 16;
+            drawPolaroid(loadedElements[2].elem, btmX, btmY, btmW, btmH, loadedElements[2].item.caption, 0.4, loadedElements[2].item.isVideo);
+          }
         } else if (count >= 4) {
-          // 2x2 Grid
-          const cardW = 410;
-          const cardH = (availableHeight - 35) / 2;
-          const x1 = 80;
-          const x2 = 530;
+          // 4 photos: 2x2 Grid with aspect-ratio preservation
+          const cardW = 415;
+          const cardH = (availableHeight - 30) / 2;
+          const x1 = 75;
+          const x2 = 535;
           const y1 = availableTop;
-          const y2 = availableTop + cardH + 20;
+          const y2 = availableTop + cardH + 16;
 
           drawPolaroid(loadedElements[0].elem, x1, y1, cardW, cardH, loadedElements[0].item.caption, -1.2, loadedElements[0].item.isVideo);
-          drawPolaroid(loadedElements[1].elem, x2, y1, cardW, cardH, loadedElements[1].item.caption, 1.5, loadedElements[1].item.isVideo);
-          drawPolaroid(loadedElements[2].elem, x1, y2, cardW, cardH, loadedElements[2].item.caption, 1.8, loadedElements[2].item.isVideo);
-          drawPolaroid(loadedElements[3].elem, x2, y2, cardW, cardH, loadedElements[3].item.caption, -1.5, loadedElements[3].item.isVideo);
+          drawPolaroid(loadedElements[1].elem, x2, y1, cardW, cardH, loadedElements[1].item.caption, 1.4, loadedElements[1].item.isVideo);
+          drawPolaroid(loadedElements[2].elem, x1, y2, cardW, cardH, loadedElements[2].item.caption, 1.6, loadedElements[2].item.isVideo);
+          drawPolaroid(loadedElements[3].elem, x2, y2, cardW, cardH, loadedElements[3].item.caption, -1.4, loadedElements[3].item.isVideo);
         }
 
         completeRendering();

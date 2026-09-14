@@ -143,7 +143,7 @@ export default function QbjectAuthenticExperience() {
         ],
         media: [
           { src: getMediaUrl('02-12-2023_3.jpg'), caption: '02.12.2023 • Bình yên bên bạn' },
-          { src: getMediaUrl('26-06-2323.mp4'), caption: '26.06 • Video kỷ niệm', isVideo: true },
+          { src: getMediaUrl('26-06-2323_thumb.jpg'), caption: '26.06 • Video kỷ niệm', isVideo: true },
         ],
         side: 'right',
       });
@@ -161,7 +161,7 @@ export default function QbjectAuthenticExperience() {
           { src: getMediaUrl('Brithdate-together-25-05-2024_2.jpg'), caption: '25.05.2024 • Thổi nến sinh nhật' },
           { src: getMediaUrl('Brithdate-together-25-05-2024_3.jpg'), caption: '25.05.2024 • Nụ cười ngọt ngào' },
           { src: getMediaUrl('Brithdate-together-25-05-2024_4.jpg'), caption: '25.05.2024 • Niềm vui trọn vẹn' },
-          { src: getMediaUrl('Brithdate-together-25-05-2024.mp4'), caption: 'Video sinh nhật 25.05.2024', isVideo: true },
+          { src: getMediaUrl('Brithdate-together-25-05-2024_thumb.jpg'), caption: 'Video sinh nhật 25.05.2024', isVideo: true },
         ],
         side: 'left',
       });
@@ -228,7 +228,7 @@ export default function QbjectAuthenticExperience() {
           { src: getMediaUrl('17-01-2025_4.jpg'), caption: '17.01.2025 • Đẹp trong trẻo' },
           { src: getMediaUrl('17-01-2025_5.jpg'), caption: '17.01.2025 • Nét hồn nhiên' },
           { src: getMediaUrl('17-01-2025_6.jpg'), caption: '17.01.2025 • Hạnh phúc giản đơn' },
-          { src: getMediaUrl('17-01-2025.mp4'), caption: 'Video 17.01.2025', isVideo: true },
+          { src: getMediaUrl('17-01-2025_thumb.jpg'), caption: 'Video 17.01.2025', isVideo: true },
         ],
         side: 'left',
       });
