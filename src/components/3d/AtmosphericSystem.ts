@@ -213,10 +213,10 @@ export class AtmosphericSystem {
         baseX: (Math.random() - 0.5) * 400,
         baseZ: 200 + Math.random() * 400,
         phase: startAngle,
-        speed: 0.008 + Math.random() * 0.012,
+        speed: 0.0018 + Math.random() * 0.0022, // Slowed down by 4x for gentle graceful floating
         radiusX,
         radiusZ,
-        wingSpeed: 16 + Math.random() * 6,
+        wingSpeed: 5 + Math.random() * 2.5,     // Relaxed, slow, dreamy wing flapping
         color: colorHex,
       };
 
@@ -245,10 +245,10 @@ export class AtmosphericSystem {
     // 2. Petals floating down
     if (this.petals) {
       this.petals.children.forEach((mesh) => {
-        mesh.position.y -= mesh.userData.speedY;
-        mesh.position.x += Math.sin(time * 1.2 + mesh.position.y * 0.01) * 0.8 + mesh.userData.speedX;
-        mesh.rotation.x += mesh.userData.rotSpeedX;
-        mesh.rotation.z += mesh.userData.rotSpeedZ;
+        mesh.position.y -= mesh.userData.speedY * 0.45; // Gentle slow floating
+        mesh.position.x += Math.sin(time * 0.6 + mesh.position.y * 0.01) * 0.5 + mesh.userData.speedX * 0.4;
+        mesh.rotation.x += mesh.userData.rotSpeedX * 0.5;
+        mesh.rotation.z += mesh.userData.rotSpeedZ * 0.5;
 
         if (mesh.position.y < -1200) {
           mesh.position.y = 1400;
