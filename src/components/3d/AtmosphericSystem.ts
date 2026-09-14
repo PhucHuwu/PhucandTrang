@@ -177,48 +177,147 @@ export class AtmosphericSystem {
     this.scene.add(this.glowingHearts);
   }
 
-  // 4. Fluttering 3D Butterflies dancing around the open book
+  // 4. Realistic Ornate 3D Butterflies with forewings, hindwings, antenna, body, and glowing wing patterns
   initButterflies() {
-    const wingShape = new THREE.Shape();
-    wingShape.moveTo(0, 0);
-    wingShape.bezierCurveTo(18, 25, 42, 45, 60, 35);
-    wingShape.bezierCurveTo(70, 18, 55, -8, 35, -20);
-    wingShape.bezierCurveTo(18, -30, 4, -8, 0, 0);
+    // 1. Forewing (Cánh trên: rộng, vuốt nhọn kiêu sa)
+    const forewingShape = new THREE.Shape();
+    forewingShape.moveTo(0, 0);
+    forewingShape.bezierCurveTo(8, 15, 20, 38, 48, 48); // Top arched ridge
+    forewingShape.bezierCurveTo(58, 42, 54, 26, 42, 12); // Outer scalloped margin
+    forewingShape.bezierCurveTo(32, 0, 16, -6, 0, 0);
 
-    const wingGeo = new THREE.ShapeGeometry(wingShape);
-    wingGeo.center();
-    wingGeo.translate(28, 0, 0); // pivot at wing base
+    const forewingGeo = new THREE.ShapeGeometry(forewingShape, 12);
+    // Offset pivot to body hinge
+    forewingGeo.translate(6, 4, 0);
 
-    const butterflyColors = [
-      '#FFA8BA', '#FFD1DC', '#FFE5B4', '#E8BCC6', '#FF8FA3', '#F4B0C0'
+    // 2. Hindwing (Cánh dưới: tròn lượn sóng)
+    const hindwingShape = new THREE.Shape();
+    hindwingShape.moveTo(0, 0);
+    hindwingShape.bezierCurveTo(10, -4, 28, -8, 34, -22); // Outer bulb
+    hindwingShape.bezierCurveTo(30, -36, 14, -42, 0, -28); // Lower rounded curve
+    hindwingShape.bezierCurveTo(-4, -18, -2, -6, 0, 0);
+
+    const hindwingGeo = new THREE.ShapeGeometry(hindwingShape, 12);
+    hindwingGeo.translate(4, -4, 0);
+
+    // Procedural Butterfly Wing Texture Canvas with veins and iridescent borders
+    const createWingTexture = (baseColor: string, patternColor: string): THREE.CanvasTexture => {
+      const cvs = document.createElement('canvas');
+      cvs.width = 256;
+      cvs.height = 256;
+      const ctx = cvs.getContext('2d')!;
+
+      // Base gradient
+      const grad = ctx.createRadialGradient(40, 128, 10, 128, 128, 140);
+      grad.addColorStop(0, '#FFFFFF');
+      grad.addColorStop(0.4, baseColor);
+      grad.addColorStop(0.85, patternColor);
+      grad.addColorStop(1, '#682535');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 256, 256);
+
+      // Delicate veins
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+      ctx.lineWidth = 2.5;
+      for (let angle = -0.6; angle <= 0.6; angle += 0.22) {
+        ctx.beginPath();
+        ctx.moveTo(30, 128);
+        const endX = 30 + Math.cos(angle) * 180;
+        const endY = 128 + Math.sin(angle) * 140;
+        ctx.quadraticCurveTo(100, 128 + angle * 50, endX, endY);
+        ctx.stroke();
+      }
+
+      // Fairy dots on margin
+      ctx.fillStyle = '#FFFFFF';
+      for (let d = 0; d < 12; d++) {
+        const dotX = 180 + Math.random() * 50;
+        const dotY = 50 + d * 14;
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const tex = new THREE.CanvasTexture(cvs);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    };
+
+    const butterflyThemes = [
+      { base: '#FFA6BA', border: '#D45D79' },
+      { base: '#FFE2E8', border: '#E87A90' },
+      { base: '#F9D5A7', border: '#D48B54' },
+      { base: '#E8BCC6', border: '#A64B62' },
+      { base: '#FFB8D0', border: '#C84B70' },
+      { base: '#FDE2E8', border: '#E295A8' },
     ];
 
     for (let i = 0; i < this.butterflyCount; i++) {
       const bGroup = new THREE.Group();
-      const colorHex = butterflyColors[i % butterflyColors.length];
+      const theme = butterflyThemes[i % butterflyThemes.length];
+      const wingTexture = createWingTexture(theme.base, theme.border);
 
       const wingMat = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(colorHex),
-        roughness: 0.6,
-        metalness: 0.1,
+        map: wingTexture,
+        roughness: 0.4,
+        metalness: 0.15,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.88,
+        opacity: 0.92,
       });
 
-      const leftWing = new THREE.Mesh(wingGeo, wingMat);
-      const rightWing = new THREE.Mesh(wingGeo, wingMat);
-      rightWing.scale.x = -1;
+      // Left wing assembly (forewing + hindwing)
+      const leftWingGroup = new THREE.Group();
+      const leftFore = new THREE.Mesh(forewingGeo, wingMat);
+      const leftHind = new THREE.Mesh(hindwingGeo, wingMat);
+      leftWingGroup.add(leftFore);
+      leftWingGroup.add(leftHind);
 
-      bGroup.add(leftWing);
-      bGroup.add(rightWing);
+      // Right wing assembly
+      const rightWingGroup = new THREE.Group();
+      const rightFore = new THREE.Mesh(forewingGeo, wingMat);
+      const rightHind = new THREE.Mesh(hindwingGeo, wingMat);
+      rightWingGroup.add(rightFore);
+      rightWingGroup.add(rightHind);
+      rightWingGroup.scale.x = -1;
 
-      // Body
-      const bodyGeo = new THREE.CylinderGeometry(2, 2, 32, 6);
-      const bodyMat = new THREE.MeshBasicMaterial({ color: 0x5C2434 });
-      const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
-      bodyMesh.rotation.x = Math.PI / 2;
-      bGroup.add(bodyMesh);
+      bGroup.add(leftWingGroup);
+      bGroup.add(rightWingGroup);
+
+      // Detailed Slender Butterfly Body (Head, Thorax, Abdomen)
+      const bodyGroup = new THREE.Group();
+
+      // Thorax / Abdomen
+      const abdomenGeo = new THREE.CylinderGeometry(1.4, 0.6, 26, 8);
+      const bodyMat = new THREE.MeshStandardMaterial({
+        color: 0x4A1523,
+        roughness: 0.6,
+        metalness: 0.2,
+      });
+      const abdomenMesh = new THREE.Mesh(abdomenGeo, bodyMat);
+      abdomenMesh.rotation.x = Math.PI / 2;
+      bodyGroup.add(abdomenMesh);
+
+      // Head
+      const headGeo = new THREE.SphereGeometry(2.2, 8, 8);
+      const headMesh = new THREE.Mesh(headGeo, bodyMat);
+      headMesh.position.set(0, 0, 13);
+      bodyGroup.add(headMesh);
+
+      // Curved Antennas
+      const antennaMat = new THREE.MeshBasicMaterial({ color: 0x38161E });
+      const leftAntenna = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 14, 4), antennaMat);
+      leftAntenna.position.set(2.5, 3, 18);
+      leftAntenna.rotation.set(Math.PI / 3, 0, Math.PI / 6);
+
+      const rightAntenna = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 14, 4), antennaMat);
+      rightAntenna.position.set(-2.5, 3, 18);
+      rightAntenna.rotation.set(Math.PI / 3, 0, -Math.PI / 6);
+
+      bodyGroup.add(leftAntenna);
+      bodyGroup.add(rightAntenna);
+
+      bGroup.add(bodyGroup);
 
       const scale = 0.55 + Math.random() * 0.45;
       bGroup.scale.set(scale, scale, scale);
@@ -230,17 +329,17 @@ export class AtmosphericSystem {
 
       const bEntity: ButterflyEntity = {
         group: bGroup,
-        leftWing,
-        rightWing,
+        leftWing: leftWingGroup as any,
+        rightWing: rightWingGroup as any,
         baseY,
         baseX: (Math.random() - 0.5) * 400,
         baseZ: 200 + Math.random() * 400,
         phase: startAngle,
-        speed: 0.0018 + Math.random() * 0.0022, // Slowed down by 4x for gentle graceful floating
+        speed: 0.0016 + Math.random() * 0.002,
         radiusX,
         radiusZ,
-        wingSpeed: 5 + Math.random() * 2.5,     // Relaxed, slow, dreamy wing flapping
-        color: colorHex,
+        wingSpeed: 4.5 + Math.random() * 2.0,
+        color: theme.base,
       };
 
       bGroup.position.set(
