@@ -110,9 +110,6 @@ export class PageTextureGenerator {
 
         ctx.restore();
 
-        // Apply subtle tactile paper grain over front cover
-        PageTextureGenerator.applyPaperGrainTexture(ctx, 1024, 1360, 0.035);
-
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         resolve(texture);
@@ -126,101 +123,107 @@ export class PageTextureGenerator {
     });
   }
 
-  static createBackCoverTexture(): THREE.CanvasTexture {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1024;
-    canvas.height = 1360;
-    const ctx = canvas.getContext('2d')!;
+  static createBackCoverTexture(photoSrc: string, isInside: boolean = false): Promise<THREE.CanvasTexture> {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 1360;
+      const ctx = canvas.getContext('2d')!;
 
-    // Matching Warm Pastel Blush Background
-    const gradient = ctx.createLinearGradient(0, 0, 1024, 1360);
-    gradient.addColorStop(0, '#FFF5F7');
-    gradient.addColorStop(0.35, '#FFE9EE');
-    gradient.addColorStop(0.7, '#FDE2E8');
-    gradient.addColorStop(1, '#F7D6DE');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 1024, 1360);
+      const renderBack = (img?: HTMLImageElement) => {
+        if (img) {
+          const srcW = img.naturalWidth || img.width;
+          const srcH = img.naturalHeight || img.height;
+          const srcRatio = srcW / srcH;
+          const destRatio = 1024 / 1360;
 
-    // Soft clouds
-    const pastelBlobs = [
-      { x: 300, y: 400, r: 280, color: 'rgba(255, 209, 220, 0.4)' },
-      { x: 720, y: 900, r: 300, color: 'rgba(250, 210, 222, 0.4)' },
-    ];
-    pastelBlobs.forEach(b => {
-      const radGrad = ctx.createRadialGradient(b.x, b.y, 10, b.x, b.y, b.r);
-      radGrad.addColorStop(0, b.color);
-      radGrad.addColorStop(1, 'rgba(255, 245, 247, 0)');
-      ctx.fillStyle = radGrad;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-      ctx.fill();
+          let sX = 0, sY = 0, sW = srcW, sH = srcH;
+          if (srcRatio > destRatio) {
+            sW = srcH * destRatio;
+            sX = (srcW - sW) / 2;
+          } else {
+            sH = srcW / destRatio;
+            sY = (srcH - sH) / 2;
+          }
+          ctx.drawImage(img, sX, sY, sW, sH, 0, 0, 1024, 1360);
+        } else {
+          ctx.fillStyle = '#1A1215';
+          ctx.fillRect(0, 0, 1024, 1360);
+        }
+
+        // Soft dark warm tint so text is super crisp and legible
+        ctx.fillStyle = 'rgba(10, 5, 8, 0.45)';
+        ctx.fillRect(0, 0, 1024, 1360);
+
+        if (!isInside) {
+          // Outer back cover: Forever & Always
+          ctx.save();
+          ctx.textAlign = 'center';
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+          ctx.shadowBlur = 16;
+          ctx.shadowOffsetY = 4;
+
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = 'bold 54px "Dancing Script", cursive';
+          ctx.fillText('Forever & Always', 512, 650);
+
+          ctx.strokeStyle = '#F0B6C3';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(380, 680);
+          ctx.lineTo(644, 680);
+          ctx.stroke();
+
+          ctx.fillStyle = '#FFE5B4';
+          ctx.font = '600 22px "Montserrat", sans-serif';
+          ctx.letterSpacing = '6px';
+          ctx.fillText('TO BE CONTINUED...', 512, 730);
+
+          ctx.fillStyle = 'rgba(255, 245, 247, 0.9)';
+          ctx.font = 'italic 26px "Dancing Script", cursive';
+          ctx.fillText('Nắm tay nhau đi qua mọi năm tháng...', 512, 800);
+
+          ctx.restore();
+        } else {
+          // Inside back cover: Conclusion note
+          ctx.save();
+          ctx.textAlign = 'center';
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+          ctx.shadowBlur = 14;
+          ctx.shadowOffsetY = 3;
+
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = 'bold 44px "Cormorant Garamond", Georgia, serif';
+          ctx.fillText('Cảm Ơn Bạn Vì Đã Đến', 512, 580);
+
+          ctx.fillStyle = '#F0B6C3';
+          ctx.font = 'italic 28px "Dancing Script", cursive';
+          ctx.fillText('"Hạnh phúc là hành trình, không phải đích đến."', 512, 640);
+
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+          ctx.font = '22px "Cormorant Garamond", Georgia, serif';
+          ctx.fillText('Cảm ơn bạn vì đã cùng mình tạo nên cuốn nhật ký này.', 512, 710);
+          ctx.fillText('Cuốn sách khép lại, nhưng tình yêu của hai mình', 512, 745);
+          ctx.fillText('sẽ luôn được viết tiếp mỗi ngày.', 512, 780);
+
+          ctx.fillStyle = '#FFE5B4';
+          ctx.font = 'bold 36px "Dancing Script", cursive';
+          ctx.fillText('Phúc & Trang • Forever & Always', 512, 860);
+
+          ctx.restore();
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        resolve(texture);
+      };
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => renderBack(img);
+      img.onerror = () => renderBack();
+      img.src = photoSrc;
     });
-
-    // Linen texture
-    ctx.fillStyle = 'rgba(180, 140, 150, 0.04)';
-    for (let i = 0; i < 5000; i++) {
-      ctx.fillRect(Math.random() * 1024, Math.random() * 1360, 2, 2);
-    }
-
-    // Border
-    ctx.strokeStyle = '#E295A8';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(50, 50, 924, 1260);
-
-    ctx.setLineDash([10, 8]);
-    ctx.strokeStyle = '#F0B6C3';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(68, 68, 888, 1224);
-    ctx.setLineDash([]);
-
-    // Corner flowers
-    ctx.fillStyle = '#D4728C';
-    ctx.font = '28px serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('🌸', 95, 100);
-    ctx.fillText('🌸', 929, 100);
-    ctx.fillText('🌸', 95, 1265);
-    ctx.fillText('🌸', 929, 1265);
-
-    // Center Back Emblem
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(512, 580, 80, 0, Math.PI * 2);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.shadowColor = 'rgba(212, 114, 140, 0.2)';
-    ctx.shadowBlur = 20;
-    ctx.fill();
-    ctx.restore();
-
-    ctx.strokeStyle = '#F3BDC8';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(512, 580, 80, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.fillStyle = '#E85A7E';
-    ctx.font = '54px serif';
-    ctx.fillText('💌', 512, 600);
-
-    ctx.fillStyle = '#732A3E';
-    ctx.font = 'bold 54px "Dancing Script", cursive';
-    ctx.fillText('Forever & Always', 512, 730);
-
-    ctx.fillStyle = '#A84D67';
-    ctx.font = '600 22px "Montserrat", sans-serif';
-    ctx.letterSpacing = '6px';
-    ctx.fillText('TO BE CONTINUED...', 512, 805);
-
-    ctx.fillStyle = '#B84364';
-    ctx.font = 'italic 26px "Dancing Script", cursive';
-    ctx.fillText('Hành trình của chúng mình vẫn đang tiếp diễn...', 512, 880);
-
-    // Apply realistic tactile paper fiber grain overlay on back cover
-    this.applyPaperGrainTexture(ctx, 1024, 1360, 0.04);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    return texture;
   }
 
   // Subtle, elegant paper grain & fine pulp texture (delicate, natural, not overwhelming)
@@ -356,9 +359,6 @@ export class PageTextureGenerator {
         ctx.font = '22px "Cormorant Garamond", Georgia, serif';
         ctx.textAlign = 'center';
         ctx.fillText(`— ${params.pageNumber} —`, 512, 1315);
-
-        // Apply subtle tactile paper grain overlay on inside pages
-        PageTextureGenerator.applyPaperGrainTexture(ctx, 1024, 1360, 0.04);
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;

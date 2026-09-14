@@ -435,7 +435,15 @@ export default function QbjectAuthenticExperience() {
         side: 'left',
       });
 
-      const coverBack = PageTextureGenerator.createBackCoverTexture();
+      // Back cover inside & outside using photo 17-01-2025_6.jpg
+      const coverBackInside = await PageTextureGenerator.createBackCoverTexture(
+        getMediaUrl('17-01-2025_6.jpg'),
+        true
+      );
+      const coverBackOutside = await PageTextureGenerator.createBackCoverTexture(
+        getMediaUrl('17-01-2025_6.jpg'),
+        false
+      );
 
       if (destroyed) return;
 
@@ -465,8 +473,8 @@ export default function QbjectAuthenticExperience() {
         p10Back.image as HTMLCanvasElement,
         p11Front.image as HTMLCanvasElement,
         p11Back.image as HTMLCanvasElement,
-        coverBack.image as HTMLCanvasElement,
-        coverBack.image as HTMLCanvasElement,
+        coverBackInside.image as HTMLCanvasElement,
+        coverBackOutside.image as HTMLCanvasElement,
       ];
 
       const pageUrls = textureCanvases.map((canvas) => canvas.toDataURL('image/jpeg', 0.90));

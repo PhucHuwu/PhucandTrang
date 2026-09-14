@@ -82,25 +82,16 @@ export default class Page {
 			textures.edgeRight = _texture(this.textureUrls.edgeLR);
 		}
 
-		const bumpMap = PaperTextureManager.getPaperBumpMap();
-		const roughnessMap = PaperTextureManager.getPaperRoughnessMap();
-
 		const materials = [
 			new THREE.MeshStandardMaterial({
 				map: _texture(this.textureUrls.back).map,
 				vertexColors: !this.isCover,
-				bumpMap: bumpMap,
-				bumpScale: 0.35,
-				roughnessMap: roughnessMap,
-				roughness: 0.9,
+				roughness: 0.8,
 			}),
 			new THREE.MeshStandardMaterial({
 				map: _texture(this.textureUrls.front).map,
 				vertexColors: !this.isCover,
-				bumpMap: bumpMap,
-				bumpScale: 0.35,
-				roughnessMap: roughnessMap,
-				roughness: 0.9,
+				roughness: 0.8,
 			}),
 			new THREE.MeshStandardMaterial(_color(this.edgeColor)),
 			new THREE.MeshStandardMaterial(_color(this.edgeColor)),
