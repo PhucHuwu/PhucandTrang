@@ -69,10 +69,13 @@ export default class VideoOverlay {
 
 		video.src = src;
 		video.controls = true;
+		video.muted = true; // Completely mute video audio to keep background music serene
+		video.volume = 0;
+		video.setAttribute("muted", "");
 		video.playsInline = true;
 		video.setAttribute("playsinline", "");
 		video.setAttribute("webkit-playsinline", "");
-		video.setAttribute("controlslist", "nodownload noremoteplayback");
+		video.setAttribute("controlslist", "nodownload noremoteplayback noaudio");
 		video.setAttribute("disablepictureinpicture", "");
 		video.setAttribute("disableremoteplayback", "");
 		video.preload = "auto";
