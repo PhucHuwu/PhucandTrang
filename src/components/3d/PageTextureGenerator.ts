@@ -66,11 +66,23 @@ export class PageTextureGenerator {
           ctx.fillRect(0, 0, 1024, 1360);
         }
 
-        // Soft frosted-glass card backdrop in Middle-Left area (y: 600)
+        // Localized soft dark-warm vignette directly behind text area for optimal readability
+        ctx.save();
+        const textVignette = ctx.createRadialGradient(230, 840, 30, 230, 840, 280);
+        textVignette.addColorStop(0, 'rgba(12, 6, 8, 0.62)');
+        textVignette.addColorStop(0.6, 'rgba(12, 6, 8, 0.38)');
+        textVignette.addColorStop(1, 'rgba(12, 6, 8, 0.0)');
+        ctx.fillStyle = textVignette;
+        ctx.beginPath();
+        ctx.ellipse(230, 840, 290, 180, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // 1. "CHÚNG MÌNH" Title with exact font public/font/2.otf ("SVN-Housttely Signature")
         ctx.save();
         ctx.textAlign = 'left';
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-        ctx.shadowBlur = 10;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+        ctx.shadowBlur = 12;
         ctx.shadowOffsetY = 3;
 
         ctx.fillStyle = '#FFFFFF';
