@@ -79,7 +79,7 @@ export class PageTextureGenerator {
     ctx.fillText(title, 512, 620);
 
     ctx.fillStyle = '#E8BCC6';
-    ctx.font = 'italic 52px "Alex Brush", cursive, serif';
+    ctx.font = 'italic 52px "Dancing Script", "Playfair Display", Georgia, cursive';
     ctx.fillText(subtitle, 512, 700);
 
     ctx.fillStyle = '#B49A6A';
@@ -131,7 +131,7 @@ export class PageTextureGenerator {
     ctx.fillText('✦', 512, 612);
 
     ctx.fillStyle = '#E8BCC6';
-    ctx.font = 'italic 48px "Alex Brush", cursive, serif';
+    ctx.font = 'italic 48px "Dancing Script", "Playfair Display", Georgia, cursive';
     ctx.fillText('Forever & Always', 512, 730);
 
     ctx.fillStyle = '#B49A6A';
@@ -211,7 +211,7 @@ export class PageTextureGenerator {
 
       if (params.quote) {
         ctx.fillStyle = '#94384F';
-        ctx.font = 'italic 26px "Alex Brush", cursive';
+        ctx.font = 'italic 26px "Dancing Script", "Playfair Display", Georgia, cursive';
         ctx.fillText(`"${params.quote}"`, 80, curY);
         curY += 38;
       }
@@ -230,7 +230,7 @@ export class PageTextureGenerator {
       const completeRendering = () => {
         if (params.handwriting) {
           ctx.fillStyle = '#38161E';
-          ctx.font = 'italic 32px "Alex Brush", cursive';
+          ctx.font = 'italic 32px "Dancing Script", "Playfair Display", Georgia, cursive';
           ctx.textAlign = params.side === 'left' ? 'right' : 'center';
           const hX = params.side === 'left' ? 920 : 512;
           ctx.fillText(params.handwriting, hX, 1250);
@@ -329,7 +329,7 @@ export class PageTextureGenerator {
         // Caption text
         if (caption) {
           ctx.fillStyle = '#4A1523';
-          ctx.font = 'italic 19px "Alex Brush", cursive';
+          ctx.font = 'italic 20px "Dancing Script", "Playfair Display", Georgia, cursive';
           ctx.textAlign = 'center';
           ctx.fillText(caption, 0, cardH / 2 - 13);
         }

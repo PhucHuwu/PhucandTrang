@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Cormorant_Garamond, Montserrat, Pinyon_Script, Alex_Brush } from 'next/font/google';
+import { Cormorant_Garamond, Montserrat, Dancing_Script } from 'next/font/google';
 import './globals.css';
 
 const cormorant = Cormorant_Garamond({
@@ -16,17 +16,10 @@ const montserrat = Montserrat({
   display: 'swap',
 });
 
-const pinyon = Pinyon_Script({
-  subsets: ['latin'],
-  weight: ['400'],
-  variable: '--font-pinyon',
-  display: 'swap',
-});
-
-const alexBrush = Alex_Brush({
+const dancingScript = Dancing_Script({
   subsets: ['latin', 'vietnamese'],
-  weight: ['400'],
-  variable: '--font-alex-brush',
+  weight: ['400', '600', '700'],
+  variable: '--font-handwriting',
   display: 'swap',
 });
 
@@ -44,7 +37,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi" className={`${cormorant.variable} ${montserrat.variable} ${pinyon.variable} ${alexBrush.variable}`}>
+    <html lang="vi" className={`${cormorant.variable} ${montserrat.variable} ${dancingScript.variable}`}>
       <body className="bg-[#12100E] text-ink-800 antialiased selection:bg-rosewood-200 selection:text-rosewood-900">
         {children}
       </body>
