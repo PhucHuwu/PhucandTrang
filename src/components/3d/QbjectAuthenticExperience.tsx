@@ -41,38 +41,38 @@ export default function QbjectAuthenticExperience() {
         side: 'left',
       });
 
-      // 2. CHAPTER I: LẦN ĐẦU GẶP GỠ (13.10 - 19.10.2022)
-      // Layout: Dual Columns (Trang 1 có 2 ảnh cạnh nhau song song)
+      // 2. CHAPTER I: LẦN ĐẦU GẶP GỠ (13.10.2022)
+      // Layout: Dual Columns (Trang 1 có 2 ảnh cạnh nhau song song ngày 13.10.2022)
       const p1Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 1,
         chapter: 'Chapter I',
         title: 'Lần Đầu Gặp Gỡ',
         quote: 'Vạn vật như muốn hai mình bên nhau...',
         textLines: [
-          'Ngày 13 và 14 tháng 10 năm 2022,',
+          'Ngày 13 tháng 10 năm 2022,',
           'khoảnh khắc đầu tiên mình và bạn chạm ánh mắt nhau,',
           'thế giới bỗng trở nên thật dịu dàng và ấm áp.',
         ],
         layout: 'dual-columns',
         media: [
           { src: getMediaUrl('First-meet-13-10-2022.jpg'), caption: '13.10.2022 • Cuộc gặp gỡ định mệnh' },
-          { src: getMediaUrl('First-meet-14-10-2022.jpg'), caption: '14.10.2022 • Rung động đầu đời' },
+          { src: getMediaUrl('First-meet-13-10-2022_2.jpg'), caption: '13.10.2022 • Rung động đầu đời' },
         ],
         side: 'right',
       });
 
-      // Layout: Single Hero (Trang 2 có 1 ảnh ngang lớn 19.10 cực đẹp)
+      // Layout: Single Hero (Trang 2 có ảnh ngang lớn ngày 13.10.2022 lưu giữ nụ cười)
       const p1Back = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 2,
         chapter: 'Chapter I',
         title: 'Ánh Nhìn Đầu Tiên',
         textLines: [
-          'Đêm 19 tháng 10 năm 2022,',
-          'những dòng tin nhắn và hồi hộp chờ đợi ngày mai.',
+          'Cũng trong ngày 13 tháng 10 năm 2022 ấy,',
+          'từng khoảnh khắc trôi qua đều ngập tràn niềm vui và sự xao xuyến.',
         ],
         layout: 'single-hero',
         media: [
-          { src: getMediaUrl('First-ani-19-10-2022.jpg'), caption: '19.10.2022 • Đêm trước ngày chung đôi' },
+          { src: getMediaUrl('First-meet-13-10-2022_3.jpg'), caption: '13.10.2022 • Những ánh nhìn đầu tiên' },
         ],
         side: 'left',
       });
