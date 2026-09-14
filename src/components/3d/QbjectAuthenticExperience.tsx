@@ -21,11 +21,9 @@ export default function QbjectAuthenticExperience() {
     let destroyed = false;
 
     const initOriginalFlipbook = async () => {
-      // 1. FRONT COVER
-      const coverFront = PageTextureGenerator.createCoverTexture(
-        'CHÚNG MÌNH',
-        'Phúc & Trang',
-        '20.10.2022'
+      // 1. FRONT COVER WITH PHOTO "WE.JPEG" & FONT 2.OTF
+      const coverFront = await PageTextureGenerator.createCoverTexture(
+        getMediaUrl('WE.JPEG')
       );
       const insideBlank = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 0,

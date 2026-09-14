@@ -17,159 +17,110 @@ export type PageLayoutType =
   | 'diagonal-duo';     // 2 ảnh góc nghiêng đè nhẹ nghệ thuật
 
 export class PageTextureGenerator {
-  static createCoverTexture(title: string, subtitle: string, date: string): THREE.CanvasTexture {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1024;
-    canvas.height = 1360;
-    const ctx = canvas.getContext('2d')!;
+  static createCoverTexture(photoSrc: string): Promise<THREE.CanvasTexture> {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 1360;
+      const ctx = canvas.getContext('2d')!;
 
-    // 1. Soft Warm Pastel Blush & Cream Watercolor Texture
-    const gradient = ctx.createLinearGradient(0, 0, 1024, 1360);
-    gradient.addColorStop(0, '#FFF5F7');
-    gradient.addColorStop(0.35, '#FFE9EE');
-    gradient.addColorStop(0.7, '#FDE2E8');
-    gradient.addColorStop(1, '#F7D6DE');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 1024, 1360);
+      // Calculate days together from 2022-10-20 to today
+      const startDate = new Date('2022-10-20T00:00:00').getTime();
+      const now = new Date().getTime();
+      const daysTogether = Math.max(0, Math.floor((now - startDate) / (1000 * 60 * 60 * 24)));
 
-    // Cute soft watercolor clouds / bubbles
-    const pastelBlobs = [
-      { x: 260, y: 320, r: 280, color: 'rgba(255, 209, 220, 0.4)' },
-      { x: 780, y: 440, r: 260, color: 'rgba(255, 225, 235, 0.45)' },
-      { x: 340, y: 920, r: 320, color: 'rgba(255, 218, 225, 0.35)' },
-      { x: 740, y: 1040, r: 290, color: 'rgba(250, 210, 222, 0.4)' },
-    ];
-    pastelBlobs.forEach(b => {
-      const radGrad = ctx.createRadialGradient(b.x, b.y, 10, b.x, b.y, b.r);
-      radGrad.addColorStop(0, b.color);
-      radGrad.addColorStop(1, 'rgba(255, 245, 247, 0)');
-      ctx.fillStyle = radGrad;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-      ctx.fill();
+      const renderCover = (img?: HTMLImageElement) => {
+        if (img) {
+          // Draw full photo cover with object-fit: cover
+          const srcW = img.naturalWidth || img.width;
+          const srcH = img.naturalHeight || img.height;
+          const srcRatio = srcW / srcH;
+          const destRatio = 1024 / 1360;
+
+          let sX = 0, sY = 0, sW = srcW, sH = srcH;
+          if (srcRatio > destRatio) {
+            sW = srcH * destRatio;
+            sX = (srcW - sW) / 2;
+          } else {
+            sH = srcW / destRatio;
+            sY = (srcH - sH) / 2;
+          }
+          ctx.drawImage(img, sX, sY, sW, sH, 0, 0, 1024, 1360);
+        } else {
+          // Fallback background
+          const grad = ctx.createLinearGradient(0, 0, 1024, 1360);
+          grad.addColorStop(0, '#FFE8EE');
+          grad.addColorStop(1, '#F7D6DE');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, 1024, 1360);
+        }
+
+        // Delicate dark-warm cinematic vignette gradient at bottom-left for crisp text readability
+        const darkVignette = ctx.createLinearGradient(0, 700, 0, 1360);
+        darkVignette.addColorStop(0, 'rgba(0, 0, 0, 0.0)');
+        darkVignette.addColorStop(0.45, 'rgba(20, 10, 15, 0.45)');
+        darkVignette.addColorStop(1, 'rgba(15, 5, 10, 0.85)');
+        ctx.fillStyle = darkVignette;
+        ctx.fillRect(0, 700, 1024, 660);
+
+        // Soft frosted-glass card backdrop behind text for extreme legibility
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(50, 1080, 520, 210, [24]);
+        ctx.fillStyle = 'rgba(15, 10, 12, 0.45)';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+        ctx.shadowBlur = 24;
+        ctx.shadowOffsetY = 8;
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
+
+        // 1. "CHÚNG MÌNH" Title with font 2.otf ("Coldwell Bridges")
+        ctx.save();
+        ctx.textAlign = 'left';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetY = 3;
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 56px "Coldwell Bridges", "Playfair Display", Georgia, serif';
+        ctx.letterSpacing = '3px';
+        ctx.fillText('CHÚNG MÌNH', 85, 1155);
+
+        // Subtle rose-gold accent line
+        ctx.strokeStyle = '#F0B6C3';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(85, 1175);
+        ctx.lineTo(440, 1175);
+        ctx.stroke();
+
+        // 2. Love Counter: Days together from 20.10.2022
+        ctx.fillStyle = '#FFE5B4'; // Warm champagne gold
+        ctx.font = 'bold 36px "Montserrat", sans-serif';
+        ctx.letterSpacing = '1px';
+        ctx.fillText(`${daysTogether.toLocaleString()} NGÀY`, 85, 1228);
+
+        ctx.fillStyle = 'rgba(255, 245, 247, 0.85)';
+        ctx.font = 'italic 20px "Dancing Script", cursive';
+        ctx.fillText('Bên nhau từ ngày 20.10.2022', 85, 1262);
+
+        ctx.restore();
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        resolve(texture);
+      };
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => renderCover(img);
+      img.onerror = () => renderCover();
+      img.src = photoSrc;
     });
-
-    // Gentle linen fabric texture
-    ctx.fillStyle = 'rgba(180, 140, 150, 0.04)';
-    for (let i = 0; i < 5000; i++) {
-      ctx.fillRect(Math.random() * 1024, Math.random() * 1360, 2, 2);
-    }
-
-    // 2. Romantic Rose-Gold & Scalloped / Stitched Border
-    ctx.strokeStyle = '#E295A8';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(50, 50, 924, 1260);
-
-    ctx.setLineDash([10, 8]);
-    ctx.strokeStyle = '#F0B6C3';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(68, 68, 888, 1224);
-    ctx.setLineDash([]);
-
-    // Cute corner flower buds / bows
-    ctx.fillStyle = '#D4728C';
-    ctx.font = '28px serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('🌸', 95, 100);
-    ctx.fillText('🌸', 929, 100);
-    ctx.fillText('🌸', 95, 1265);
-    ctx.fillText('🌸', 929, 1265);
-
-    // Floating little sparkles and hearts on cover
-    const cuteElements = [
-      { text: '✨', x: 220, y: 220, size: 28 },
-      { text: '💖', x: 810, y: 240, size: 26 },
-      { text: '🌷', x: 180, y: 800, size: 30 },
-      { text: '🎀', x: 840, y: 780, size: 32 },
-      { text: '✨', x: 790, y: 1140, size: 26 },
-      { text: '💕', x: 230, y: 1120, size: 28 },
-    ];
-    cuteElements.forEach(e => {
-      ctx.font = `${e.size}px serif`;
-      ctx.fillText(e.text, e.x, e.y);
-    });
-
-    // Top ribbon title
-    ctx.fillStyle = '#C45D78';
-    ctx.font = 'bold 22px "Montserrat", sans-serif';
-    ctx.letterSpacing = '6px';
-    ctx.fillText('OUR LOVE JOURNAL', 512, 260);
-
-    // Romantic Wreath / Heart Centerpiece
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(512, 450, 95, 0, Math.PI * 2);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.shadowColor = 'rgba(212, 114, 140, 0.2)';
-    ctx.shadowBlur = 25;
-    ctx.shadowOffsetY = 6;
-    ctx.fill();
-    ctx.restore();
-
-    ctx.strokeStyle = '#F3BDC8';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(512, 450, 95, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.setLineDash([6, 6]);
-    ctx.strokeStyle = '#E8A3B3';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(512, 450, 83, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Big cute heart in centerpiece
-    ctx.fillStyle = '#E85A7E';
-    ctx.font = '72px serif';
-    ctx.fillText('💗', 512, 475);
-
-    // Main Title: Chúng Mình
-    ctx.fillStyle = '#732A3E';
-    ctx.font = 'bold 68px "Cormorant Garamond", Georgia, serif';
-    ctx.letterSpacing = '2px';
-    ctx.fillText(title, 512, 640);
-
-    // Cute decorative flourish line
-    ctx.strokeStyle = '#E295A8';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(412, 675);
-    ctx.lineTo(612, 675);
-    ctx.stroke();
-
-    ctx.fillStyle = '#E85A7E';
-    ctx.font = '22px serif';
-    ctx.fillText('❦', 512, 683);
-
-    // Sweet handwriting couple names
-    ctx.fillStyle = '#B84364';
-    ctx.font = 'bold 64px "Dancing Script", cursive';
-    ctx.fillText(subtitle, 512, 765);
-
-    // Cute date badge
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-    ctx.beginPath();
-    ctx.roundRect(362, 830, 300, 52, [26]);
-    ctx.fill();
-    ctx.strokeStyle = '#F0B6C3';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    ctx.fillStyle = '#A84D67';
-    ctx.font = '600 22px "Montserrat", sans-serif';
-    ctx.letterSpacing = '3px';
-    ctx.fillText(`• ${date} •`, 512, 863);
-
-    // Sweet closing quote on cover
-    ctx.fillStyle = '#8C485B';
-    ctx.font = 'italic 28px "Dancing Script", cursive';
-    ctx.fillText('Nơi tình yêu bắt đầu và lớn lên từng ngày...', 512, 970);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    return texture;
   }
 
   static createBackCoverTexture(): THREE.CanvasTexture {
