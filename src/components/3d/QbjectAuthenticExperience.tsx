@@ -7,6 +7,7 @@ import { AtmosphericSystem } from './AtmosphericSystem';
 import VintageMusicPlayer from '@/components/VintageMusicPlayer';
 import { getMediaUrl } from '@/data/mediaConfig';
 import { ensureCustomFontLoaded } from '@/data/fontLoader';
+import { BookOpen } from 'lucide-react';
 
 export default function QbjectAuthenticExperience() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -573,16 +574,16 @@ export default function QbjectAuthenticExperience() {
 
           {/* Center Floating Icon & Title */}
           <div className="relative z-10 flex flex-col items-center text-center px-6">
-            <div className="w-20 h-20 rounded-full bg-white/5 border border-pink-300/30 backdrop-blur-md flex items-center justify-center mb-5 shadow-xl animate-heart-float">
-              <span className="text-3xl select-none">📖</span>
+            <div className="w-20 h-20 rounded-full bg-white/5 border border-pink-300/30 backdrop-blur-md flex items-center justify-center mb-6 shadow-xl animate-heart-float text-pink-200">
+              <BookOpen className="w-9 h-9 stroke-[1.5]" />
             </div>
 
-            <h2 className="font-serif text-2xl sm:text-3xl tracking-widest text-[#FFF0F4] font-medium mb-1">
-              CHÚNG MÌNH
+            <h2
+              className="text-4xl sm:text-5xl text-[#FFF0F4] font-normal mb-8 tracking-wide drop-shadow-md"
+              style={{ fontFamily: '"SVN-Housttely Signature", "Coldwell Bridges", cursive, serif' }}
+            >
+              Chúng Mình
             </h2>
-            <p className="font-script text-2xl sm:text-3xl text-rosewood-200 mb-6">
-              Phúc &amp; Trang
-            </p>
 
             {/* Elegant Loading Progress Line */}
             <div className="w-48 sm:w-64 h-[2px] bg-white/10 rounded-full overflow-hidden relative mb-4">

@@ -484,7 +484,7 @@ export class PageTextureGenerator {
             vCtx.fillStyle = '#E8BCC6';
             vCtx.font = '22px Montserrat, sans-serif';
             vCtx.textAlign = 'center';
-            vCtx.fillText('▶ Video Kỷ Niệm', 200, 155);
+            vCtx.fillText('Video Kỷ Niệm', 200, 155);
 
             loadedElements[idx] = { elem: vCanvas, item };
             loadedCount++;
