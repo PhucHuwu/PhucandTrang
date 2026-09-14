@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Flipbook from './qbject/flipbook';
 import { PageTextureGenerator } from './PageTextureGenerator';
 import VintageMusicPlayer from '@/components/VintageMusicPlayer';
+import { getMediaUrl } from '@/data/mediaConfig';
 
 export default function QbjectAuthenticExperience() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -43,7 +44,7 @@ export default function QbjectAuthenticExperience() {
           'khoảnh khắc đầu tiên mình và bạn chạm ánh mắt nhau,',
           'thế giới bỗng trở nên thật dịu dàng và ấm áp.',
         ],
-        imageSrc: '/memories/First-meet-13-10-2022.jpg',
+        imageSrc: getMediaUrl('First-meet-13-10-2022.jpg'),
         imageCaption: '13.10.2022 • Cuộc gặp gỡ định mệnh',
         side: 'right',
       });
@@ -56,9 +57,9 @@ export default function QbjectAuthenticExperience() {
           'Ngày 14.10.2022 và đêm trước ngày tỏ tình 19.10,',
           'từng khoảnh khắc trôi qua đều ngập tràn sự nhớ nhung.',
         ],
-        imageSrc: '/memories/First-meet-14-10-2022.jpg',
+        imageSrc: getMediaUrl('First-meet-14-10-2022.jpg'),
         imageCaption: '14.10.2022 • Những rung động đầu tiên',
-        secondaryImageSrc: '/memories/First-ani-19-10-2022.jpg',
+        secondaryImageSrc: getMediaUrl('First-ani-19-10-2022.jpg'),
         secondaryImageCaption: '19.10.2022 • Đêm trước ngày nhận lời',
         side: 'left',
       });
@@ -74,7 +75,7 @@ export default function QbjectAuthenticExperience() {
           'câu hỏi ngập ngừng chứa trọn sự chân thành của tuổi trẻ,',
           'và nụ cười gật đầu của bạn là món quà tuyệt vời nhất đời mình.',
         ],
-        imageSrc: '/memories/23-12-2022.JPG',
+        imageSrc: getMediaUrl('23-12-2022.JPG'),
         imageCaption: '23.12.2022 • Trước thềm Giáng Sinh',
         side: 'right',
       });
@@ -87,9 +88,9 @@ export default function QbjectAuthenticExperience() {
           'Giáng sinh đầu tiên cùng nhau dạo phố,',
           'cái lạnh mùa đông tan biến trước hơi ấm đôi bàn tay.',
         ],
-        imageSrc: '/memories/25-12-2022.jpg',
+        imageSrc: getMediaUrl('25-12-2022.jpg'),
         imageCaption: '25.12.2022 • Mùa đông an yên',
-        secondaryImageSrc: '/memories/25-12-2022_2.jpg',
+        secondaryImageSrc: getMediaUrl('25-12-2022_2.jpg'),
         secondaryImageCaption: 'Tay trong tay đón Giáng sinh',
         side: 'left',
       });
@@ -104,9 +105,9 @@ export default function QbjectAuthenticExperience() {
           'Tháng 3 dịu dàng, mùa hè tháng 7 rực rỡ nắng vàng,',
           'và ngày 25.10.2023 kỷ niệm tròn một năm chúng mình bên nhau.',
         ],
-        imageSrc: '/memories/05-03-2023.jpg',
+        imageSrc: getMediaUrl('05-03-2023.jpg'),
         imageCaption: '05.03.2023 • Những ngày mùa xuân',
-        secondaryImageSrc: '/memories/08-07-2023.jpg',
+        secondaryImageSrc: getMediaUrl('08-07-2023.jpg'),
         secondaryImageCaption: '08.07.2023 • Nắng hè rạng rỡ',
         side: 'right',
       });
@@ -119,9 +120,9 @@ export default function QbjectAuthenticExperience() {
           'Những góc phố tháng 12 lưu giữ nụ cười của hai đứa,',
           'bình yên bên nhau qua từng năm tháng.',
         ],
-        imageSrc: '/memories/02-12-2023.jpg',
+        imageSrc: getMediaUrl('02-12-2023.jpg'),
         imageCaption: '02.12.2023 • Kỷ niệm tháng 12',
-        secondaryImageSrc: '/memories/02-12-2023_2.jpg',
+        secondaryImageSrc: getMediaUrl('02-12-2023_2.jpg'),
         secondaryImageCaption: '02.12.2023 • Dạo phố cùng nhau',
         side: 'left',
       });
@@ -137,9 +138,9 @@ export default function QbjectAuthenticExperience() {
           'sinh nhật đặc biệt nhất khi luôn có bạn kề cạnh,',
           'cùng thổi nến và sẻ chia những ước nguyện mai sau.',
         ],
-        imageSrc: '/memories/Brithdate-together-25-05-2024_2.jpg',
+        imageSrc: getMediaUrl('Brithdate-together-25-05-2024_2.jpg'),
         imageCaption: '25.05.2024 • Sinh nhật ngọt ngào',
-        secondaryImageSrc: '/memories/Brithdate-together-25-05-2024_3.jpg',
+        secondaryImageSrc: getMediaUrl('Brithdate-together-25-05-2024_3.jpg'),
         secondaryImageCaption: '25.05.2024 • Nụ cười hạnh phúc',
         side: 'right',
       });
@@ -152,9 +153,9 @@ export default function QbjectAuthenticExperience() {
           'Những ngày tháng 7 đầy ắp kỷ niệm và tiếng cười,',
           'tình cảm của chúng mình ngày càng thêm gắn kết.',
         ],
-        imageSrc: '/memories/Brithdate-together-25-05-2024_4.jpg',
+        imageSrc: getMediaUrl('Brithdate-together-25-05-2024_4.jpg'),
         imageCaption: '25.05.2024 • Khoảnh khắc đáng nhớ',
-        secondaryImageSrc: '/memories/02-07-2024.jpg',
+        secondaryImageSrc: getMediaUrl('02-07-2024.jpg'),
         secondaryImageCaption: '02.07.2024 • Mùa hè yêu thương',
         side: 'left',
       });
@@ -170,9 +171,9 @@ export default function QbjectAuthenticExperience() {
           'chuyến đi khởi đầu năm mới với bao hy vọng,',
           'mình và bạn cùng nhau gom góp thêm thật nhiều bức ảnh đẹp.',
         ],
-        imageSrc: '/memories/02-01-2025.jpg',
+        imageSrc: getMediaUrl('02-01-2025.jpg'),
         imageCaption: '02.01.2025 • Du xuân năm mới',
-        secondaryImageSrc: '/memories/02-01-2025_2.jpg',
+        secondaryImageSrc: getMediaUrl('02-01-2025_2.jpg'),
         secondaryImageCaption: '02.01.2025 • Bên nhau bình yên',
         side: 'right',
       });
@@ -185,9 +186,9 @@ export default function QbjectAuthenticExperience() {
           'Những góc chụp rạng rỡ ngày 02 và 17 tháng 01,',
           'từng cung đường đi qua đều in dấu chân của hai mình.',
         ],
-        imageSrc: '/memories/02-01-2025_3.jpg',
+        imageSrc: getMediaUrl('02-01-2025_3.jpg'),
         imageCaption: '02.01.2025 • Rạng rỡ nụ cười',
-        secondaryImageSrc: '/memories/17-01-2025_2.jpg',
+        secondaryImageSrc: getMediaUrl('17-01-2025_2.jpg'),
         secondaryImageCaption: '17.01.2025 • Chuyến đi đáng nhớ',
         side: 'left',
       });
@@ -203,9 +204,9 @@ export default function QbjectAuthenticExperience() {
           'nụ cười và nét duyên dáng của bạn',
           'luôn làm trái tim mình rung động như ngày đầu.',
         ],
-        imageSrc: '/memories/her-pic-1.jpg',
+        imageSrc: getMediaUrl('her-pic-1.jpg'),
         imageCaption: 'Nụ cười tỏa nắng của bạn',
-        secondaryImageSrc: '/memories/her-pic-2.jpg',
+        secondaryImageSrc: getMediaUrl('her-pic-2.jpg'),
         secondaryImageCaption: 'Nét dịu dàng trong trẻo',
         side: 'right',
       });
@@ -218,9 +219,9 @@ export default function QbjectAuthenticExperience() {
           'Lưu giữ từng nụ cười rạng rỡ và ánh mắt biết nói,',
           'người con gái mình luôn yêu thương và trân quý.',
         ],
-        imageSrc: '/memories/her-pic-5.jpg',
+        imageSrc: getMediaUrl('her-pic-5.jpg'),
         imageCaption: 'Xinh đẹp & Rạng rỡ',
-        secondaryImageSrc: '/memories/20-08-2025_4.jpg',
+        secondaryImageSrc: getMediaUrl('20-08-2025_4.jpg'),
         secondaryImageCaption: '20.08.2025 • Dịu dàng mùa thu',
         side: 'left',
       });
@@ -235,9 +236,9 @@ export default function QbjectAuthenticExperience() {
           'Tháng 11.2025, chuyến đi 2026 và những ngày tháng sau này,',
           'chúng mình vẫn sẽ luôn nắm chặt tay nhau như thế.',
         ],
-        imageSrc: '/memories/22-11-2025.jpg',
+        imageSrc: getMediaUrl('22-11-2025.jpg'),
         imageCaption: '22.11.2025 • Gắn kết bền chặt',
-        secondaryImageSrc: '/memories/18-04-2026.jpg',
+        secondaryImageSrc: getMediaUrl('18-04-2026.jpg'),
         secondaryImageCaption: '18.04.2026 • Hẹn ước tương lai',
         side: 'right',
       });
@@ -253,7 +254,7 @@ export default function QbjectAuthenticExperience() {
           'Yêu bạn đến tận cùng những năm tháng dịu dàng.',
         ],
         handwriting: '~ Yêu bạn trọn vẹn, Phúc ~',
-        secondaryImageSrc: '/memories/First-trip-14-03-2026.jpg',
+        secondaryImageSrc: getMediaUrl('First-trip-14-03-2026.jpg'),
         secondaryImageCaption: '14.03.2026 • Bên nhau mãi mãi',
         side: 'left',
       });
