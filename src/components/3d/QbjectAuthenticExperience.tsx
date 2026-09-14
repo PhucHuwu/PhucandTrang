@@ -410,6 +410,38 @@ export default function QbjectAuthenticExperience() {
         coverMarginX: 8,
         coverMarginY: 10,
         pageEdgeColor: 0xb1a283,
+        pageActiveAreas: [
+          // Chapter IV: Page 7 right face (faceIndex: 7) -> 26-06-2323.mp4
+          {
+            faceIndex: 7,
+            video: getMediaUrl('26-06-2323.mp4'),
+            top: 0.25,
+            left: 0.15,
+            width: 0.7,
+            height: 0.65,
+            title: 'Xem Video Kỷ Niệm 26.06',
+          },
+          // Chapter IV: Page 8 left face (faceIndex: 8) -> Brithdate-together-25-05-2024.mp4
+          {
+            faceIndex: 8,
+            video: getMediaUrl('Brithdate-together-25-05-2024.mp4'),
+            top: 0.25,
+            left: 0.15,
+            width: 0.7,
+            height: 0.65,
+            title: 'Xem Video Sinh Nhật 25.05.2024',
+          },
+          // Chapter VI: Page 12 left face (faceIndex: 12) -> 17-01-2025.mp4
+          {
+            faceIndex: 12,
+            video: getMediaUrl('17-01-2025.mp4'),
+            top: 0.25,
+            left: 0.15,
+            width: 0.7,
+            height: 0.65,
+            title: 'Xem Video Chuyến Đi 17.01.2025',
+          },
+        ],
         textureUrls: {
           pages: pageUrls,
           spineInner: pageUrls[0],

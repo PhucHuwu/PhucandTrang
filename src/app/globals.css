@@ -77,17 +77,101 @@
   backdrop-filter: blur(1px);
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
+/* Qbject Original Video Overlay Styles */
+.flipbook-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
 }
-::-webkit-scrollbar-track {
-  background: #1E1B18;
+
+.wrapper-link {
+  display: block;
 }
-::-webkit-scrollbar-thumb {
-  background: #94384F;
-  border-radius: 3px;
+
+.video-overlay {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition-property: opacity;
+  transition-duration: 300ms;
+  transition-timing-function: ease-in;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: #B6566D;
+
+.video-overlay.active {
+  opacity: 1;
+  pointer-events: all;
+  transition-delay: 400ms;
+  transition-timing-function: ease-out;
+}
+
+.video-overlay > .video-wrapper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1;
+  transform: translateX(-50%) translateY(-50%) scale(0.96);
+  transition-property: transform, opacity;
+  transition-duration: 300ms;
+  transition-timing-function: ease-in;
+  opacity: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-overlay > .video-wrapper > video {
+  max-width: 85vw;
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+}
+
+.video-overlay.active > .video-wrapper {
+  transition-delay: 400ms;
+  transition-timing-function: ease-out;
+}
+
+.video-overlay > .video-wrapper.active {
+  transform: translateX(-50%) translateY(-50%) scale(1);
+  opacity: 1;
+  pointer-events: all;
+}
+
+.video-overlay .backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+}
+
+.video-overlay .closeBtn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 48px;
+  height: 48px;
+  box-sizing: border-box;
+  background-color: rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  opacity: 0.8;
+  z-index: 2;
+  transition-property: opacity, transform, background-color;
+  transition-duration: 300ms;
+  transition-timing-function: ease-out;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 55%;
+}
+
+.video-overlay .closeBtn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+  background-color: rgba(255, 255, 255, 0.3);
 }
