@@ -44,8 +44,11 @@ export default class Page {
 		this.textureLoader = pageParams.textureLoader;
 		this.isFrontCover = pageParams.isFrontCover;
 
+		this.ySegments = 16;
 		if (this.isCover) {
-			this.zSegments = 1;
+			this.zSegments = 16;
+		} else {
+			this.zSegments = 24;
 		}
 
 		// Load front and back textures
@@ -135,6 +138,35 @@ export default class Page {
 				// increase vertex density closer to the spine for better bending
 				coord.z = cosineInterpolate(0, 2, coord.z / 2);
 				uv.setXY(i, coord.x > 0.5 ? 1 - coord.z : coord.z, coord.y);
+			}
+
+			// Softly bevel/round the outer vertical corners (top-right & bottom-right of page)
+			const cornerRadiusRelZ = 45 / this.width;
+			const cornerRadiusRelY = 45 / this.height;
+			if (coord.z > 1 - cornerRadiusRelZ) {
+				const distFromOuterEdge = (coord.z - (1 - cornerRadiusRelZ)) / cornerRadiusRelZ;
+				// Check top corner
+				if (coord.y > 1 - cornerRadiusRelY) {
+					const distFromTop = (coord.y - (1 - cornerRadiusRelY)) / cornerRadiusRelY;
+					const dist = Math.sqrt(distFromOuterEdge * distFromOuterEdge + distFromTop * distFromTop);
+					if (dist > 1) {
+						const factor = 1 / dist;
+						coord.z = (1 - cornerRadiusRelZ) + distFromOuterEdge * factor * cornerRadiusRelZ;
+						coord.y = (1 - cornerRadiusRelY) + distFromTop * factor * cornerRadiusRelY;
+						position.setY(i, (coord.y - 0.5) * this.height);
+					}
+				}
+				// Check bottom corner
+				else if (coord.y < cornerRadiusRelY) {
+					const distFromBottom = (cornerRadiusRelY - coord.y) / cornerRadiusRelY;
+					const dist = Math.sqrt(distFromOuterEdge * distFromOuterEdge + distFromBottom * distFromBottom);
+					if (dist > 1) {
+						const factor = 1 / dist;
+						coord.z = (1 - cornerRadiusRelZ) + distFromOuterEdge * factor * cornerRadiusRelZ;
+						coord.y = cornerRadiusRelY - distFromBottom * factor * cornerRadiusRelY;
+						position.setY(i, (coord.y - 0.5) * this.height);
+					}
+				}
 			}
 
 			this.vertexRelCoords[i] = coord;
