@@ -18,11 +18,22 @@ export type PageLayoutType =
 
 export class PageTextureGenerator {
   static createCoverTexture(photoSrc: string): Promise<THREE.CanvasTexture> {
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
       const canvas = document.createElement('canvas');
       canvas.width = 1024;
       canvas.height = 1360;
       const ctx = canvas.getContext('2d')!;
+
+      // Ensure custom font 2.otf (SVN-Housttely Signature) is fully loaded in browser
+      if (typeof document !== 'undefined' && document.fonts) {
+        try {
+          await document.fonts.load('60px "SVN-Housttely Signature"');
+          await document.fonts.load('60px "Coldwell Bridges"');
+          await document.fonts.ready;
+        } catch (err) {
+          console.log('Font load check:', err);
+        }
+      }
 
       // Calculate days together from 2022-10-20 to today
       const startDate = new Date('2022-10-20T00:00:00').getTime();
@@ -66,9 +77,9 @@ export class PageTextureGenerator {
         // Soft frosted-glass card backdrop behind text for extreme legibility
         ctx.save();
         ctx.beginPath();
-        ctx.roundRect(50, 1080, 520, 210, [24]);
-        ctx.fillStyle = 'rgba(15, 10, 12, 0.45)';
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+        ctx.roundRect(50, 1060, 530, 230, [24]);
+        ctx.fillStyle = 'rgba(15, 10, 12, 0.5)';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
         ctx.shadowBlur = 24;
         ctx.shadowOffsetY = 8;
         ctx.fill();
@@ -78,35 +89,35 @@ export class PageTextureGenerator {
         ctx.stroke();
         ctx.restore();
 
-        // 1. "CHÚNG MÌNH" Title with font 2.otf ("Coldwell Bridges")
+        // 1. "CHÚNG MÌNH" Title with exact font public/font/2.otf ("SVN-Housttely Signature")
         ctx.save();
         ctx.textAlign = 'left';
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-        ctx.shadowBlur = 12;
-        ctx.shadowOffsetY = 3;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        ctx.shadowBlur = 14;
+        ctx.shadowOffsetY = 4;
 
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 56px "Coldwell Bridges", "Playfair Display", Georgia, serif';
-        ctx.letterSpacing = '3px';
-        ctx.fillText('CHÚNG MÌNH', 85, 1155);
+        ctx.font = 'normal 64px "SVN-Housttely Signature", "Coldwell Bridges", cursive, serif';
+        ctx.letterSpacing = '2px';
+        ctx.fillText('CHÚNG MÌNH', 80, 1145);
 
         // Subtle rose-gold accent line
         ctx.strokeStyle = '#F0B6C3';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(85, 1175);
-        ctx.lineTo(440, 1175);
+        ctx.moveTo(80, 1165);
+        ctx.lineTo(460, 1165);
         ctx.stroke();
 
         // 2. Love Counter: Days together from 20.10.2022
         ctx.fillStyle = '#FFE5B4'; // Warm champagne gold
         ctx.font = 'bold 36px "Montserrat", sans-serif';
         ctx.letterSpacing = '1px';
-        ctx.fillText(`${daysTogether.toLocaleString()} NGÀY`, 85, 1228);
+        ctx.fillText(`${daysTogether.toLocaleString()} NGÀY`, 80, 1222);
 
-        ctx.fillStyle = 'rgba(255, 245, 247, 0.85)';
-        ctx.font = 'italic 20px "Dancing Script", cursive';
-        ctx.fillText('Bên nhau từ ngày 20.10.2022', 85, 1262);
+        ctx.fillStyle = 'rgba(255, 245, 247, 0.9)';
+        ctx.font = 'italic 22px "Dancing Script", cursive';
+        ctx.fillText('Bên nhau từ ngày 20.10.2022', 80, 1262);
 
         ctx.restore();
 

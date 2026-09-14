@@ -6,6 +6,7 @@ import { PageTextureGenerator, PageMediaItem } from './PageTextureGenerator';
 import { AtmosphericSystem } from './AtmosphericSystem';
 import VintageMusicPlayer from '@/components/VintageMusicPlayer';
 import { getMediaUrl } from '@/data/mediaConfig';
+import { ensureCustomFontLoaded } from '@/data/fontLoader';
 
 export default function QbjectAuthenticExperience() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -21,6 +22,9 @@ export default function QbjectAuthenticExperience() {
     let destroyed = false;
 
     const initOriginalFlipbook = async () => {
+      // Ensure custom font 2.otf is loaded before generating canvas textures
+      await ensureCustomFontLoaded();
+
       // 1. FRONT COVER WITH PHOTO "WE.JPEG" & FONT 2.OTF
       const coverFront = await PageTextureGenerator.createCoverTexture(
         getMediaUrl('WE.JPEG')
