@@ -66,30 +66,7 @@ export class PageTextureGenerator {
           ctx.fillRect(0, 0, 1024, 1360);
         }
 
-        // Delicate dark-warm cinematic vignette gradient at bottom-left for crisp text readability
-        const darkVignette = ctx.createLinearGradient(0, 700, 0, 1360);
-        darkVignette.addColorStop(0, 'rgba(0, 0, 0, 0.0)');
-        darkVignette.addColorStop(0.45, 'rgba(20, 10, 15, 0.45)');
-        darkVignette.addColorStop(1, 'rgba(15, 5, 10, 0.85)');
-        ctx.fillStyle = darkVignette;
-        ctx.fillRect(0, 700, 1024, 660);
-
         // Soft frosted-glass card backdrop in Middle-Left area (y: 600)
-        ctx.save();
-        ctx.beginPath();
-        ctx.roundRect(45, 600, 390, 160, [18]);
-        ctx.fillStyle = 'rgba(15, 10, 12, 0.45)';
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-        ctx.shadowBlur = 18;
-        ctx.shadowOffsetY = 6;
-        ctx.fill();
-
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
-        ctx.restore();
-
-        // 1. "CHÚNG MÌNH" Title with exact font public/font/2.otf ("SVN-Housttely Signature")
         ctx.save();
         ctx.textAlign = 'left';
         ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
@@ -97,27 +74,27 @@ export class PageTextureGenerator {
         ctx.shadowOffsetY = 3;
 
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'normal 42px "SVN-Housttely Signature", "Coldwell Bridges", cursive, serif';
+        ctx.font = 'normal 60px "SVN-Housttely Signature", "Coldwell Bridges", cursive, serif';
         ctx.letterSpacing = '1px';
-        ctx.fillText('CHÚNG MÌNH', 70, 660);
+        ctx.fillText('Chúng Mình', 70, 780);
 
         // Subtle rose-gold accent line
         ctx.strokeStyle = '#F0B6C3';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(70, 675);
-        ctx.lineTo(340, 675);
+        ctx.moveTo(70, 850);
+        ctx.lineTo(340, 850);
         ctx.stroke();
 
         // 2. Love Counter: Days together from 20.10.2022
         ctx.fillStyle = '#FFE5B4'; // Warm champagne gold
-        ctx.font = 'bold 26px "Montserrat", sans-serif';
+        ctx.font = 'bold 32px "Montserrat", sans-serif';
         ctx.letterSpacing = '1px';
-        ctx.fillText(`${daysTogether.toLocaleString()} NGÀY`, 70, 715);
+        ctx.fillText(`${daysTogether.toLocaleString()} NGÀY`, 70, 900);
 
         ctx.fillStyle = 'rgba(255, 245, 247, 0.85)';
-        ctx.font = 'italic 16px "Dancing Script", cursive';
-        ctx.fillText('Bên nhau từ ngày 20.10.2022', 70, 742);
+        ctx.font = 'italic 24px "Dancing Script", cursive';
+        ctx.fillText('Bên nhau từ ngày 20.10.2022', 70, 930);
 
         ctx.restore();
 
