@@ -1,10 +1,5 @@
 import * as THREE from 'three';
 
-/**
- * Creates high-res 1024x1360 Canvas texture for book covers and inside pages.
- * Incorporates authentic paper fibers, watercolor edges, elegant serif typography,
- * polaroid frames, and handwritten notes.
- */
 export class PageTextureGenerator {
   static createCoverTexture(title: string, subtitle: string, date: string): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
@@ -153,6 +148,8 @@ export class PageTextureGenerator {
     handwriting?: string;
     imageSrc?: string;
     imageCaption?: string;
+    secondaryImageSrc?: string;
+    secondaryImageCaption?: string;
     side: 'left' | 'right';
   }): Promise<THREE.CanvasTexture> {
     return new Promise((resolve) => {
@@ -204,84 +201,127 @@ export class PageTextureGenerator {
       if (params.title) {
         ctx.textAlign = 'left';
         ctx.fillStyle = '#292522';
-        ctx.font = 'bold 46px "Cormorant Garamond", Georgia, serif';
+        ctx.font = 'bold 44px "Cormorant Garamond", Georgia, serif';
         ctx.letterSpacing = '1px';
-        ctx.fillText(params.title, 100, 200);
+        ctx.fillText(params.title, 100, 190);
       }
 
       if (params.quote) {
         ctx.fillStyle = '#94384F';
-        ctx.font = 'italic 34px "Alex Brush", cursive';
-        ctx.fillText(`"${params.quote}"`, 100, 260);
+        ctx.font = 'italic 32px "Alex Brush", cursive';
+        ctx.fillText(`"${params.quote}"`, 100, 245);
       }
 
       // 4. Text Lines
       if (params.textLines && params.textLines.length > 0) {
         ctx.fillStyle = '#474039';
-        ctx.font = '26px "Cormorant Garamond", Georgia, serif';
-        let lineY = params.quote ? 320 : 260;
+        ctx.font = '24px "Cormorant Garamond", Georgia, serif';
+        let lineY = params.quote ? 300 : 250;
         params.textLines.forEach((line) => {
           ctx.fillText(line, 100, lineY);
-          lineY += 42;
+          lineY += 38;
         });
       }
 
-      // 5. Draw Polaroid Photo if provided
       const completeRendering = () => {
         // Handwriting note
         if (params.handwriting) {
           ctx.fillStyle = '#38161E';
-          ctx.font = 'italic 38px "Alex Brush", cursive';
+          ctx.font = 'italic 36px "Alex Brush", cursive';
           ctx.textAlign = params.side === 'left' ? 'right' : 'center';
           const hX = params.side === 'left' ? 900 : 512;
-          ctx.fillText(params.handwriting, hX, 1220);
+          ctx.fillText(params.handwriting, hX, 1230);
         }
 
         // Page Number
         ctx.fillStyle = '#8A7E71';
         ctx.font = '22px "Cormorant Garamond", Georgia, serif';
         ctx.textAlign = 'center';
-        ctx.fillText(`— ${params.pageNumber} —`, 512, 1310);
+        ctx.fillText(`— ${params.pageNumber} —`, 512, 1315);
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         resolve(texture);
       };
 
-      if (params.imageSrc) {
+      // Helper function to draw a single Polaroid frame
+      const drawPolaroid = (
+        img: HTMLImageElement,
+        x: number,
+        y: number,
+        w: number,
+        h: number,
+        caption?: string,
+        rotationDeg: number = 0
+      ) => {
+        ctx.save();
+        ctx.translate(x + w / 2, y + h / 2);
+        ctx.rotate((rotationDeg * Math.PI) / 180);
+
+        // Shadow & Card
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.16)';
+        ctx.shadowBlur = 20;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 8;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(-w / 2, -h / 2, w, h);
+        ctx.shadowColor = 'transparent';
+
+        // Draw image clipped inside
+        const imgPadding = 18;
+        const imgH = h - 70;
+        ctx.drawImage(img, -w / 2 + imgPadding, -h / 2 + imgPadding, w - imgPadding * 2, imgH - imgPadding);
+
+        // Washi Tape
+        ctx.fillStyle = 'rgba(235, 225, 205, 0.82)';
+        ctx.fillRect(-60, -h / 2 - 12, 120, 24);
+
+        // Caption
+        if (caption) {
+          ctx.fillStyle = '#4A1523';
+          ctx.font = 'italic 26px "Alex Brush", cursive';
+          ctx.textAlign = 'center';
+          ctx.fillText(caption, 0, h / 2 - 24);
+        }
+
+        ctx.restore();
+      };
+
+      // Handle dual or single images
+      if (params.imageSrc && params.secondaryImageSrc) {
+        let loaded = 0;
+        const img1 = new Image();
+        const img2 = new Image();
+        img1.crossOrigin = 'anonymous';
+        img2.crossOrigin = 'anonymous';
+
+        const checkBoth = () => {
+          loaded++;
+          if (loaded === 2) {
+            // Draw dual polaroids vertically stacked with slight rotation
+            const startY = params.textLines ? 480 : 280;
+            drawPolaroid(img1, 212, startY, 560, 420, params.imageCaption, -1.5);
+            drawPolaroid(img2, 252, startY + 440, 560, 420, params.secondaryImageCaption, 1.8);
+            completeRendering();
+          }
+        };
+
+        img1.onload = checkBoth;
+        img1.onerror = checkBoth;
+        img2.onload = checkBoth;
+        img2.onerror = checkBoth;
+
+        img1.src = params.imageSrc;
+        img2.src = params.secondaryImageSrc;
+      } else if (params.imageSrc) {
         const img = new Image();
         img.crossOrigin = 'anonymous';
         img.onload = () => {
-          // Draw Polaroid Frame
-          const frameX = 212;
-          const frameY = params.textLines ? 540 : 280;
-          const frameW = 600;
-          const frameH = 680;
-
-          // Shadow
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.16)';
-          ctx.shadowBlur = 24;
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = 10;
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(frameX, frameY, frameW, frameH);
-          ctx.shadowColor = 'transparent';
-
-          // Image inside
-          ctx.drawImage(img, frameX + 24, frameY + 24, frameW - 48, frameH - 120);
-
-          // Masking tape on top
-          ctx.fillStyle = 'rgba(235, 225, 205, 0.85)';
-          ctx.fillRect(frameX + frameW / 2 - 80, frameY - 14, 160, 32);
-
-          // Caption under polaroid
-          if (params.imageCaption) {
-            ctx.fillStyle = '#4A1523';
-            ctx.font = 'italic 30px "Alex Brush", cursive';
-            ctx.textAlign = 'center';
-            ctx.fillText(params.imageCaption, frameX + frameW / 2, frameY + frameH - 40);
-          }
-
+          const frameX = 182;
+          const frameY = params.textLines ? 520 : 270;
+          const frameW = 660;
+          const frameH = 740;
+          drawPolaroid(img, frameX, frameY, frameW, frameH, params.imageCaption, 0);
           completeRendering();
         };
         img.onerror = () => completeRendering();

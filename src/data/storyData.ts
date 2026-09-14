@@ -57,42 +57,42 @@ export const LOVE_STORY_DATA = {
     {
       id: 1,
       src: "/img/1.JPEG",
-      title: "Chúng Mình",
+      title: "Lần Đầu Gặp Gỡ",
       caption: "Ánh mắt đầu tiên trao nhau trọn vẹn sự dịu dàng của cả đất trời.",
       rotation: "-rotate-2",
-      stamp: "20.10.2022"
+      stamp: "13.10.2022"
     },
     {
       id: 2,
       src: "/img/2.JPEG",
-      title: "Inseparable Souls",
+      title: "First Anniversary",
       caption: "Bên nhau là nơi an yên nhất giữa thế giới hối hả ngoài kia.",
       rotation: "rotate-1",
-      stamp: "Together"
+      stamp: "19.10.2022"
     },
     {
       id: 3,
       src: "/img/3.JPEG",
-      title: "Love In Our Eyes",
+      title: "Mùa Giáng Sinh Đầu Tiên",
       caption: "Nụ cười rạng rỡ của em là lý do mỗi ngày đều trở nên kỳ diệu.",
       rotation: "-rotate-2",
-      stamp: "Sweet Moment"
+      stamp: "25.12.2022"
     },
     {
       id: 4,
       src: "/img/4.JPEG",
-      title: "Hand In Hand",
+      title: "Những Chuyến Đi Cùng Nhau",
       caption: "Cùng nắm tay nhau đi qua từng con phố, gom góp những yêu thương bình dị.",
       rotation: "rotate-2",
-      stamp: "Holding Hands"
+      stamp: "05.03.2023"
     },
     {
       id: 5,
       src: "/img/5.JPEG",
-      title: "Loving You Forever",
+      title: "Sinh Nhật Bên Nhau",
       caption: "Cảm ơn vì đã luôn ở đây, đồng hành và sưởi ấm trái tim tớ suốt những năm tháng qua.",
       rotation: "-rotate-1",
-      stamp: "Eternity"
+      stamp: "25.05.2024"
     }
   ]
 };
