@@ -38,6 +38,7 @@ export default function QbjectAuthenticExperience() {
       });
 
       // 2. CHAPTER I: LẦN ĐẦU GẶP GỠ (13.10 - 19.10.2022)
+      // Layout: Dual Stacked (Trang 1 có 2 ảnh ngang 13.10 & 14.10)
       const p1Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 1,
         chapter: 'Chapter I',
@@ -48,6 +49,7 @@ export default function QbjectAuthenticExperience() {
           'khoảnh khắc đầu tiên mình và bạn chạm ánh mắt nhau,',
           'thế giới bỗng trở nên thật dịu dàng và ấm áp.',
         ],
+        layout: 'dual-stacked',
         media: [
           { src: getMediaUrl('First-meet-13-10-2022.jpg'), caption: '13.10.2022 • Cuộc gặp gỡ định mệnh' },
           { src: getMediaUrl('First-meet-14-10-2022.jpg'), caption: '14.10.2022 • Rung động đầu đời' },
@@ -55,14 +57,16 @@ export default function QbjectAuthenticExperience() {
         side: 'right',
       });
 
+      // Layout: Single Hero (Trang 2 có 1 ảnh ngang lớn 19.10 cực đẹp)
       const p1Back = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 2,
         chapter: 'Chapter I',
-        title: 'Trước Ngày Nhận Lời',
+        title: 'Ánh Nhìn Đầu Tiên',
         textLines: [
           'Đêm 19 tháng 10 năm 2022,',
           'những dòng tin nhắn và hồi hộp chờ đợi ngày mai.',
         ],
+        layout: 'single-hero',
         media: [
           { src: getMediaUrl('First-ani-19-10-2022.jpg'), caption: '19.10.2022 • Đêm trước ngày chung đôi' },
         ],
@@ -70,6 +74,7 @@ export default function QbjectAuthenticExperience() {
       });
 
       // 3. CHAPTER II: LỜI TỎ TÌNH & MÙA GIÁNG SINH 2022
+      // Layout: Dual Columns (Trang 3 có 2 ảnh dọc 3:4 đứng song song)
       const p2Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 3,
         chapter: 'Chapter II',
@@ -79,6 +84,7 @@ export default function QbjectAuthenticExperience() {
           'Ngày 20 tháng 10 năm 2022,',
           'và nụ cười gật đầu của bạn là món quà tuyệt vời nhất.',
         ],
+        layout: 'dual-columns',
         media: [
           { src: getMediaUrl('23-12-2022.JPG'), caption: '23.12.2022 • Dạo phố mùa đông' },
           { src: getMediaUrl('25-12-2022.jpg'), caption: '25.12.2022 • Giáng sinh đầu tiên' },
@@ -86,6 +92,7 @@ export default function QbjectAuthenticExperience() {
         side: 'right',
       });
 
+      // Layout: Single Hero (Trang 4 chân dung Noel ấm áp)
       const p2Back = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 4,
         chapter: 'Chapter II',
@@ -94,6 +101,7 @@ export default function QbjectAuthenticExperience() {
           'Những góc phố lung linh ánh đèn Noel,',
           'tay trong tay xua đi cái lạnh giá.',
         ],
+        layout: 'single-hero',
         media: [
           { src: getMediaUrl('25-12-2022_2.jpg'), caption: '25.12.2022 • Hơi ấm ngọt ngào' },
         ],
@@ -101,6 +109,7 @@ export default function QbjectAuthenticExperience() {
       });
 
       // 4. CHAPTER III: MÙA XUÂN & MÙA HÈ 2023 (05.03 - 08.07.2023)
+      // Layout: Diagonal Duo (2 ảnh nghiêng so le nghệ thuật)
       const p3Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 5,
         chapter: 'Chapter III',
@@ -110,6 +119,7 @@ export default function QbjectAuthenticExperience() {
           'Tháng 3 dịu mát và những ngày tháng 7 đầy nắng,',
           'hai mình cùng đi qua những cung đường mới.',
         ],
+        layout: 'diagonal-duo',
         media: [
           { src: getMediaUrl('05-03-2023.jpg'), caption: '05.03.2023 • Mùa xuân bên nhau' },
           { src: getMediaUrl('08-07-2023.jpg'), caption: '08.07.2023 • Mùa hè rạng rỡ' },
@@ -117,6 +127,7 @@ export default function QbjectAuthenticExperience() {
         side: 'right',
       });
 
+      // Layout: Quad Gallery (Lưới 4 ảnh kỷ niệm 1 năm & tháng 12.2023)
       const p3Back = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 6,
         chapter: 'Chapter III',
@@ -124,6 +135,7 @@ export default function QbjectAuthenticExperience() {
         textLines: [
           'Tròn 1 năm ngày nhận lời yêu và mùa đông ấm cúng.',
         ],
+        layout: 'quad-gallery',
         media: [
           { src: getMediaUrl('25-10-2023.jpg'), caption: '25.10.2023 • Tròn 1 năm yêu' },
           { src: getMediaUrl('25-10-2023_2.jpg'), caption: '25.10.2023 • Gắn kết bền lâu' },
@@ -134,6 +146,7 @@ export default function QbjectAuthenticExperience() {
       });
 
       // 5. CHAPTER IV: THÁNG 12.2023 & NĂM 2024
+      // Layout: Dual Stacked (1 ảnh dọc 3:4 & 1 khung Video 16:9)
       const p4Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 7,
         chapter: 'Chapter IV',
@@ -141,6 +154,7 @@ export default function QbjectAuthenticExperience() {
         textLines: [
           'Gom góp từng khoảnh khắc bình dị cùng bạn.',
         ],
+        layout: 'dual-stacked',
         media: [
           { src: getMediaUrl('02-12-2023_3.jpg'), caption: '02.12.2023 • Bình yên bên bạn' },
           { src: getMediaUrl('26-06-2323_thumb.jpg'), caption: '26.06 • Video kỷ niệm', isVideo: true },
@@ -148,6 +162,7 @@ export default function QbjectAuthenticExperience() {
         side: 'right',
       });
 
+      // Layout: Quad Gallery (Trang sinh nhật 25.05.2024 có video 16:9 & ảnh)
       const p4Back = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 8,
         chapter: 'Chapter IV',
@@ -157,6 +172,7 @@ export default function QbjectAuthenticExperience() {
           'Ngày 25 tháng 05 năm 2024,',
           'sinh nhật đặc biệt nhất khi luôn có bạn kề cạnh.',
         ],
+        layout: 'quad-gallery',
         media: [
           { src: getMediaUrl('Brithdate-together-25-05-2024_2.jpg'), caption: '25.05.2024 • Thổi nến sinh nhật' },
           { src: getMediaUrl('Brithdate-together-25-05-2024_3.jpg'), caption: '25.05.2024 • Nụ cười ngọt ngào' },
@@ -167,6 +183,7 @@ export default function QbjectAuthenticExperience() {
       });
 
       // 6. CHAPTER V: MÙA HÈ 2024 & CHUYẾN ĐI ĐẦU NĂM 2025 (02.01.2025)
+      // Layout: Quad Gallery
       const p5Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 9,
         chapter: 'Chapter V',
@@ -174,6 +191,7 @@ export default function QbjectAuthenticExperience() {
         textLines: [
           'Tháng 7.2024 rực rỡ và chuyến đi đầu năm 02.01.2025.',
         ],
+        layout: 'quad-gallery',
         media: [
           { src: getMediaUrl('02-07-2024.jpg'), caption: '02.07.2024 • Nắng hè' },
           { src: getMediaUrl('02-01-2025.jpg'), caption: '02.01.2025 • Chuyến đi năm mới' },
@@ -183,6 +201,7 @@ export default function QbjectAuthenticExperience() {
         side: 'right',
       });
 
+      // Layout: Quad Gallery
       const p5Back = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 10,
         chapter: 'Chapter V',
@@ -190,6 +209,7 @@ export default function QbjectAuthenticExperience() {
         textLines: [
           'Từng góc máy lưu giữ trọn vẹn sự rạng rỡ của bạn.',
         ],
+        layout: 'quad-gallery',
         media: [
           { src: getMediaUrl('02-01-2025_4.jpg'), caption: '02.01.2025 • Duyên dáng' },
           { src: getMediaUrl('02-01-2025_5.jpg'), caption: '02.01.2025 • Khoảnh khắc đáng nhớ' },
@@ -200,6 +220,7 @@ export default function QbjectAuthenticExperience() {
       });
 
       // 7. CHAPTER VI: CHUYẾN ĐI THÁNG 01.2025 (17.01.2025)
+      // Layout: Quad Gallery
       const p6Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 11,
         chapter: 'Chapter VI',
@@ -208,6 +229,7 @@ export default function QbjectAuthenticExperience() {
         textLines: [
           'Tháng 1 năm 2025 với những chuyến hành trình đáng nhớ nhất.',
         ],
+        layout: 'quad-gallery',
         media: [
           { src: getMediaUrl('02-01-2025_8.jpg'), caption: '02.01.2025 • Nụ cười tỏa nắng' },
           { src: getMediaUrl('17-01-1025.jpg'), caption: '17.01.2025 • Từng bước chân qua' },
@@ -217,6 +239,7 @@ export default function QbjectAuthenticExperience() {
         side: 'right',
       });
 
+      // Layout: Quad Gallery (kèm Video 17.01.2025)
       const p6Back = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 12,
         chapter: 'Chapter VI',
@@ -224,6 +247,7 @@ export default function QbjectAuthenticExperience() {
         textLines: [
           'Những bức hình và thước phim quý giá của hai đứa.',
         ],
+        layout: 'quad-gallery',
         media: [
           { src: getMediaUrl('17-01-2025_4.jpg'), caption: '17.01.2025 • Đẹp trong trẻo' },
           { src: getMediaUrl('17-01-2025_5.jpg'), caption: '17.01.2025 • Nét hồn nhiên' },
@@ -234,6 +258,7 @@ export default function QbjectAuthenticExperience() {
       });
 
       // 8. CHAPTER VII: MÙA THU & MÙA ĐÔNG 2025 (20.08 - 22.11.2025)
+      // Layout: Quad Gallery
       const p7Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 13,
         chapter: 'Chapter VII',
@@ -241,6 +266,7 @@ export default function QbjectAuthenticExperience() {
         textLines: [
           'Tháng 8 mùa thu đưa hai mình đến những trải nghiệm mới.',
         ],
+        layout: 'quad-gallery',
         media: [
           { src: getMediaUrl('20-08-2025.jpg'), caption: '20.08.2025 • Nắng thu' },
           { src: getMediaUrl('20-08-2025_2.jpg'), caption: '20.08.2025 • Dịu mát' },
@@ -250,6 +276,7 @@ export default function QbjectAuthenticExperience() {
         side: 'right',
       });
 
+      // Layout: Scrapbook Trio (3 ảnh đan xen độc đáo)
       const p7Back = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 14,
         chapter: 'Chapter VII',
@@ -257,6 +284,7 @@ export default function QbjectAuthenticExperience() {
         textLines: [
           'Những ngày cuối năm 2025 luôn đong đầy tình cảm.',
         ],
+        layout: 'scrapbook-trio',
         media: [
           { src: getMediaUrl('22-11-2025.jpg'), caption: '22.11.2025 • Chớm đông' },
           { src: getMediaUrl('22-11-2025_2.jpg'), caption: '22.11.2025 • Ấm áp' },
@@ -266,6 +294,7 @@ export default function QbjectAuthenticExperience() {
       });
 
       // 9. CHAPTER VIII: NHỮNG CHUYẾN ĐI TƯƠNG LAI 2026
+      // Layout: Dual Columns (2 ảnh dọc song song)
       const p8Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 15,
         chapter: 'Chapter VIII',
@@ -273,70 +302,105 @@ export default function QbjectAuthenticExperience() {
         textLines: [
           'Những ngày tháng 4 đáng nhớ của tuổi trẻ.',
         ],
+        layout: 'dual-columns',
         media: [
           { src: getMediaUrl('18-04-2016.jpg'), caption: '18.04 • Kỷ niệm' },
-          { src: getMediaUrl('18-04-2026.jpg'), caption: '18.04 • Ngày đẹp trời' },
-          { src: getMediaUrl('18-04-2026_2.jpg'), caption: '18.04 • Hẹn ước' },
           { src: getMediaUrl('First-trip-14-03-2026.jpg'), caption: '14.03.2026 • First Trip' },
         ],
         side: 'right',
       });
 
+      // Layout: Dual Stacked (2 ảnh ngang 16:9 của ngày 18.04.2026)
       const p8Back = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 16,
         chapter: 'Chapter VIII',
+        title: 'Hẹn Ước Tương Lai',
+        textLines: [
+          'Những chuyến đi dài phía trước luôn có hai mình bên nhau.',
+        ],
+        layout: 'dual-stacked',
+        media: [
+          { src: getMediaUrl('18-04-2026.jpg'), caption: '18.04 • Ngày đẹp trời' },
+          { src: getMediaUrl('18-04-2026_2.jpg'), caption: '18.04 • Hẹn ước mai sau' },
+        ],
+        side: 'left',
+      });
+
+      // 10. CHAPTER IX: MÙA THU 21.08 (LOẠT ẢNH NGANG 16:9)
+      // Layout: Dual Stacked (2 ảnh ngang 16:9 ngày 21.08)
+      const p9Front = await PageTextureGenerator.createInsidePageTexture({
+        pageNumber: 17,
+        chapter: 'Chapter IX',
         title: 'Mùa Thu Ngày 21.08',
         textLines: [
           'Loạt khoảnh khắc đẹp ngày 21 tháng 08.',
         ],
+        layout: 'dual-stacked',
         media: [
           { src: getMediaUrl('21-08-2026.jpg'), caption: '21.08 • Nụ cười xinh' },
           { src: getMediaUrl('21-08-2026_2.jpg'), caption: '21.08 • Nhẹ nhàng' },
+        ],
+        side: 'right',
+      });
+
+      // Layout: Dual Stacked (2 ảnh ngang 16:9 tiếp theo)
+      const p9Back = await PageTextureGenerator.createInsidePageTexture({
+        pageNumber: 18,
+        chapter: 'Chapter IX',
+        title: 'Nắng Thu Ngọt Ngào',
+        textLines: [
+          'Từng khung hình rạng rỡ của bạn.',
+        ],
+        layout: 'dual-stacked',
+        media: [
           { src: getMediaUrl('21-08-2026_3.jpg'), caption: '21.08 • Dễ thương' },
           { src: getMediaUrl('21-08-2026_4.jpg'), caption: '21.08 • Trong trẻo' },
         ],
         side: 'left',
       });
 
-      // 10. CHAPTER IX: NÀNG THƠ CỦA MÌNH (HER PIC & ME)
-      const p9Front = await PageTextureGenerator.createInsidePageTexture({
-        pageNumber: 17,
-        chapter: 'Chapter IX',
+      // 11. CHAPTER X: NÀNG THƠ TRONG MẮT MÌNH (HER PORTRAITS)
+      // Layout: Asymmetric Featured (1 ảnh ngang 16:9 + 2 ảnh dọc chân dung nàng thơ)
+      const p10Front = await PageTextureGenerator.createInsidePageTexture({
+        pageNumber: 19,
+        chapter: 'Chapter X',
         title: 'Nàng Thơ Trong Mắt Mình',
         quote: 'Bạn luôn là điều dịu dàng nhất...',
         textLines: [
           'Dù ở bất kỳ góc chụp nào, nét duyên dáng của bạn',
           'luôn làm trái tim mình rung động như ngày đầu.',
         ],
+        layout: 'asymmetric-featured',
         media: [
           { src: getMediaUrl('21-08-2026_5.jpg'), caption: '21.08 • Tỏa nắng' },
-          { src: getMediaUrl('21-08-2026_6.jpg'), caption: '21.08 • Rực rỡ' },
           { src: getMediaUrl('her-pic-1.jpg'), caption: 'Nụ cười tỏa nắng' },
           { src: getMediaUrl('her-pic-2.jpg'), caption: 'Nét trong trẻo' },
         ],
         side: 'right',
       });
 
-      const p9Back = await PageTextureGenerator.createInsidePageTexture({
-        pageNumber: 18,
-        chapter: 'Chapter IX',
+      // Layout: Asymmetric Featured (1 ảnh vuông Polaroid đặc biệt her-pic-5 + 2 ảnh dọc)
+      const p10Back = await PageTextureGenerator.createInsidePageTexture({
+        pageNumber: 20,
+        chapter: 'Chapter X',
         title: 'Những Bức Hình Đẹp Nhất',
         textLines: [
           'Lưu giữ từng nụ cười và ánh mắt biết nói.',
         ],
+        layout: 'asymmetric-featured',
         media: [
+          { src: getMediaUrl('her-pic-5.jpg'), caption: 'Xinh đẹp & Rạng rỡ' },
           { src: getMediaUrl('her-pic-3.jpg'), caption: 'Nét duyên dáng' },
           { src: getMediaUrl('her-pic-4.jpg'), caption: 'Đáng yêu' },
-          { src: getMediaUrl('her-pic-5.jpg'), caption: 'Rạng rỡ' },
-          { src: getMediaUrl('me-1.jpg'), caption: 'Chàng trai của bạn' },
         ],
         side: 'left',
       });
 
-      // 11. CHAPTER X: TRANG KẾT & HẸN ƯỚC MAI SAU
-      const p10Front = await PageTextureGenerator.createInsidePageTexture({
-        pageNumber: 19,
-        chapter: 'Chapter X',
+      // 12. CHAPTER XI: CHÚNG MÌNH & HẸN ƯỚC MAI SAU
+      // Layout: Dual Columns (2 ảnh chân dung: Phúc & Trang bên nhau)
+      const p11Front = await PageTextureGenerator.createInsidePageTexture({
+        pageNumber: 21,
+        chapter: 'Chapter XI',
         title: 'Mãi Mãi Về Sau',
         quote: 'Hành trình này sẽ không có trang cuối...',
         textLines: [
@@ -345,14 +409,17 @@ export default function QbjectAuthenticExperience() {
           'Yêu bạn đến tận cùng những năm tháng dịu dàng.',
         ],
         handwriting: '~ Yêu bạn trọn vẹn, Phúc ~',
+        layout: 'dual-columns',
         media: [
+          { src: getMediaUrl('me-1.jpg'), caption: 'Chàng trai của bạn' },
           { src: getMediaUrl('me-2.jpg'), caption: 'Phúc & Trang' },
         ],
         side: 'right',
       });
 
-      const p10Back = await PageTextureGenerator.createInsidePageTexture({
-        pageNumber: 20,
+      // Layout: Single Hero (Trang kết bức thư tình khép lại cuốn sách)
+      const p11Back = await PageTextureGenerator.createInsidePageTexture({
+        pageNumber: 22,
         chapter: 'The End',
         title: 'Cảm Ơn Bạn Vì Đã Đến',
         quote: 'Hạnh phúc là hành trình, không phải đích đến.',
@@ -393,6 +460,8 @@ export default function QbjectAuthenticExperience() {
         p9Back.image as HTMLCanvasElement,
         p10Front.image as HTMLCanvasElement,
         p10Back.image as HTMLCanvasElement,
+        p11Front.image as HTMLCanvasElement,
+        p11Back.image as HTMLCanvasElement,
         coverBack.image as HTMLCanvasElement,
         coverBack.image as HTMLCanvasElement,
       ];

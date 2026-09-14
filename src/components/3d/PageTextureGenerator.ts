@@ -6,6 +6,16 @@ export interface PageMediaItem {
   isVideo?: boolean;
 }
 
+export type PageLayoutType = 
+  | 'auto'
+  | 'single-hero'       // 1 ảnh lớn tràn viền trang nhã (3:4 hoặc 9:16)
+  | 'dual-stacked'      // 2 ảnh ngang/vuông xếp trên dưới
+  | 'dual-columns'      // 2 ảnh dọc thanh mảnh đứng cạnh nhau
+  | 'asymmetric-featured' // 1 ảnh lớn chủ đạo + 2 ảnh nhỏ bên cạnh
+  | 'scrapbook-trio'    // 3 ảnh so le phong cách dán ảnh scrapbook
+  | 'quad-gallery'      // Lưới 4 ảnh polaroid thanh lịch
+  | 'diagonal-duo';     // 2 ảnh góc nghiêng đè nhẹ nghệ thuật
+
 export class PageTextureGenerator {
   static createCoverTexture(title: string, subtitle: string, date: string): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
@@ -142,6 +152,7 @@ export class PageTextureGenerator {
     textLines?: string[];
     handwriting?: string;
     media?: PageMediaItem[];
+    layout?: PageLayoutType;
     side: 'left' | 'right';
   }): Promise<THREE.CanvasTexture> {
     return new Promise((resolve) => {
@@ -155,7 +166,7 @@ export class PageTextureGenerator {
       ctx.fillRect(0, 0, 1024, 1360);
 
       const vGrad = ctx.createRadialGradient(512, 680, 200, 512, 680, 800);
-      vGrad.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
+      vGrad.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
       vGrad.addColorStop(1, 'rgba(180, 154, 106, 0.12)');
       ctx.fillStyle = vGrad;
       ctx.fillRect(0, 0, 1024, 1360);
@@ -167,7 +178,7 @@ export class PageTextureGenerator {
         params.side === 'left' ? 900 : 124,
         0
       );
-      spineGrad.addColorStop(0, 'rgba(0, 0, 0, 0.15)');
+      spineGrad.addColorStop(0, 'rgba(0, 0, 0, 0.16)');
       spineGrad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
       ctx.fillStyle = spineGrad;
       ctx.fillRect(params.side === 'left' ? 880 : 0, 0, 144, 1360);
@@ -236,91 +247,91 @@ export class PageTextureGenerator {
       };
 
       /**
-       * Draws an image onto a Polaroid card with intelligent object-fit: contain/cover
-       * so that photos NEVER get squished or distorted!
+       * Draws Polaroid Card with STRICT 100% Aspect Ratio Preservation (Contain Mode inside Matte Card)
+       * ZERO Stretching, ZERO Distortion!
        */
-      const drawPolaroid = (
+      const drawAdaptivePolaroid = (
         source: HTMLImageElement | HTMLCanvasElement,
-        x: number,
-        y: number,
-        w: number,
-        h: number,
+        boxX: number,
+        boxY: number,
+        boxW: number,
+        boxH: number,
         caption?: string,
         rotationDeg: number = 0,
         isVideo: boolean = false
       ) => {
+        const srcW = (source as HTMLImageElement).naturalWidth || source.width || 400;
+        const srcH = (source as HTMLImageElement).naturalHeight || source.height || 300;
+        const srcRatio = srcW / srcH;
+
+        // Calculate card dimensions that natively hug the photo aspect ratio
+        const padding = 14;
+        const captionSpace = caption ? 38 : 22;
+        
+        // Available space inside bounding box for photo
+        const maxImgW = boxW - padding * 2;
+        const maxImgH = boxH - padding * 2 - captionSpace;
+
+        let finalImgW = maxImgW;
+        let finalImgH = finalImgW / srcRatio;
+
+        if (finalImgH > maxImgH) {
+          finalImgH = maxImgH;
+          finalImgW = finalImgH * srcRatio;
+        }
+
+        // Exact outer Polaroid Card size
+        const cardW = Math.round(finalImgW + padding * 2);
+        const cardH = Math.round(finalImgH + padding * 2 + captionSpace);
+        
+        // Center the card within the assigned bounding box
+        const cardX = boxX + (boxW - cardW) / 2;
+        const cardY = boxY + (boxH - cardH) / 2;
+
         ctx.save();
-        ctx.translate(x + w / 2, y + h / 2);
+        ctx.translate(cardX + cardW / 2, cardY + cardH / 2);
         ctx.rotate((rotationDeg * Math.PI) / 180);
 
-        // Polaroid Frame Shadow & Card
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.16)';
+        // Polaroid Frame Shadow & Paper Card
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
         ctx.shadowBlur = 18;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 6;
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(-w / 2, -h / 2, w, h);
+        ctx.fillRect(-cardW / 2, -cardH / 2, cardW, cardH);
         ctx.shadowColor = 'transparent';
 
-        // Inner Image Dimensions
-        const padding = 12;
-        const captionHeight = caption ? 36 : 22;
-        const destW = w - padding * 2;
-        const destH = h - padding * 2 - captionHeight;
-        const destX = -w / 2 + padding;
-        const destY = -h / 2 + padding;
+        // Draw Image directly with exact dimensions
+        const imgX = -cardW / 2 + padding;
+        const imgY = -cardH / 2 + padding;
+        ctx.drawImage(source, 0, 0, srcW, srcH, imgX, imgY, finalImgW, finalImgH);
 
-        // Black/Warm backing inside image container
-        ctx.fillStyle = '#F5EFE6';
-        ctx.fillRect(destX, destY, destW, destH);
-
-        // Aspect-ratio calculation with OBJECT-FIT: COVER (no distortion, cropped cleanly from center)
-        const srcW = (source as HTMLImageElement).naturalWidth || source.width || 400;
-        const srcH = (source as HTMLImageElement).naturalHeight || source.height || 300;
-
-        const srcRatio = srcW / srcH;
-        const destRatio = destW / destH;
-
-        let sX = 0, sY = 0, sW = srcW, sH = srcH;
-
-        if (srcRatio > destRatio) {
-          // Source is wider than destination: crop sides
-          sW = srcH * destRatio;
-          sX = (srcW - sW) / 2;
-        } else {
-          // Source is taller than destination: crop top/bottom
-          sH = srcW / destRatio;
-          sY = (srcH - sH) / 2;
-        }
-
-        ctx.drawImage(source, sX, sY, sW, sH, destX, destY, destW, destH);
-
-        // Video badge overlay if video
+        // If Video: badge overlay
         if (isVideo) {
           ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
           ctx.beginPath();
-          ctx.arc(destX + destW / 2, destY + destH / 2, 22, 0, Math.PI * 2);
+          ctx.arc(0, imgY + finalImgH / 2, 22, 0, Math.PI * 2);
           ctx.fill();
 
           ctx.fillStyle = '#FFFFFF';
           ctx.beginPath();
-          ctx.moveTo(destX + destW / 2 - 5, destY + destH / 2 - 9);
-          ctx.lineTo(destX + destW / 2 + 10, destY + destH / 2);
-          ctx.lineTo(destX + destW / 2 - 5, destY + destH / 2 + 9);
+          ctx.moveTo(-5, imgY + finalImgH / 2 - 9);
+          ctx.lineTo(10, imgY + finalImgH / 2);
+          ctx.lineTo(-5, imgY + finalImgH / 2 + 9);
           ctx.closePath();
           ctx.fill();
         }
 
-        // Decorative Washi Tape on top
+        // Washi tape on top
         ctx.fillStyle = 'rgba(235, 225, 205, 0.85)';
-        ctx.fillRect(-42, -h / 2 - 8, 84, 16);
+        ctx.fillRect(-38, -cardH / 2 - 7, 76, 16);
 
         // Caption text
         if (caption) {
           ctx.fillStyle = '#4A1523';
           ctx.font = 'italic 19px "Alex Brush", cursive';
           ctx.textAlign = 'center';
-          ctx.fillText(caption, 0, h / 2 - 12);
+          ctx.fillText(caption, 0, cardH / 2 - 13);
         }
 
         ctx.restore();
@@ -332,7 +343,6 @@ export class PageTextureGenerator {
         return;
       }
 
-      // Load all media
       let loadedCount = 0;
       const loadedElements: Array<{ elem: HTMLImageElement | HTMLCanvasElement; item: PageMediaItem }> = [];
 
@@ -343,12 +353,9 @@ export class PageTextureGenerator {
           vImg.onload = () => {
             loadedElements[idx] = { elem: vImg, item };
             loadedCount++;
-            if (loadedCount === mediaItems.length) {
-              renderMediaGrid();
-            }
+            if (loadedCount === mediaItems.length) renderDynamicLayout();
           };
           vImg.onerror = () => {
-            // fallback canvas placeholder with exact ratio if thumb fails
             const vCanvas = document.createElement('canvas');
             vCanvas.width = 400;
             vCanvas.height = 300;
@@ -362,11 +369,8 @@ export class PageTextureGenerator {
 
             loadedElements[idx] = { elem: vCanvas, item };
             loadedCount++;
-            if (loadedCount === mediaItems.length) {
-              renderMediaGrid();
-            }
+            if (loadedCount === mediaItems.length) renderDynamicLayout();
           };
-          // Use the real thumbnail extracted from video
           vImg.src = item.src;
         } else {
           const img = new Image();
@@ -374,9 +378,7 @@ export class PageTextureGenerator {
           img.onload = () => {
             loadedElements[idx] = { elem: img, item };
             loadedCount++;
-            if (loadedCount === mediaItems.length) {
-              renderMediaGrid();
-            }
+            if (loadedCount === mediaItems.length) renderDynamicLayout();
           };
           img.onerror = () => {
             const errCanvas = document.createElement('canvas');
@@ -392,95 +394,97 @@ export class PageTextureGenerator {
 
             loadedElements[idx] = { elem: errCanvas, item };
             loadedCount++;
-            if (loadedCount === mediaItems.length) {
-              renderMediaGrid();
-            }
+            if (loadedCount === mediaItems.length) renderDynamicLayout();
           };
           img.src = item.src;
         }
       });
 
-      const renderMediaGrid = () => {
+      // RENDER SPECIFIC AND DIVERSE LAYOUTS PER PAGE
+      const renderDynamicLayout = () => {
         const count = loadedElements.length;
-        const availableTop = curY + 10;
+        const availableTop = curY + 12;
         const availableHeight = 1205 - availableTop;
+        const layout = params.layout || 'auto';
 
-        // Check aspect ratio of first photo to optimize layout
-        const firstW = (loadedElements[0].elem as HTMLImageElement).naturalWidth || loadedElements[0].elem.width || 400;
-        const firstH = (loadedElements[0].elem as HTMLImageElement).naturalHeight || loadedElements[0].elem.height || 300;
-        const isLandscape = firstW / firstH > 1.15;
+        // 1. Single Hero Layout (Trang chân dung hoặc ảnh ngang tráng lệ)
+        if (count === 1 || layout === 'single-hero') {
+          const el = loadedElements[0];
+          drawAdaptivePolaroid(el.elem, 70, availableTop, 884, availableHeight, el.item.caption, 0, el.item.isVideo);
+        }
+        
+        // 2. Dual Stacked Layout (2 ảnh ngang/vuông xếp trên dưới)
+        else if (layout === 'dual-stacked') {
+          const halfH = (availableHeight - 20) / 2;
+          drawAdaptivePolaroid(loadedElements[0].elem, 80, availableTop, 864, halfH, loadedElements[0].item.caption, -1.2, loadedElements[0].item.isVideo);
+          drawAdaptivePolaroid(loadedElements[1].elem, 80, availableTop + halfH + 20, 864, halfH, loadedElements[1].item.caption, 1.4, loadedElements[1].item.isVideo);
+        }
 
-        if (count === 1) {
-          // Single photo: adapt card shape to orientation
+        // 3. Dual Columns Layout (2 ảnh dọc đứng cạnh nhau)
+        else if (layout === 'dual-columns') {
+          const halfW = (884 - 24) / 2;
+          drawAdaptivePolaroid(loadedElements[0].elem, 70, availableTop, halfW, availableHeight, loadedElements[0].item.caption, -1.5, loadedElements[0].item.isVideo);
+          drawAdaptivePolaroid(loadedElements[1].elem, 70 + halfW + 24, availableTop, halfW, availableHeight, loadedElements[1].item.caption, 1.8, loadedElements[1].item.isVideo);
+        }
+
+        // 4. Diagonal Duo Layout (2 ảnh góc chéo xếp so le nghệ thuật)
+        else if (layout === 'diagonal-duo') {
+          const w = 580;
+          const h = availableHeight * 0.58;
+          drawAdaptivePolaroid(loadedElements[0].elem, 70, availableTop, w, h, loadedElements[0].item.caption, -2.5, loadedElements[0].item.isVideo);
+          drawAdaptivePolaroid(loadedElements[1].elem, 1024 - w - 70, availableTop + availableHeight - h, w, h, loadedElements[1].item.caption, 2.2, loadedElements[1].item.isVideo);
+        }
+
+        // 5. Asymmetric Featured (1 ảnh lớn + 2 ảnh nhỏ)
+        else if (layout === 'asymmetric-featured' && count >= 3) {
+          const topH = availableHeight * 0.52;
+          drawAdaptivePolaroid(loadedElements[0].elem, 80, availableTop, 864, topH, loadedElements[0].item.caption, 0.6, loadedElements[0].item.isVideo);
+          
+          const btmW = (864 - 20) / 2;
+          const btmH = availableHeight * 0.44;
+          const btmY = availableTop + topH + 18;
+          drawAdaptivePolaroid(loadedElements[1].elem, 80, btmY, btmW, btmH, loadedElements[1].item.caption, -1.8, loadedElements[1].item.isVideo);
+          drawAdaptivePolaroid(loadedElements[2].elem, 80 + btmW + 20, btmY, btmW, btmH, loadedElements[2].item.caption, 1.9, loadedElements[2].item.isVideo);
+        }
+
+        // 6. Scrapbook Trio (3 ảnh đan xen)
+        else if (layout === 'scrapbook-trio' && count >= 3) {
+          const cardW = 540;
+          const cardH = availableHeight * 0.46;
+          drawAdaptivePolaroid(loadedElements[0].elem, 70, availableTop, cardW, cardH, loadedElements[0].item.caption, -2.0, loadedElements[0].item.isVideo);
+          drawAdaptivePolaroid(loadedElements[1].elem, 1024 - cardW - 70, availableTop + 140, cardW, cardH, loadedElements[1].item.caption, 2.5, loadedElements[1].item.isVideo);
+          drawAdaptivePolaroid(loadedElements[2].elem, 160, availableTop + availableHeight - cardH, cardW + 80, cardH, loadedElements[2].item.caption, -1.0, loadedElements[2].item.isVideo);
+        }
+
+        // 7. Quad Gallery Grid (4 ảnh polaroid thanh lịch)
+        else if (count >= 4) {
+          const colW = (884 - 20) / 2;
+          const rowH = (availableHeight - 20) / 2;
+          drawAdaptivePolaroid(loadedElements[0].elem, 70, availableTop, colW, rowH, loadedElements[0].item.caption, -1.5, loadedElements[0].item.isVideo);
+          drawAdaptivePolaroid(loadedElements[1].elem, 70 + colW + 20, availableTop, colW, rowH, loadedElements[1].item.caption, 1.8, loadedElements[1].item.isVideo);
+          drawAdaptivePolaroid(loadedElements[2].elem, 70, availableTop + rowH + 20, colW, rowH, loadedElements[2].item.caption, 1.6, loadedElements[2].item.isVideo);
+          drawAdaptivePolaroid(loadedElements[3].elem, 70 + colW + 20, availableTop + rowH + 20, colW, rowH, loadedElements[3].item.caption, -1.7, loadedElements[3].item.isVideo);
+        }
+
+        // Fallback auto logic
+        else if (count === 2) {
+          const isLandscape = ((loadedElements[0].elem as HTMLImageElement).naturalWidth || 400) > ((loadedElements[0].elem as HTMLImageElement).naturalHeight || 300);
           if (isLandscape) {
-            const cardW = 840;
-            const cardH = cardW * 0.72;
-            const leftX = (1024 - cardW) / 2;
-            const topY = availableTop + (availableHeight - cardH) / 2;
-            drawPolaroid(loadedElements[0].elem, leftX, topY, cardW, cardH, loadedElements[0].item.caption, 0, loadedElements[0].item.isVideo);
+            const halfH = (availableHeight - 20) / 2;
+            drawAdaptivePolaroid(loadedElements[0].elem, 80, availableTop, 864, halfH, loadedElements[0].item.caption, -1.0, loadedElements[0].item.isVideo);
+            drawAdaptivePolaroid(loadedElements[1].elem, 80, availableTop + halfH + 20, 864, halfH, loadedElements[1].item.caption, 1.2, loadedElements[1].item.isVideo);
           } else {
-            const cardH = availableHeight - 30;
-            const cardW = Math.min(cardH * 0.82, 800);
-            const leftX = (1024 - cardW) / 2;
-            drawPolaroid(loadedElements[0].elem, leftX, availableTop + 15, cardW, cardH, loadedElements[0].item.caption, 0, loadedElements[0].item.isVideo);
-          }
-        } else if (count === 2) {
-          if (isLandscape) {
-            // 2 Landscape photos: stack vertically
-            const cardW = 820;
-            const cardH = (availableHeight - 30) / 2;
-            const leftX = (1024 - cardW) / 2;
-            drawPolaroid(loadedElements[0].elem, leftX, availableTop, cardW, cardH, loadedElements[0].item.caption, -1.0, loadedElements[0].item.isVideo);
-            drawPolaroid(loadedElements[1].elem, leftX, availableTop + cardH + 15, cardW, cardH, loadedElements[1].item.caption, 1.2, loadedElements[1].item.isVideo);
-          } else {
-            // 2 Portrait photos: side-by-side! (Fits 3:4 & 9:16 perfectly)
-            const cardW = 415;
-            const cardH = availableHeight - 20;
-            const x1 = 75;
-            const x2 = 535;
-            drawPolaroid(loadedElements[0].elem, x1, availableTop + 10, cardW, cardH, loadedElements[0].item.caption, -1.2, loadedElements[0].item.isVideo);
-            drawPolaroid(loadedElements[1].elem, x2, availableTop + 10, cardW, cardH, loadedElements[1].item.caption, 1.5, loadedElements[1].item.isVideo);
+            const halfW = (884 - 20) / 2;
+            drawAdaptivePolaroid(loadedElements[0].elem, 70, availableTop, halfW, availableHeight, loadedElements[0].item.caption, -1.5, loadedElements[0].item.isVideo);
+            drawAdaptivePolaroid(loadedElements[1].elem, 70 + halfW + 20, availableTop, halfW, availableHeight, loadedElements[1].item.caption, 1.8, loadedElements[1].item.isVideo);
           }
         } else if (count === 3) {
-          // 3 photos layout:
-          // If first is landscape: 1 wide top + 2 portrait bottom
-          if (isLandscape) {
-            const topW = 820;
-            const topH = availableHeight * 0.46;
-            const topX = (1024 - topW) / 2;
-            drawPolaroid(loadedElements[0].elem, topX, availableTop, topW, topH, loadedElements[0].item.caption, 0.5, loadedElements[0].item.isVideo);
-
-            const btmW = 390;
-            const btmH = availableHeight * 0.48;
-            const btmY = availableTop + topH + 18;
-            drawPolaroid(loadedElements[1].elem, 85, btmY, btmW, btmH, loadedElements[1].item.caption, -1.8, loadedElements[1].item.isVideo);
-            drawPolaroid(loadedElements[2].elem, 545, btmY, btmW, btmH, loadedElements[2].item.caption, 2.0, loadedElements[2].item.isVideo);
-          } else {
-            // 2 side-by-side top + 1 wide centered bottom
-            const topW = 410;
-            const topH = availableHeight * 0.48;
-            drawPolaroid(loadedElements[0].elem, 75, availableTop, topW, topH, loadedElements[0].item.caption, -1.5, loadedElements[0].item.isVideo);
-            drawPolaroid(loadedElements[1].elem, 535, availableTop, topW, topH, loadedElements[1].item.caption, 1.8, loadedElements[1].item.isVideo);
-
-            const btmW = 680;
-            const btmH = availableHeight * 0.46;
-            const btmX = (1024 - btmW) / 2;
-            const btmY = availableTop + topH + 16;
-            drawPolaroid(loadedElements[2].elem, btmX, btmY, btmW, btmH, loadedElements[2].item.caption, 0.4, loadedElements[2].item.isVideo);
-          }
-        } else if (count >= 4) {
-          // 4 photos: 2x2 Grid with aspect-ratio preservation
-          const cardW = 415;
-          const cardH = (availableHeight - 30) / 2;
-          const x1 = 75;
-          const x2 = 535;
-          const y1 = availableTop;
-          const y2 = availableTop + cardH + 16;
-
-          drawPolaroid(loadedElements[0].elem, x1, y1, cardW, cardH, loadedElements[0].item.caption, -1.2, loadedElements[0].item.isVideo);
-          drawPolaroid(loadedElements[1].elem, x2, y1, cardW, cardH, loadedElements[1].item.caption, 1.4, loadedElements[1].item.isVideo);
-          drawPolaroid(loadedElements[2].elem, x1, y2, cardW, cardH, loadedElements[2].item.caption, 1.6, loadedElements[2].item.isVideo);
-          drawPolaroid(loadedElements[3].elem, x2, y2, cardW, cardH, loadedElements[3].item.caption, -1.4, loadedElements[3].item.isVideo);
+          const topH = availableHeight * 0.5;
+          drawAdaptivePolaroid(loadedElements[0].elem, 80, availableTop, 864, topH, loadedElements[0].item.caption, 0.8, loadedElements[0].item.isVideo);
+          const btmW = (864 - 20) / 2;
+          const btmH = availableHeight * 0.46;
+          drawAdaptivePolaroid(loadedElements[1].elem, 80, availableTop + topH + 18, btmW, btmH, loadedElements[1].item.caption, -1.8, loadedElements[1].item.isVideo);
+          drawAdaptivePolaroid(loadedElements[2].elem, 80 + btmW + 20, availableTop + topH + 18, btmW, btmH, loadedElements[2].item.caption, 2.0, loadedElements[2].item.isVideo);
         }
 
         completeRendering();
