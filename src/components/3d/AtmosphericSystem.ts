@@ -73,41 +73,64 @@ export class AtmosphericSystem {
     this.scene.add(this.dustParticles);
   }
 
-  // 2. Drifting Romantic Rose Petals & Cherry Blossoms
+  // 2. Realistic Organic Curved Rose & Cherry Blossom Petals
   initPetals() {
     this.petals = new THREE.Group();
-    const petalCount = 50;
-    const petalGeo = new THREE.PlaneGeometry(32, 42, 2, 2);
-    const pos = petalGeo.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      pos.setZ(i, Math.sin(pos.getY(i) * 0.1) * 4);
-    }
-    petalGeo.computeVertexNormals();
+    const petalCount = 45;
 
-    const petalColors = [0xFFA8B8, 0xFFCAD4, 0xF4ACB7, 0xFFE5EC];
+    // Build real organic teardrop / cherry blossom petal curve with subtle notch
+    const petalShape = new THREE.Shape();
+    petalShape.moveTo(0, 0); // Petal base / stem point
+    petalShape.bezierCurveTo(8, 12, 18, 26, 16, 42); // Right outer curve
+    petalShape.bezierCurveTo(14, 54, 4, 60, 0, 56);   // Top curve with gentle dip
+    petalShape.bezierCurveTo(-4, 60, -14, 54, -16, 42);// Top left notch
+    petalShape.bezierCurveTo(-18, 26, -8, 12, 0, 0);  // Left curve returning to base
+
+    const basePetalGeo = new THREE.ShapeGeometry(petalShape, 12);
+    basePetalGeo.center();
+
+    // Give 3D cup curvature to the petal so it doesn't look flat
+    const pos = basePetalGeo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      // Cup depression along center line (y) and curl along edges
+      const cupZ = Math.sin((y / 30) * Math.PI) * 5 - (Math.abs(x) / 18) * 4;
+      pos.setZ(i, cupZ);
+    }
+    basePetalGeo.computeVertexNormals();
+
+    const petalColors = [0xFFA6BA, 0xFFC2CD, 0xF9B4C4, 0xFFD8E2, 0xEFA0B0];
 
     for (let i = 0; i < petalCount; i++) {
       const col = petalColors[i % petalColors.length];
       const mat = new THREE.MeshStandardMaterial({
         color: col,
-        roughness: 0.8,
+        roughness: 0.65,
+        metalness: 0.05,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.75,
+        opacity: 0.85,
       });
 
-      const mesh = new THREE.Mesh(petalGeo, mat);
+      const mesh = new THREE.Mesh(basePetalGeo, mat);
       mesh.position.set(
         (Math.random() - 0.5) * 3600,
         Math.random() * 2200 - 600,
         Math.random() * 1600 - 200
       );
       mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      
+      const scale = 0.5 + Math.random() * 0.4;
+      mesh.scale.set(scale, scale, scale);
+
       mesh.userData = {
-        speedY: 1.2 + Math.random() * 2.0,
-        speedX: (Math.random() - 0.5) * 1.5,
-        rotSpeedX: (Math.random() - 0.5) * 0.03,
-        rotSpeedZ: (Math.random() - 0.5) * 0.03,
+        speedY: 1.0 + Math.random() * 1.5,
+        speedX: (Math.random() - 0.5) * 1.2,
+        rotSpeedX: (Math.random() - 0.5) * 0.02,
+        rotSpeedZ: (Math.random() - 0.5) * 0.02,
+        wobblePhase: Math.random() * Math.PI * 2,
+        wobbleSpeed: 0.02 + Math.random() * 0.02,
       };
       this.petals.add(mesh);
     }
@@ -242,13 +265,17 @@ export class AtmosphericSystem {
       this.dustParticles.geometry.attributes.position.needsUpdate = true;
     }
 
-    // 2. Petals floating down
+    // 2. Petals floating down with natural leaf fluttering
     if (this.petals) {
       this.petals.children.forEach((mesh) => {
-        mesh.position.y -= mesh.userData.speedY * 0.45; // Gentle slow floating
-        mesh.position.x += Math.sin(time * 0.6 + mesh.position.y * 0.01) * 0.5 + mesh.userData.speedX * 0.4;
-        mesh.rotation.x += mesh.userData.rotSpeedX * 0.5;
-        mesh.rotation.z += mesh.userData.rotSpeedZ * 0.5;
+        mesh.userData.wobblePhase += mesh.userData.wobbleSpeed;
+        mesh.position.y -= mesh.userData.speedY * 0.4;
+        mesh.position.x += Math.sin(mesh.userData.wobblePhase) * 1.5 + mesh.userData.speedX * 0.3;
+        mesh.position.z += Math.cos(mesh.userData.wobblePhase) * 0.8;
+
+        mesh.rotation.x += mesh.userData.rotSpeedX;
+        mesh.rotation.y += Math.sin(mesh.userData.wobblePhase) * 0.02;
+        mesh.rotation.z += mesh.userData.rotSpeedZ;
 
         if (mesh.position.y < -1200) {
           mesh.position.y = 1400;
