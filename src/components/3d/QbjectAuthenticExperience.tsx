@@ -68,7 +68,7 @@ export default function QbjectAuthenticExperience() {
         pageNumber: 3,
         chapter: 'Chapter II',
         title: 'Khoảnh Khắc 20.10.2022',
-        quote: 'Thế bạn đồng ý làm bạn gái mình không?',
+        quote: 'Thế cậu đồng ý làm bạn gái tớ không?',
         textLines: [
           'Ngày 20 tháng 10 năm 2022,',
           'câu hỏi ngập ngừng chứa trọn sự chân thành của tuổi trẻ,',
