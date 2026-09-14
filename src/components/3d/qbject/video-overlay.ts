@@ -69,9 +69,12 @@ export default class VideoOverlay {
 
 		video.src = src;
 		video.controls = true;
+		video.playsInline = true;
+		video.setAttribute("playsinline", "");
+		video.setAttribute("webkit-playsinline", "");
 		video.setAttribute("controlslist", "nodownload noremoteplayback");
 		video.setAttribute("disablepictureinpicture", "");
 		video.setAttribute("disableremoteplayback", "");
-		video.preload = "metadata";
+		video.preload = "auto";
 	}
 }
