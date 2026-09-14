@@ -66,16 +66,16 @@ export class PageTextureGenerator {
           ctx.fillRect(0, 0, 1024, 1360);
         }
 
-        // Localized soft dark-warm vignette directly behind text area for optimal readability
+        // Ultra-smooth seamless feathering vignette directly under text cluster (zero visible borders)
         ctx.save();
-        const textVignette = ctx.createRadialGradient(230, 840, 30, 230, 840, 280);
-        textVignette.addColorStop(0, 'rgba(12, 6, 8, 0.62)');
-        textVignette.addColorStop(0.6, 'rgba(12, 6, 8, 0.38)');
-        textVignette.addColorStop(1, 'rgba(12, 6, 8, 0.0)');
+        const textVignette = ctx.createRadialGradient(200, 840, 0, 200, 840, 480);
+        textVignette.addColorStop(0, 'rgba(10, 5, 8, 0.65)');
+        textVignette.addColorStop(0.25, 'rgba(10, 5, 8, 0.45)');
+        textVignette.addColorStop(0.55, 'rgba(10, 5, 8, 0.20)');
+        textVignette.addColorStop(0.8, 'rgba(10, 5, 8, 0.06)');
+        textVignette.addColorStop(1, 'rgba(10, 5, 8, 0.0)');
         ctx.fillStyle = textVignette;
-        ctx.beginPath();
-        ctx.ellipse(230, 840, 290, 180, 0, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillRect(0, 380, 680, 880);
         ctx.restore();
 
         // 1. "CHÚNG MÌNH" Title with exact font public/font/2.otf ("SVN-Housttely Signature")
@@ -109,6 +109,9 @@ export class PageTextureGenerator {
         ctx.fillText('Bên nhau từ ngày 20.10.2022', 70, 930);
 
         ctx.restore();
+
+        // Apply realistic tactile paper grain & linen texture over the entire front cover photo
+        PageTextureGenerator.applyPaperGrainTexture(ctx, 1024, 1360, 0.045);
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
@@ -212,9 +215,49 @@ export class PageTextureGenerator {
     ctx.font = 'italic 26px "Dancing Script", cursive';
     ctx.fillText('Hành trình của chúng mình vẫn đang tiếp diễn...', 512, 880);
 
+    // Apply realistic tactile paper fiber grain overlay on back cover
+    this.applyPaperGrainTexture(ctx, 1024, 1360, 0.04);
+
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     return texture;
+  }
+
+  // Realistic procedural handmade paper grain & pulp fibers
+  static applyPaperGrainTexture(ctx: CanvasRenderingContext2D, width: number, height: number, intensity: number = 0.05) {
+    ctx.save();
+    
+    // 1. Organic fiber speckles
+    ctx.fillStyle = `rgba(130, 110, 95, ${intensity * 1.5})`;
+    for (let i = 0; i < 3500; i++) {
+      const rx = Math.random() * width;
+      const ry = Math.random() * height;
+      const rw = Math.random() * 2.5 + 0.5;
+      const rh = Math.random() * 1.5 + 0.5;
+      ctx.fillRect(rx, ry, rw, rh);
+    }
+
+    // 2. Fine pulp lines / parchment hair fibers
+    ctx.strokeStyle = `rgba(140, 115, 100, ${intensity * 1.2})`;
+    ctx.lineWidth = 0.8;
+    for (let i = 0; i < 400; i++) {
+      const fx = Math.random() * width;
+      const fy = Math.random() * height;
+      const length = Math.random() * 14 + 4;
+      const angle = Math.random() * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(fx, fy);
+      ctx.lineTo(fx + Math.cos(angle) * length, fy + Math.sin(angle) * length);
+      ctx.stroke();
+    }
+
+    // 3. Subtle noise speckle for micro-roughness
+    ctx.fillStyle = `rgba(255, 255, 255, ${intensity * 0.9})`;
+    for (let i = 0; i < 3000; i++) {
+      ctx.fillRect(Math.random() * width, Math.random() * height, 1.2, 1.2);
+    }
+
+    ctx.restore();
   }
 
   static createInsidePageTexture(params: {
@@ -313,6 +356,9 @@ export class PageTextureGenerator {
         ctx.font = '22px "Cormorant Garamond", Georgia, serif';
         ctx.textAlign = 'center';
         ctx.fillText(`— ${params.pageNumber} —`, 512, 1315);
+
+        // Apply realistic tactile paper fiber grain overlay on all inside pages
+        PageTextureGenerator.applyPaperGrainTexture(ctx, 1024, 1360, 0.05);
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
