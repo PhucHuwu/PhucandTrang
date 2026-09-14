@@ -34,21 +34,28 @@ export default class VideoOverlay {
 	}
 
 	public open(videoUrl: string) {
+		this.close();
 		this.addVideo(videoUrl);
 		this.dom.container.classList.toggle("active", true);
 		this.activeVideo = this.dom.videos[videoUrl];
-		this.activeVideo.parentElement?.classList.toggle("active", true);
-		this.activeVideo.currentTime = 0;
-		this.activeVideo.play();
+		if (this.activeVideo) {
+			this.activeVideo.parentElement?.classList.toggle("active", true);
+			this.activeVideo.currentTime = 0;
+			this.activeVideo.play().catch(e => console.log("Video play interrupted:", e));
+		}
 	}
 
 	public close() {
-		if (!this.activeVideo) return;
-
+		if (this.activeVideo) {
+			this.activeVideo.pause();
+			this.activeVideo.parentElement?.classList.toggle("active", false);
+			this.activeVideo = null;
+		}
+		Object.values(this.dom.videos).forEach(v => {
+			v.pause();
+			v.parentElement?.classList.toggle("active", false);
+		});
 		this.dom.container.classList.toggle("active", false);
-		this.activeVideo.parentElement?.classList.toggle("active", false);
-		this.activeVideo.pause();
-		this.activeVideo = null;
 	}
 
 	public addVideo(src?: string) {

@@ -411,34 +411,34 @@ export default function QbjectAuthenticExperience() {
         coverMarginY: 10,
         pageEdgeColor: 0xb1a283,
         pageActiveAreas: [
-          // Chapter IV: Page 7 right face (faceIndex: 7) -> 26-06-2323.mp4
-          {
-            faceIndex: 7,
-            video: getMediaUrl('26-06-2323.mp4'),
-            top: 0.25,
-            left: 0.15,
-            width: 0.7,
-            height: 0.65,
-            title: 'Xem Video Kỷ Niệm 26.06',
-          },
-          // Chapter IV: Page 8 left face (faceIndex: 8) -> Brithdate-together-25-05-2024.mp4
+          // p4Front (Page 7, Trang 7: right face of leaf 4 -> faceIndex = 4*2 = 8) -> 26-06-2323.mp4
           {
             faceIndex: 8,
+            video: getMediaUrl('26-06-2323.mp4'),
+            top: 0.1,
+            left: 0.05,
+            width: 0.9,
+            height: 0.85,
+            title: 'Xem Video Kỷ Niệm 26.06',
+          },
+          // p4Back (Page 8, Trang 8: left face of leaf 4 -> faceIndex = 4*2 + 1 = 9) -> Brithdate-together-25-05-2024.mp4
+          {
+            faceIndex: 9,
             video: getMediaUrl('Brithdate-together-25-05-2024.mp4'),
-            top: 0.25,
-            left: 0.15,
-            width: 0.7,
-            height: 0.65,
+            top: 0.1,
+            left: 0.05,
+            width: 0.9,
+            height: 0.85,
             title: 'Xem Video Sinh Nhật 25.05.2024',
           },
-          // Chapter VI: Page 12 left face (faceIndex: 12) -> 17-01-2025.mp4
+          // p6Back (Page 12, Trang 12: left face of leaf 6 -> faceIndex = 6*2 + 1 = 13) -> 17-01-2025.mp4
           {
-            faceIndex: 12,
+            faceIndex: 13,
             video: getMediaUrl('17-01-2025.mp4'),
-            top: 0.25,
-            left: 0.15,
-            width: 0.7,
-            height: 0.65,
+            top: 0.1,
+            left: 0.05,
+            width: 0.9,
+            height: 0.85,
             title: 'Xem Video Chuyến Đi 17.01.2025',
           },
         ],

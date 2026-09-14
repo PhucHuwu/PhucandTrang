@@ -838,13 +838,14 @@ export default class Flipbook {
 		// find active area with given coords
 		const faceX = intersects[0].uv?.x || 0;
 		const faceY = 1 - (intersects[0].uv?.y || 0);
+
 		return this.pageActiveAreas.find(
 			area =>
 				area.faceIndex === hoverFaceIndex &&
-				faceY > area.top &&
-				faceY < area.top + area.height &&
-				faceX > area.left &&
-				faceX < area.left + area.width,
+				faceY >= area.top &&
+				faceY <= area.top + area.height &&
+				faceX >= area.left &&
+				faceX <= area.left + area.width,
 		);
 	}
 
