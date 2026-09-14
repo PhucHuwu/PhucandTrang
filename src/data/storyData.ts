@@ -11,7 +11,7 @@ export const LOVE_STORY_DATA = {
     he: "Phúc",
     she: "Trang",
     anniversaryDate: "2022-10-20T00:00:00",
-    proposalQuote: "Thế cậu đồng ý làm bạn gái tớ không?",
+    proposalQuote: "Thế bạn đồng ý làm bạn gái mình không?",
     songTitle: "Vạn vật như muốn ta bên nhau",
     songSrc: "/music/van-vat-nhu-muon-ta-ben-nhau.mp3"
   },

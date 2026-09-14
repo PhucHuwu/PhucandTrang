@@ -37,10 +37,10 @@ export default function QbjectAuthenticExperience() {
         pageNumber: 1,
         chapter: 'Chapter I',
         title: 'Lần Đầu Gặp Gỡ',
-        quote: 'Vạn vật như muốn ta bên nhau...',
+        quote: 'Vạn vật như muốn hai mình bên nhau...',
         textLines: [
           'Ngày 13 và 14 tháng 10 năm 2022,',
-          'khoảnh khắc đầu tiên hai ta chạm ánh mắt nhau,',
+          'khoảnh khắc đầu tiên mình và bạn chạm ánh mắt nhau,',
           'thế giới bỗng trở nên thật dịu dàng và ấm áp.',
         ],
         imageSrc: '/memories/First-meet-13-10-2022.jpg',
@@ -54,10 +54,10 @@ export default function QbjectAuthenticExperience() {
         title: 'Ánh Nhìn Đầu Tiên',
         textLines: [
           'Ngày 14.10.2022 và đêm trước ngày tỏ tình 19.10,',
-          'từng khoảnh khắc trôi qua đều ngập tràn nhớ nhung.',
+          'từng khoảnh khắc trôi qua đều ngập tràn sự nhớ nhung.',
         ],
         imageSrc: '/memories/First-meet-14-10-2022.jpg',
-        imageCaption: '14.10.2022 • Những rung động đầu đời',
+        imageCaption: '14.10.2022 • Những rung động đầu tiên',
         secondaryImageSrc: '/memories/First-ani-19-10-2022.jpg',
         secondaryImageCaption: '19.10.2022 • Đêm trước ngày nhận lời',
         side: 'left',
@@ -68,11 +68,11 @@ export default function QbjectAuthenticExperience() {
         pageNumber: 3,
         chapter: 'Chapter II',
         title: 'Khoảnh Khắc 20.10.2022',
-        quote: 'Thế cậu đồng ý làm bạn gái tớ không?',
+        quote: 'Thế bạn đồng ý làm bạn gái mình không?',
         textLines: [
           'Ngày 20 tháng 10 năm 2022,',
-          'câu nói ngập ngừng chứa trọn sự chân thành của tuổi trẻ,',
-          'và nụ cười gật đầu của em là món quà tuyệt vời nhất.',
+          'câu hỏi ngập ngừng chứa trọn sự chân thành của tuổi trẻ,',
+          'và nụ cười gật đầu của bạn là món quà tuyệt vời nhất đời mình.',
         ],
         imageSrc: '/memories/23-12-2022.JPG',
         imageCaption: '23.12.2022 • Trước thềm Giáng Sinh',
@@ -102,7 +102,7 @@ export default function QbjectAuthenticExperience() {
         quote: 'Bên nhau qua từng mùa hoa nở...',
         textLines: [
           'Tháng 3 dịu dàng, mùa hè tháng 7 rực rỡ nắng vàng,',
-          'và ngày 25.10.2023 kỷ niệm tròn một năm yêu nhau.',
+          'và ngày 25.10.2023 kỷ niệm tròn một năm chúng mình bên nhau.',
         ],
         imageSrc: '/memories/05-03-2023.jpg',
         imageCaption: '05.03.2023 • Những ngày mùa xuân',
@@ -117,7 +117,7 @@ export default function QbjectAuthenticExperience() {
         title: 'Mùa Đông Tháng 12.2023',
         textLines: [
           'Những góc phố tháng 12 lưu giữ nụ cười của hai đứa,',
-          'bên nhau bình yên qua từng tháng năm.',
+          'bình yên bên nhau qua từng năm tháng.',
         ],
         imageSrc: '/memories/02-12-2023.jpg',
         imageCaption: '02.12.2023 • Kỷ niệm tháng 12',
@@ -131,10 +131,10 @@ export default function QbjectAuthenticExperience() {
         pageNumber: 7,
         chapter: 'Chapter IV',
         title: 'Sinh Nhật Bên Nhau 2024',
-        quote: 'Tuổi mới ngập tràn niềm vui cùng em',
+        quote: 'Tuổi mới ngập tràn niềm vui cùng bạn',
         textLines: [
           'Ngày 25 tháng 05 năm 2024,',
-          'sinh nhật đặc biệt nhất khi luôn có em kề cạnh,',
+          'sinh nhật đặc biệt nhất khi luôn có bạn kề cạnh,',
           'cùng thổi nến và sẻ chia những ước nguyện mai sau.',
         ],
         imageSrc: '/memories/Brithdate-together-25-05-2024_2.jpg',
@@ -150,7 +150,7 @@ export default function QbjectAuthenticExperience() {
         title: 'Mùa Hè Tháng 07.2024',
         textLines: [
           'Những ngày tháng 7 đầy ắp kỷ niệm và tiếng cười,',
-          'tình cảm đôi ta ngày càng thêm gắn kết.',
+          'tình cảm của chúng mình ngày càng thêm gắn kết.',
         ],
         imageSrc: '/memories/Brithdate-together-25-05-2024_4.jpg',
         imageCaption: '25.05.2024 • Khoảnh khắc đáng nhớ',
@@ -168,7 +168,7 @@ export default function QbjectAuthenticExperience() {
         textLines: [
           'Ngày 02 tháng 01 năm 2025,',
           'chuyến đi khởi đầu năm mới với bao hy vọng,',
-          'chúng mình cùng nhau gom góp thêm thật nhiều bức ảnh đẹp.',
+          'mình và bạn cùng nhau gom góp thêm thật nhiều bức ảnh đẹp.',
         ],
         imageSrc: '/memories/02-01-2025.jpg',
         imageCaption: '02.01.2025 • Du xuân năm mới',
@@ -183,7 +183,7 @@ export default function QbjectAuthenticExperience() {
         title: 'Chuyến Đi Tháng 01.2025',
         textLines: [
           'Những góc chụp rạng rỡ ngày 02 và 17 tháng 01,',
-          'từng cung đường đi qua đều in dấu chân đôi ta.',
+          'từng cung đường đi qua đều in dấu chân của hai mình.',
         ],
         imageSrc: '/memories/02-01-2025_3.jpg',
         imageCaption: '02.01.2025 • Rạng rỡ nụ cười',
@@ -192,19 +192,19 @@ export default function QbjectAuthenticExperience() {
         side: 'left',
       });
 
-      // 7. CHAPTER VI: NÀNG THƠ CỦA TỚ (HER PORTRAITS)
+      // 7. CHAPTER VI: NÀNG THƠ TRONG MẮT MÌNH (HER PORTRAITS)
       const p6Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 11,
         chapter: 'Chapter VI',
-        title: 'Nàng Thơ Trong Mắt Tớ',
-        quote: 'Em luôn là điều dịu dàng nhất...',
+        title: 'Nàng Thơ Trong Mắt Mình',
+        quote: 'Bạn luôn là điều dịu dàng nhất...',
         textLines: [
           'Dù ở bất kỳ góc chụp nào hay khoảnh khắc nào,',
-          'nụ cười và nét duyên dáng của Trang',
-          'luôn làm trái tim tớ rung động như ngày đầu.',
+          'nụ cười và nét duyên dáng của bạn',
+          'luôn làm trái tim mình rung động như ngày đầu.',
         ],
         imageSrc: '/memories/her-pic-1.jpg',
-        imageCaption: 'Nụ cười tỏa nắng của em',
+        imageCaption: 'Nụ cười tỏa nắng của bạn',
         secondaryImageSrc: '/memories/her-pic-2.jpg',
         secondaryImageCaption: 'Nét dịu dàng trong trẻo',
         side: 'right',
@@ -216,7 +216,7 @@ export default function QbjectAuthenticExperience() {
         title: 'Những Bức Hình Đẹp Nhất',
         textLines: [
           'Lưu giữ từng nụ cười rạng rỡ và ánh mắt biết nói,',
-          'người con gái tớ yêu thương và trân quý suốt đời.',
+          'người con gái mình luôn yêu thương và trân quý.',
         ],
         imageSrc: '/memories/her-pic-5.jpg',
         imageCaption: 'Xinh đẹp & Rạng rỡ',
@@ -249,10 +249,10 @@ export default function QbjectAuthenticExperience() {
         quote: 'Hành trình này sẽ không có trang cuối...',
         textLines: [
           'Mỗi sớm mai thức dậy lại là một trang giấy mới,',
-          'nơi tình yêu đôi mình vẫn lớn lên từng ngày.',
-          'Yêu em đến tận cùng những năm tháng dịu dàng.',
+          'nơi tình yêu của hai mình vẫn lớn lên từng ngày.',
+          'Yêu bạn đến tận cùng những năm tháng dịu dàng.',
         ],
-        handwriting: '~ Yêu em trọn vẹn, Phúc ~',
+        handwriting: '~ Yêu bạn trọn vẹn, Phúc ~',
         secondaryImageSrc: '/memories/First-trip-14-03-2026.jpg',
         secondaryImageCaption: '14.03.2026 • Bên nhau mãi mãi',
         side: 'left',
@@ -262,10 +262,10 @@ export default function QbjectAuthenticExperience() {
       const p8Inside = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 15,
         chapter: 'The End',
-        title: 'Cảm Ơn Em Vì Đã Đến',
+        title: 'Cảm Ơn Bạn Vì Đã Đến',
         quote: 'Hạnh phúc là hành trình, không phải đích đến.',
         textLines: [
-          'Cảm ơn em vì đã cùng tớ tạo nên cuốn nhật ký tuyệt vời này.',
+          'Cảm ơn bạn vì đã cùng mình tạo nên cuốn nhật ký tuyệt vời này.',
           'Dù cuốn sách này có khép lại,',
           'chuyện tình của chúng mình sẽ luôn được viết tiếp mỗi ngày.',
         ],
