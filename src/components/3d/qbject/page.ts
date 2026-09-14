@@ -44,11 +44,11 @@ export default class Page {
 		this.textureLoader = pageParams.textureLoader;
 		this.isFrontCover = pageParams.isFrontCover;
 
-		this.ySegments = 16;
+		this.ySegments = 32;
 		if (this.isCover) {
-			this.zSegments = 16;
+			this.zSegments = 32;
 		} else {
-			this.zSegments = 24;
+			this.zSegments = 32;
 		}
 
 		// Load front and back textures
@@ -140,30 +140,30 @@ export default class Page {
 				uv.setXY(i, coord.x > 0.5 ? 1 - coord.z : coord.z, coord.y);
 			}
 
-			// Softly bevel/round the outer vertical corners (top-right & bottom-right of page)
-			const cornerRadiusRelZ = 45 / this.width;
-			const cornerRadiusRelY = 45 / this.height;
-			if (coord.z > 1 - cornerRadiusRelZ) {
-				const distFromOuterEdge = (coord.z - (1 - cornerRadiusRelZ)) / cornerRadiusRelZ;
-				// Check top corner
-				if (coord.y > 1 - cornerRadiusRelY) {
-					const distFromTop = (coord.y - (1 - cornerRadiusRelY)) / cornerRadiusRelY;
-					const dist = Math.sqrt(distFromOuterEdge * distFromOuterEdge + distFromTop * distFromTop);
-					if (dist > 1) {
-						const factor = 1 / dist;
-						coord.z = (1 - cornerRadiusRelZ) + distFromOuterEdge * factor * cornerRadiusRelZ;
-						coord.y = (1 - cornerRadiusRelY) + distFromTop * factor * cornerRadiusRelY;
+			// Perfectly smooth circular filleted outer corners (R = 75px)
+			const cornerRadiusZ = 75 / this.width;
+			const cornerRadiusY = 75 / this.height;
+
+			if (coord.z > 1 - cornerRadiusZ) {
+				const deltaZ = (coord.z - (1 - cornerRadiusZ)) / cornerRadiusZ;
+
+				// Top-right outer corner
+				if (coord.y > 1 - cornerRadiusY) {
+					const deltaY = (coord.y - (1 - cornerRadiusY)) / cornerRadiusY;
+					const distance = Math.hypot(deltaZ, deltaY);
+					if (distance > 1.0) {
+						coord.z = (1 - cornerRadiusZ) + (deltaZ / distance) * cornerRadiusZ;
+						coord.y = (1 - cornerRadiusY) + (deltaY / distance) * cornerRadiusY;
 						position.setY(i, (coord.y - 0.5) * this.height);
 					}
 				}
-				// Check bottom corner
-				else if (coord.y < cornerRadiusRelY) {
-					const distFromBottom = (cornerRadiusRelY - coord.y) / cornerRadiusRelY;
-					const dist = Math.sqrt(distFromOuterEdge * distFromOuterEdge + distFromBottom * distFromBottom);
-					if (dist > 1) {
-						const factor = 1 / dist;
-						coord.z = (1 - cornerRadiusRelZ) + distFromOuterEdge * factor * cornerRadiusRelZ;
-						coord.y = cornerRadiusRelY - distFromBottom * factor * cornerRadiusRelY;
+				// Bottom-right outer corner
+				else if (coord.y < cornerRadiusY) {
+					const deltaY = (cornerRadiusY - coord.y) / cornerRadiusY;
+					const distance = Math.hypot(deltaZ, deltaY);
+					if (distance > 1.0) {
+						coord.z = (1 - cornerRadiusZ) + (deltaZ / distance) * cornerRadiusZ;
+						coord.y = cornerRadiusY - (deltaY / distance) * cornerRadiusY;
 						position.setY(i, (coord.y - 0.5) * this.height);
 					}
 				}
