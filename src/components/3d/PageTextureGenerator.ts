@@ -292,14 +292,14 @@ export class PageTextureGenerator {
         ctx.translate(cardX + cardW / 2, cardY + cardH / 2);
         ctx.rotate((rotationDeg * Math.PI) / 180);
 
-        // Polaroid Frame Shadow & Paper Card
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
-        ctx.shadowBlur = 18;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 6;
+        // Natural Card Border (No fake heavy drop shadow, blends flat and organically onto parchment)
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(-cardW / 2, -cardH / 2, cardW, cardH);
-        ctx.shadowColor = 'transparent';
+
+        // Thin delicate frame line to ground the photo naturally on the page
+        ctx.strokeStyle = 'rgba(180, 160, 140, 0.25)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-cardW / 2, -cardH / 2, cardW, cardH);
 
         // Draw Image directly with exact dimensions
         const imgX = -cardW / 2 + padding;
