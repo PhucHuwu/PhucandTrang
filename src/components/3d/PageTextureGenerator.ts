@@ -1,5 +1,11 @@
 import * as THREE from 'three';
 
+export interface PageMediaItem {
+  src: string;
+  caption?: string;
+  isVideo?: boolean;
+}
+
 export class PageTextureGenerator {
   static createCoverTexture(title: string, subtitle: string, date: string): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
@@ -15,15 +21,13 @@ export class PageTextureGenerator {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 1024, 1360);
 
-    // Subtle leather grain texture
+    // Leather texture grain
     ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
     for (let i = 0; i < 4000; i++) {
-      const x = Math.random() * 1024;
-      const y = Math.random() * 1360;
-      ctx.fillRect(x, y, 2, 2);
+      ctx.fillRect(Math.random() * 1024, Math.random() * 1360, 2, 2);
     }
 
-    // 2. Gilded Double Frame
+    // Gilded Frame
     ctx.strokeStyle = '#D4AF37';
     ctx.lineWidth = 4;
     ctx.strokeRect(40, 40, 944, 1280);
@@ -42,13 +46,13 @@ export class PageTextureGenerator {
     ctx.fillText('✦', 80, 1280);
     ctx.fillText('✦', 944, 1280);
 
-    // 3. Typography
+    // Typography
     ctx.fillStyle = '#D4AF37';
     ctx.font = '24px Montserrat, sans-serif';
     ctx.letterSpacing = '8px';
     ctx.fillText('A JOURNEY OF LOVE', 512, 280);
 
-    // Center Gold Ring Emblem
+    // Center Emblem
     ctx.beginPath();
     ctx.arc(512, 440, 70, 0, Math.PI * 2);
     ctx.strokeStyle = '#D4AF37';
@@ -59,18 +63,15 @@ export class PageTextureGenerator {
     ctx.font = '54px serif';
     ctx.fillText('❤', 512, 458);
 
-    // Main Title
     ctx.fillStyle = '#F4EDE2';
     ctx.font = 'bold 72px "Cormorant Garamond", Georgia, serif';
     ctx.letterSpacing = '2px';
     ctx.fillText(title, 512, 620);
 
-    // Subtitle
     ctx.fillStyle = '#E8BCC6';
     ctx.font = 'italic 52px "Alex Brush", cursive, serif';
     ctx.fillText(subtitle, 512, 700);
 
-    // Date
     ctx.fillStyle = '#B49A6A';
     ctx.font = '24px Montserrat, sans-serif';
     ctx.letterSpacing = '4px';
@@ -87,7 +88,6 @@ export class PageTextureGenerator {
     canvas.height = 1360;
     const ctx = canvas.getContext('2d')!;
 
-    // Rich Wine Leather
     const gradient = ctx.createLinearGradient(0, 0, 1024, 1360);
     gradient.addColorStop(0, '#38161E');
     gradient.addColorStop(0.5, '#280F15');
@@ -95,15 +95,11 @@ export class PageTextureGenerator {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 1024, 1360);
 
-    // Leather grain
     ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
     for (let i = 0; i < 4000; i++) {
-      const x = Math.random() * 1024;
-      const y = Math.random() * 1360;
-      ctx.fillRect(x, y, 2, 2);
+      ctx.fillRect(Math.random() * 1024, Math.random() * 1360, 2, 2);
     }
 
-    // Gilded Frame
     ctx.strokeStyle = '#D4AF37';
     ctx.lineWidth = 4;
     ctx.strokeRect(40, 40, 944, 1280);
@@ -113,7 +109,6 @@ export class PageTextureGenerator {
     ctx.strokeRect(60, 60, 904, 1240);
     ctx.setLineDash([]);
 
-    // Center Gold Emblem
     ctx.beginPath();
     ctx.arc(512, 600, 60, 0, Math.PI * 2);
     ctx.strokeStyle = '#D4AF37';
@@ -146,10 +141,7 @@ export class PageTextureGenerator {
     quote?: string;
     textLines?: string[];
     handwriting?: string;
-    imageSrc?: string;
-    imageCaption?: string;
-    secondaryImageSrc?: string;
-    secondaryImageCaption?: string;
+    media?: PageMediaItem[];
     side: 'left' | 'right';
   }): Promise<THREE.CanvasTexture> {
     return new Promise((resolve) => {
@@ -162,7 +154,6 @@ export class PageTextureGenerator {
       ctx.fillStyle = '#F9F5EC';
       ctx.fillRect(0, 0, 1024, 1360);
 
-      // Subtle paper fibers & vignette
       const vGrad = ctx.createRadialGradient(512, 680, 200, 512, 680, 800);
       vGrad.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
       vGrad.addColorStop(1, 'rgba(180, 154, 106, 0.12)');
@@ -186,54 +177,54 @@ export class PageTextureGenerator {
       ctx.font = 'bold 20px Montserrat, sans-serif';
       ctx.letterSpacing = '4px';
       ctx.textAlign = params.side === 'left' ? 'left' : 'right';
-      const headerX = params.side === 'left' ? 100 : 924;
-      ctx.fillText(params.chapter ? params.chapter.toUpperCase() : 'LOVE JOURNEY', headerX, 100);
+      const headerX = params.side === 'left' ? 80 : 944;
+      ctx.fillText(params.chapter ? params.chapter.toUpperCase() : 'LOVE JOURNEY', headerX, 85);
 
-      // Thin separator line
       ctx.strokeStyle = 'rgba(201, 154, 154, 0.3)';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(100, 120);
-      ctx.lineTo(924, 120);
+      ctx.moveTo(80, 105);
+      ctx.lineTo(944, 105);
       ctx.stroke();
 
       // 3. Title & Quote
+      let curY = 165;
       if (params.title) {
         ctx.textAlign = 'left';
         ctx.fillStyle = '#292522';
-        ctx.font = 'bold 44px "Cormorant Garamond", Georgia, serif';
+        ctx.font = 'bold 40px "Cormorant Garamond", Georgia, serif';
         ctx.letterSpacing = '1px';
-        ctx.fillText(params.title, 100, 190);
+        ctx.fillText(params.title, 80, curY);
+        curY += 45;
       }
 
       if (params.quote) {
         ctx.fillStyle = '#94384F';
-        ctx.font = 'italic 32px "Alex Brush", cursive';
-        ctx.fillText(`"${params.quote}"`, 100, 245);
+        ctx.font = 'italic 28px "Alex Brush", cursive';
+        ctx.fillText(`"${params.quote}"`, 80, curY);
+        curY += 40;
       }
 
       // 4. Text Lines
       if (params.textLines && params.textLines.length > 0) {
         ctx.fillStyle = '#474039';
-        ctx.font = '24px "Cormorant Garamond", Georgia, serif';
-        let lineY = params.quote ? 300 : 250;
+        ctx.font = '22px "Cormorant Garamond", Georgia, serif';
         params.textLines.forEach((line) => {
-          ctx.fillText(line, 100, lineY);
-          lineY += 38;
+          ctx.fillText(line, 80, curY);
+          curY += 32;
         });
+        curY += 15;
       }
 
       const completeRendering = () => {
-        // Handwriting note
         if (params.handwriting) {
           ctx.fillStyle = '#38161E';
-          ctx.font = 'italic 36px "Alex Brush", cursive';
+          ctx.font = 'italic 34px "Alex Brush", cursive';
           ctx.textAlign = params.side === 'left' ? 'right' : 'center';
-          const hX = params.side === 'left' ? 900 : 512;
-          ctx.fillText(params.handwriting, hX, 1230);
+          const hX = params.side === 'left' ? 920 : 512;
+          ctx.fillText(params.handwriting, hX, 1245);
         }
 
-        // Page Number
         ctx.fillStyle = '#8A7E71';
         ctx.font = '22px "Cormorant Garamond", Georgia, serif';
         ctx.textAlign = 'center';
@@ -244,15 +235,15 @@ export class PageTextureGenerator {
         resolve(texture);
       };
 
-      // Helper function to draw a single Polaroid frame
       const drawPolaroid = (
-        img: HTMLImageElement,
+        img: HTMLImageElement | HTMLCanvasElement,
         x: number,
         y: number,
         w: number,
         h: number,
         caption?: string,
-        rotationDeg: number = 0
+        rotationDeg: number = 0,
+        isVideo: boolean = false
       ) => {
         ctx.save();
         ctx.translate(x + w / 2, y + h / 2);
@@ -260,75 +251,158 @@ export class PageTextureGenerator {
 
         // Shadow & Card
         ctx.shadowColor = 'rgba(0, 0, 0, 0.16)';
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = 18;
         ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 8;
+        ctx.shadowOffsetY = 6;
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(-w / 2, -h / 2, w, h);
         ctx.shadowColor = 'transparent';
 
-        // Draw image clipped inside
-        const imgPadding = 18;
-        const imgH = h - 70;
-        ctx.drawImage(img, -w / 2 + imgPadding, -h / 2 + imgPadding, w - imgPadding * 2, imgH - imgPadding);
+        // Image area
+        const padding = 14;
+        const bottomArea = 48;
+        const imgW = w - padding * 2;
+        const imgH = h - padding * 2 - bottomArea;
 
-        // Washi Tape
-        ctx.fillStyle = 'rgba(235, 225, 205, 0.82)';
-        ctx.fillRect(-60, -h / 2 - 12, 120, 24);
+        // Draw image clipped inside
+        ctx.drawImage(img, -w / 2 + padding, -h / 2 + padding, imgW, imgH);
+
+        // If Video: draw sweet video badge overlay
+        if (isVideo) {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+          ctx.beginPath();
+          ctx.arc(0, (-h / 2 + padding + imgH / 2), 24, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#FFFFFF';
+          ctx.beginPath();
+          ctx.moveTo(-6, (-h / 2 + padding + imgH / 2) - 10);
+          ctx.lineTo(12, (-h / 2 + padding + imgH / 2));
+          ctx.lineTo(-6, (-h / 2 + padding + imgH / 2) + 10);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // Washi tape on top
+        ctx.fillStyle = 'rgba(235, 225, 205, 0.85)';
+        ctx.fillRect(-45, -h / 2 - 8, 90, 18);
 
         // Caption
         if (caption) {
           ctx.fillStyle = '#4A1523';
-          ctx.font = 'italic 26px "Alex Brush", cursive';
+          ctx.font = 'italic 20px "Alex Brush", cursive';
           ctx.textAlign = 'center';
-          ctx.fillText(caption, 0, h / 2 - 24);
+          ctx.fillText(caption, 0, h / 2 - 16);
         }
 
         ctx.restore();
       };
 
-      // Handle dual or single images
-      if (params.imageSrc && params.secondaryImageSrc) {
-        let loaded = 0;
-        const img1 = new Image();
-        const img2 = new Image();
-        img1.crossOrigin = 'anonymous';
-        img2.crossOrigin = 'anonymous';
-
-        const checkBoth = () => {
-          loaded++;
-          if (loaded === 2) {
-            // Draw dual polaroids vertically stacked with slight rotation
-            const startY = params.textLines ? 480 : 280;
-            drawPolaroid(img1, 212, startY, 560, 420, params.imageCaption, -1.5);
-            drawPolaroid(img2, 252, startY + 440, 560, 420, params.secondaryImageCaption, 1.8);
-            completeRendering();
-          }
-        };
-
-        img1.onload = checkBoth;
-        img1.onerror = checkBoth;
-        img2.onload = checkBoth;
-        img2.onerror = checkBoth;
-
-        img1.src = params.imageSrc;
-        img2.src = params.secondaryImageSrc;
-      } else if (params.imageSrc) {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => {
-          const frameX = 182;
-          const frameY = params.textLines ? 520 : 270;
-          const frameW = 660;
-          const frameH = 740;
-          drawPolaroid(img, frameX, frameY, frameW, frameH, params.imageCaption, 0);
-          completeRendering();
-        };
-        img.onerror = () => completeRendering();
-        img.src = params.imageSrc;
-      } else {
+      const mediaItems = params.media || [];
+      if (mediaItems.length === 0) {
         completeRendering();
+        return;
       }
+
+      // Load all media
+      let loadedCount = 0;
+      const loadedElements: Array<{ elem: HTMLImageElement | HTMLCanvasElement; item: PageMediaItem }> = [];
+
+      mediaItems.forEach((item, idx) => {
+        if (item.isVideo) {
+          // For video, generate a clean frame canvas placeholder
+          const vCanvas = document.createElement('canvas');
+          vCanvas.width = 400;
+          vCanvas.height = 300;
+          const vCtx = vCanvas.getContext('2d')!;
+          vCtx.fillStyle = '#2A181E';
+          vCtx.fillRect(0, 0, 400, 300);
+          vCtx.fillStyle = '#E8BCC6';
+          vCtx.font = '22px Montserrat, sans-serif';
+          vCtx.textAlign = 'center';
+          vCtx.fillText('▶ Video Kỷ Niệm', 200, 155);
+
+          loadedElements[idx] = { elem: vCanvas, item };
+          loadedCount++;
+          if (loadedCount === mediaItems.length) {
+            renderMediaGrid();
+          }
+        } else {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            loadedElements[idx] = { elem: img, item };
+            loadedCount++;
+            if (loadedCount === mediaItems.length) {
+              renderMediaGrid();
+            }
+          };
+          img.onerror = () => {
+            // fallback canvas if load fails
+            const errCanvas = document.createElement('canvas');
+            errCanvas.width = 300;
+            errCanvas.height = 300;
+            const eCtx = errCanvas.getContext('2d')!;
+            eCtx.fillStyle = '#EFE9DE';
+            eCtx.fillRect(0, 0, 300, 300);
+            eCtx.fillStyle = '#8A7E71';
+            eCtx.font = '16px serif';
+            eCtx.textAlign = 'center';
+            eCtx.fillText('Khoảnh khắc đôi mình', 150, 150);
+
+            loadedElements[idx] = { elem: errCanvas, item };
+            loadedCount++;
+            if (loadedCount === mediaItems.length) {
+              renderMediaGrid();
+            }
+          };
+          img.src = item.src;
+        }
+      });
+
+      const renderMediaGrid = () => {
+        const count = loadedElements.length;
+        const availableTop = curY + 10;
+        const availableHeight = 1200 - availableTop;
+
+        if (count === 1) {
+          const el = loadedElements[0];
+          drawPolaroid(el.elem, 172, availableTop + 20, 680, availableHeight - 40, el.item.caption, 0, el.item.isVideo);
+        } else if (count === 2) {
+          const cardH = (availableHeight - 40) / 2;
+          const cardW = 600;
+          const leftX = (1024 - cardW) / 2;
+          drawPolaroid(loadedElements[0].elem, leftX, availableTop, cardW, cardH, loadedElements[0].item.caption, -1.2, loadedElements[0].item.isVideo);
+          drawPolaroid(loadedElements[1].elem, leftX + 15, availableTop + cardH + 15, cardW, cardH, loadedElements[1].item.caption, 1.5, loadedElements[1].item.isVideo);
+        } else if (count === 3) {
+          // 1 top center, 2 bottom side-by-side
+          const topH = availableHeight * 0.46;
+          const topW = 540;
+          const topX = (1024 - topW) / 2;
+          drawPolaroid(loadedElements[0].elem, topX, availableTop, topW, topH, loadedElements[0].item.caption, 0.8, loadedElements[0].item.isVideo);
+
+          const btmW = 420;
+          const btmH = availableHeight * 0.44;
+          const btmY = availableTop + topH + 20;
+          drawPolaroid(loadedElements[1].elem, 75, btmY, btmW, btmH, loadedElements[1].item.caption, -1.8, loadedElements[1].item.isVideo);
+          drawPolaroid(loadedElements[2].elem, 525, btmY, btmW, btmH, loadedElements[2].item.caption, 2.0, loadedElements[2].item.isVideo);
+        } else if (count >= 4) {
+          // 2x2 Grid
+          const cardW = 410;
+          const cardH = (availableHeight - 35) / 2;
+          const x1 = 80;
+          const x2 = 530;
+          const y1 = availableTop;
+          const y2 = availableTop + cardH + 20;
+
+          drawPolaroid(loadedElements[0].elem, x1, y1, cardW, cardH, loadedElements[0].item.caption, -1.2, loadedElements[0].item.isVideo);
+          drawPolaroid(loadedElements[1].elem, x2, y1, cardW, cardH, loadedElements[1].item.caption, 1.5, loadedElements[1].item.isVideo);
+          drawPolaroid(loadedElements[2].elem, x1, y2, cardW, cardH, loadedElements[2].item.caption, 1.8, loadedElements[2].item.isVideo);
+          drawPolaroid(loadedElements[3].elem, x2, y2, cardW, cardH, loadedElements[3].item.caption, -1.5, loadedElements[3].item.isVideo);
+        }
+
+        completeRendering();
+      };
     });
   }
 }
