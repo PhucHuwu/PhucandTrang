@@ -23,69 +23,149 @@ export class PageTextureGenerator {
     canvas.height = 1360;
     const ctx = canvas.getContext('2d')!;
 
-    // 1. Rich Wine / Burgundy Leather background
+    // 1. Soft Warm Pastel Blush & Cream Watercolor Texture
     const gradient = ctx.createLinearGradient(0, 0, 1024, 1360);
-    gradient.addColorStop(0, '#38161E');
-    gradient.addColorStop(0.5, '#280F15');
-    gradient.addColorStop(1, '#1A070B');
+    gradient.addColorStop(0, '#FFF5F7');
+    gradient.addColorStop(0.35, '#FFE9EE');
+    gradient.addColorStop(0.7, '#FDE2E8');
+    gradient.addColorStop(1, '#F7D6DE');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 1024, 1360);
 
-    // Leather grain
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
-    for (let i = 0; i < 4000; i++) {
+    // Cute soft watercolor clouds / bubbles
+    const pastelBlobs = [
+      { x: 260, y: 320, r: 280, color: 'rgba(255, 209, 220, 0.4)' },
+      { x: 780, y: 440, r: 260, color: 'rgba(255, 225, 235, 0.45)' },
+      { x: 340, y: 920, r: 320, color: 'rgba(255, 218, 225, 0.35)' },
+      { x: 740, y: 1040, r: 290, color: 'rgba(250, 210, 222, 0.4)' },
+    ];
+    pastelBlobs.forEach(b => {
+      const radGrad = ctx.createRadialGradient(b.x, b.y, 10, b.x, b.y, b.r);
+      radGrad.addColorStop(0, b.color);
+      radGrad.addColorStop(1, 'rgba(255, 245, 247, 0)');
+      ctx.fillStyle = radGrad;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Gentle linen fabric texture
+    ctx.fillStyle = 'rgba(180, 140, 150, 0.04)';
+    for (let i = 0; i < 5000; i++) {
       ctx.fillRect(Math.random() * 1024, Math.random() * 1360, 2, 2);
     }
 
-    // Gilded Frame
-    ctx.strokeStyle = '#D4AF37';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(40, 40, 944, 1280);
+    // 2. Romantic Rose-Gold & Scalloped / Stitched Border
+    ctx.strokeStyle = '#E295A8';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(50, 50, 924, 1260);
 
-    ctx.setLineDash([8, 6]);
+    ctx.setLineDash([10, 8]);
+    ctx.strokeStyle = '#F0B6C3';
     ctx.lineWidth = 2;
-    ctx.strokeRect(60, 60, 904, 1240);
+    ctx.strokeRect(68, 68, 888, 1224);
     ctx.setLineDash([]);
 
-    // Corner Ornaments
-    ctx.fillStyle = '#D4AF37';
-    ctx.font = '32px serif';
+    // Cute corner flower buds / bows
+    ctx.fillStyle = '#D4728C';
+    ctx.font = '28px serif';
     ctx.textAlign = 'center';
-    ctx.fillText('✦', 80, 90);
-    ctx.fillText('✦', 944, 90);
-    ctx.fillText('✦', 80, 1280);
-    ctx.fillText('✦', 944, 1280);
+    ctx.fillText('🌸', 95, 100);
+    ctx.fillText('🌸', 929, 100);
+    ctx.fillText('🌸', 95, 1265);
+    ctx.fillText('🌸', 929, 1265);
 
-    // Typography
-    ctx.fillStyle = '#D4AF37';
-    ctx.font = '24px Montserrat, sans-serif';
-    ctx.letterSpacing = '8px';
-    ctx.fillText('A JOURNEY OF LOVE', 512, 280);
+    // Floating little sparkles and hearts on cover
+    const cuteElements = [
+      { text: '✨', x: 220, y: 220, size: 28 },
+      { text: '💖', x: 810, y: 240, size: 26 },
+      { text: '🌷', x: 180, y: 800, size: 30 },
+      { text: '🎀', x: 840, y: 780, size: 32 },
+      { text: '✨', x: 790, y: 1140, size: 26 },
+      { text: '💕', x: 230, y: 1120, size: 28 },
+    ];
+    cuteElements.forEach(e => {
+      ctx.font = `${e.size}px serif`;
+      ctx.fillText(e.text, e.x, e.y);
+    });
 
-    // Center Emblem
+    // Top ribbon title
+    ctx.fillStyle = '#C45D78';
+    ctx.font = 'bold 22px "Montserrat", sans-serif';
+    ctx.letterSpacing = '6px';
+    ctx.fillText('OUR LOVE JOURNAL', 512, 260);
+
+    // Romantic Wreath / Heart Centerpiece
+    ctx.save();
     ctx.beginPath();
-    ctx.arc(512, 440, 70, 0, Math.PI * 2);
-    ctx.strokeStyle = '#D4AF37';
+    ctx.arc(512, 450, 95, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.shadowColor = 'rgba(212, 114, 140, 0.2)';
+    ctx.shadowBlur = 25;
+    ctx.shadowOffsetY = 6;
+    ctx.fill();
+    ctx.restore();
+
+    ctx.strokeStyle = '#F3BDC8';
     ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(512, 450, 95, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.fillStyle = '#E8BCC6';
-    ctx.font = '54px serif';
-    ctx.fillText('❤', 512, 458);
+    ctx.setLineDash([6, 6]);
+    ctx.strokeStyle = '#E8A3B3';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(512, 450, 83, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
 
-    ctx.fillStyle = '#F4EDE2';
-    ctx.font = 'bold 72px "Cormorant Garamond", Georgia, serif';
+    // Big cute heart in centerpiece
+    ctx.fillStyle = '#E85A7E';
+    ctx.font = '72px serif';
+    ctx.fillText('💗', 512, 475);
+
+    // Main Title: Chúng Mình
+    ctx.fillStyle = '#732A3E';
+    ctx.font = 'bold 68px "Cormorant Garamond", Georgia, serif';
     ctx.letterSpacing = '2px';
-    ctx.fillText(title, 512, 620);
+    ctx.fillText(title, 512, 640);
 
-    ctx.fillStyle = '#E8BCC6';
-    ctx.font = 'italic 52px "Dancing Script", "Playfair Display", Georgia, cursive';
-    ctx.fillText(subtitle, 512, 700);
+    // Cute decorative flourish line
+    ctx.strokeStyle = '#E295A8';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(412, 675);
+    ctx.lineTo(612, 675);
+    ctx.stroke();
 
-    ctx.fillStyle = '#B49A6A';
-    ctx.font = '24px Montserrat, sans-serif';
-    ctx.letterSpacing = '4px';
-    ctx.fillText(date, 512, 820);
+    ctx.fillStyle = '#E85A7E';
+    ctx.font = '22px serif';
+    ctx.fillText('❦', 512, 683);
+
+    // Sweet handwriting couple names
+    ctx.fillStyle = '#B84364';
+    ctx.font = 'bold 64px "Dancing Script", cursive';
+    ctx.fillText(subtitle, 512, 765);
+
+    // Cute date badge
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(362, 830, 300, 52, [26]);
+    ctx.fill();
+    ctx.strokeStyle = '#F0B6C3';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = '#A84D67';
+    ctx.font = '600 22px "Montserrat", sans-serif';
+    ctx.letterSpacing = '3px';
+    ctx.fillText(`• ${date} •`, 512, 863);
+
+    // Sweet closing quote on cover
+    ctx.fillStyle = '#8C485B';
+    ctx.font = 'italic 28px "Dancing Script", cursive';
+    ctx.fillText('Nơi tình yêu bắt đầu và lớn lên từng ngày...', 512, 970);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -98,46 +178,88 @@ export class PageTextureGenerator {
     canvas.height = 1360;
     const ctx = canvas.getContext('2d')!;
 
+    // Matching Warm Pastel Blush Background
     const gradient = ctx.createLinearGradient(0, 0, 1024, 1360);
-    gradient.addColorStop(0, '#38161E');
-    gradient.addColorStop(0.5, '#280F15');
-    gradient.addColorStop(1, '#1A070B');
+    gradient.addColorStop(0, '#FFF5F7');
+    gradient.addColorStop(0.35, '#FFE9EE');
+    gradient.addColorStop(0.7, '#FDE2E8');
+    gradient.addColorStop(1, '#F7D6DE');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 1024, 1360);
 
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
-    for (let i = 0; i < 4000; i++) {
+    // Soft clouds
+    const pastelBlobs = [
+      { x: 300, y: 400, r: 280, color: 'rgba(255, 209, 220, 0.4)' },
+      { x: 720, y: 900, r: 300, color: 'rgba(250, 210, 222, 0.4)' },
+    ];
+    pastelBlobs.forEach(b => {
+      const radGrad = ctx.createRadialGradient(b.x, b.y, 10, b.x, b.y, b.r);
+      radGrad.addColorStop(0, b.color);
+      radGrad.addColorStop(1, 'rgba(255, 245, 247, 0)');
+      ctx.fillStyle = radGrad;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Linen texture
+    ctx.fillStyle = 'rgba(180, 140, 150, 0.04)';
+    for (let i = 0; i < 5000; i++) {
       ctx.fillRect(Math.random() * 1024, Math.random() * 1360, 2, 2);
     }
 
-    ctx.strokeStyle = '#D4AF37';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(40, 40, 944, 1280);
+    // Border
+    ctx.strokeStyle = '#E295A8';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(50, 50, 924, 1260);
 
-    ctx.setLineDash([8, 6]);
+    ctx.setLineDash([10, 8]);
+    ctx.strokeStyle = '#F0B6C3';
     ctx.lineWidth = 2;
-    ctx.strokeRect(60, 60, 904, 1240);
+    ctx.strokeRect(68, 68, 888, 1224);
     ctx.setLineDash([]);
 
+    // Corner flowers
+    ctx.fillStyle = '#D4728C';
+    ctx.font = '28px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🌸', 95, 100);
+    ctx.fillText('🌸', 929, 100);
+    ctx.fillText('🌸', 95, 1265);
+    ctx.fillText('🌸', 929, 1265);
+
+    // Center Back Emblem
+    ctx.save();
     ctx.beginPath();
-    ctx.arc(512, 600, 60, 0, Math.PI * 2);
-    ctx.strokeStyle = '#D4AF37';
+    ctx.arc(512, 580, 80, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.shadowColor = 'rgba(212, 114, 140, 0.2)';
+    ctx.shadowBlur = 20;
+    ctx.fill();
+    ctx.restore();
+
+    ctx.strokeStyle = '#F3BDC8';
     ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(512, 580, 80, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.fillStyle = '#D4AF37';
-    ctx.font = '36px serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('✦', 512, 612);
+    ctx.fillStyle = '#E85A7E';
+    ctx.font = '54px serif';
+    ctx.fillText('💌', 512, 600);
 
-    ctx.fillStyle = '#E8BCC6';
-    ctx.font = 'italic 48px "Dancing Script", "Playfair Display", Georgia, cursive';
+    ctx.fillStyle = '#732A3E';
+    ctx.font = 'bold 54px "Dancing Script", cursive';
     ctx.fillText('Forever & Always', 512, 730);
 
-    ctx.fillStyle = '#B49A6A';
-    ctx.font = '22px Montserrat, sans-serif';
+    ctx.fillStyle = '#A84D67';
+    ctx.font = '600 22px "Montserrat", sans-serif';
     ctx.letterSpacing = '6px';
-    ctx.fillText('TO BE CONTINUED...', 512, 800);
+    ctx.fillText('TO BE CONTINUED...', 512, 805);
+
+    ctx.fillStyle = '#B84364';
+    ctx.font = 'italic 26px "Dancing Script", cursive';
+    ctx.fillText('Hành trình của chúng mình vẫn đang tiếp diễn...', 512, 880);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;

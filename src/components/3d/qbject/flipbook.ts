@@ -226,7 +226,7 @@ export default class Flipbook {
 		// init spine mesh
 		const _texture = (url?: string) => {
 			if (!url) {
-				return { color: new THREE.Color(0x38161E) };
+				return { color: new THREE.Color(0xF7D6DE) };
 			}
 			const texture = this.textureLoader.load(url);
 			texture.colorSpace = THREE.SRGBColorSpace;
