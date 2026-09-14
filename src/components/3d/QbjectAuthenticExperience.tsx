@@ -38,7 +38,7 @@ export default function QbjectAuthenticExperience() {
       });
 
       // 2. CHAPTER I: LẦN ĐẦU GẶP GỠ (13.10 - 19.10.2022)
-      // Layout: Dual Stacked (Trang 1 có 2 ảnh ngang 13.10 & 14.10)
+      // Layout: Dual Columns (Trang 1 có 2 ảnh cạnh nhau song song)
       const p1Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 1,
         chapter: 'Chapter I',
@@ -49,7 +49,7 @@ export default function QbjectAuthenticExperience() {
           'khoảnh khắc đầu tiên mình và bạn chạm ánh mắt nhau,',
           'thế giới bỗng trở nên thật dịu dàng và ấm áp.',
         ],
-        layout: 'dual-stacked',
+        layout: 'dual-columns',
         media: [
           { src: getMediaUrl('First-meet-13-10-2022.jpg'), caption: '13.10.2022 • Cuộc gặp gỡ định mệnh' },
           { src: getMediaUrl('First-meet-14-10-2022.jpg'), caption: '14.10.2022 • Rung động đầu đời' },
@@ -146,7 +146,7 @@ export default function QbjectAuthenticExperience() {
       });
 
       // 5. CHAPTER IV: THÁNG 12.2023 & NĂM 2024
-      // Layout: Dual Stacked (1 ảnh dọc 3:4 & 1 khung Video 16:9)
+      // Layout: Dual Columns (Trang 7 có 2 ảnh cạnh nhau song song)
       const p4Front = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 7,
         chapter: 'Chapter IV',
@@ -154,7 +154,7 @@ export default function QbjectAuthenticExperience() {
         textLines: [
           'Gom góp từng khoảnh khắc bình dị cùng bạn.',
         ],
-        layout: 'dual-stacked',
+        layout: 'dual-columns',
         media: [
           { src: getMediaUrl('02-12-2023_3.jpg'), caption: '02.12.2023 • Bình yên bên bạn' },
           { src: getMediaUrl('26-06-2323_thumb.jpg'), caption: '26.06 • Video kỷ niệm', isVideo: true },
