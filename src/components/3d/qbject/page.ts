@@ -6,6 +6,7 @@ import {
 	lerp,
 	clamp,
 } from "./util";
+import { PaperTextureManager } from "./PaperTextureManager";
 
 export default class Page {
 	public textureUrls;
@@ -81,13 +82,30 @@ export default class Page {
 			textures.edgeRight = _texture(this.textureUrls.edgeLR);
 		}
 
+		const bumpMap = PaperTextureManager.getPaperBumpMap();
+		const roughnessMap = PaperTextureManager.getPaperRoughnessMap();
+
 		const materials = [
-			new THREE.MeshStandardMaterial(textures.back),
-			new THREE.MeshStandardMaterial(textures.front),
-			new THREE.MeshStandardMaterial(textures.edgeTop),
-			new THREE.MeshStandardMaterial(textures.edgeBottom),
-			new THREE.MeshStandardMaterial(textures.edgeRight),
-			new THREE.MeshStandardMaterial(textures.edgeLeft),
+			new THREE.MeshStandardMaterial({
+				map: _texture(this.textureUrls.back).map,
+				vertexColors: !this.isCover,
+				bumpMap: bumpMap,
+				bumpScale: 1.8,
+				roughnessMap: roughnessMap,
+				roughness: 0.95,
+			}),
+			new THREE.MeshStandardMaterial({
+				map: _texture(this.textureUrls.front).map,
+				vertexColors: !this.isCover,
+				bumpMap: bumpMap,
+				bumpScale: 1.8,
+				roughnessMap: roughnessMap,
+				roughness: 0.95,
+			}),
+			new THREE.MeshStandardMaterial(_color(this.edgeColor)),
+			new THREE.MeshStandardMaterial(_color(this.edgeColor)),
+			new THREE.MeshStandardMaterial(_color(this.edgeColor)),
+			new THREE.MeshStandardMaterial(_color(this.edgeColor)),
 		];
 
 		const geometry = new THREE.BoxGeometry(
