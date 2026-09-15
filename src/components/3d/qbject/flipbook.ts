@@ -88,6 +88,7 @@ export default class Flipbook {
 	private isVerticalMode = false;
 	private swipeHandler: SwipeHandler;
 	public atmospheric?: any;
+	public loadingProgress = 0;
 
 	// if this code is running, means the scripts are already loaded
 	private scriptProgressWeight = 0.4;
@@ -120,19 +121,21 @@ export default class Flipbook {
 			this.introOverlay.onProgress(this.scriptProgressWeight);
 		}
 
-		THREE.DefaultLoadingManager.onProgress = (
+		this.loadingManager.onProgress = (
 			_,
 			itemsLoaded,
 			itemsTotal,
 		) => {
-			if (this.introPhase === "COMPLETED") return;
+			if (this.disposed || this.introPhase !== "LOADING") return;
 
 			const assetsProgress = itemsLoaded / itemsTotal;
 			const overallProgress =
 				this.scriptProgressWeight +
 				assetsProgress * (1 - this.scriptProgressWeight);
+			this.loadingProgress = overallProgress;
 			this.introOverlay?.onProgress(overallProgress);
 			if (overallProgress === 1) {
+				this.loadingProgress = 1;
 				this.playIntro();
 			}
 		};
@@ -162,7 +165,7 @@ export default class Flipbook {
 		this.containerEl.appendChild(this.wrapperLinkEl);
 		this.wrapperLinkEl.appendChild(this.renderer.domElement);
 
-		this.textureLoader = new THREE.TextureLoader();
+		this.textureLoader = new THREE.TextureLoader(this.loadingManager);
 
 		this.raycaster = new THREE.Raycaster();
 		this.sceneMousePos = new THREE.Vector2();
@@ -311,7 +314,7 @@ export default class Flipbook {
 		// event listeners
 		window.addEventListener(
 			"resize",
-			this.onWindowResize.bind(this),
+			this.resizeHandler,
 			false,
 		);
 
@@ -488,20 +491,58 @@ export default class Flipbook {
 	}
 
 	private runAnimation() {
+		if (this.disposed || this.animationFrame) return;
 		let previousTime = performance.now();
 
 		const animate = ((currentTime: number) => {
-			let dt = (currentTime - previousTime) / 1000;
+			if (this.disposed) return;
+			let dt = Math.min((currentTime - previousTime) / 1000, 0.05);
 			previousTime = currentTime;
+			if (document.hidden) {
+				this.animationFrame = requestAnimationFrame(animate);
+				return;
+			}
 			// this.stats?.begin?.();
 			this.update(dt);
 			// this.stats?.end?.();
 			this.controls?.update?.();
 
-			requestAnimationFrame(animate);
+			this.animationFrame = requestAnimationFrame(animate);
 		}).bind(this);
 
 		animate(performance.now());
+	}
+
+	private disposed = false;
+	private resizeHandler = () => this.onWindowResize();
+	private animationFrame = 0;
+	private loadingManager = new THREE.LoadingManager();
+	public get isReady() { return this.introPhase === "COMPLETED" && this.initCompleted; }
+	public destroy() {
+		this.disposed = true;
+		window.removeEventListener("resize", this.resizeHandler);
+		cancelAnimationFrame(this.animationFrame);
+		this.progress.destroy();
+		this.cameraSideShift.destroy();
+		this.videoOverlay.close();
+		gsap.killTweensOf(this.camera.position);
+		gsap.killTweensOf(this.camera.quaternion);
+		const geometries = new Set<THREE.BufferGeometry>();
+		const materials = new Set<THREE.Material>();
+		const textures = new Set<THREE.Texture>();
+		this.scene.traverse(object => {
+			const mesh = object as THREE.Mesh;
+			if (mesh.geometry) geometries.add(mesh.geometry);
+			if (mesh.material) for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+				materials.add(material);
+				for (const value of Object.values(material)) if (value instanceof THREE.Texture) textures.add(value);
+			}
+		});
+		textures.forEach(texture => texture.dispose());
+		materials.forEach(material => material.dispose());
+		geometries.forEach(geometry => geometry.dispose());
+		this.renderer.dispose();
+		this.wrapperLinkEl.remove();
 	}
 
 	private onSwipeMove(swipe: Swipe) {
@@ -566,7 +607,9 @@ export default class Flipbook {
 			!this.focusedActiveArea &&
 			this.introPhase === "COMPLETED"
 		) {
-			this.restoreCamera();
+			const target = this.getCameraPos(this.getBaseViewRect());
+			this.camera.position.copy(target.position);
+			this.camera.quaternion.copy(target.rotation);
 		}
 
 		// TODO:
@@ -642,12 +685,11 @@ export default class Flipbook {
 		this.group.position.x = newPoint.x;
 		this.group.position.z = newPoint.z;
 
-		if (!this.focusedActiveArea || this.isChangingFocus) {
-			this.render();
-		}
-
 		if (this.atmospheric) {
 			this.atmospheric.update(performance.now() / 1000, this.sceneMousePos);
+		}
+		if (!this.focusedActiveArea || this.isChangingFocus) {
+			this.render();
 		}
 	}
 

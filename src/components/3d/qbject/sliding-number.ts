@@ -124,14 +124,19 @@ export default class SlidingNumber extends EventEmitter {
 		let previousTime = performance.now();
 
 		const animate = ((currentTime: number) => {
-			let dt = (currentTime - previousTime) / 1000;
+			let dt = Math.min((currentTime - previousTime) / 1000, 0.05);
 			previousTime = currentTime;
-			this.update(dt);
+			if (!document.hidden) this.update(dt);
 
-			requestAnimationFrame(animate);
+			this.animationFrame = requestAnimationFrame(animate);
 		}).bind(this);
 
 		animate(performance.now());
+	}
+
+	private animationFrame = 0;
+	public destroy() {
+		cancelAnimationFrame(this.animationFrame);
 	}
 
 	public nudge(amount: number): void {

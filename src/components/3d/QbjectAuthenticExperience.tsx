@@ -14,6 +14,8 @@ export default function QbjectAuthenticExperience() {
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [isReady, setIsReady] = useState(false);
+  const [showLoading, setShowLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0.04);
   const flipbookInstanceRef = useRef<Flipbook | null>(null);
 
   useEffect(() => {
@@ -25,11 +27,13 @@ export default function QbjectAuthenticExperience() {
     const initOriginalFlipbook = async () => {
       // Ensure custom font 2.otf is loaded before generating canvas textures
       await ensureCustomFontLoaded();
+      setLoadingProgress(0.08);
 
       // 1. FRONT COVER WITH PHOTO "WE.JPEG" & FONT 2.OTF
       const coverFront = await PageTextureGenerator.createCoverTexture(
         getMediaUrl('WE.JPEG')
       );
+      setLoadingProgress(0.12);
       const insideBlank = await PageTextureGenerator.createInsidePageTexture({
         pageNumber: 0,
         title: 'OUR STORY',
@@ -40,6 +44,7 @@ export default function QbjectAuthenticExperience() {
         ],
         side: 'left',
       });
+      setLoadingProgress(0.16);
 
       // 2. CHAPTER I: LẦN ĐẦU GẶP GỠ (13.10.2022)
       // Layout: Dual Columns (Trang 1 có 2 ảnh cạnh nhau song song ngày 13.10.2022)
@@ -111,6 +116,7 @@ export default function QbjectAuthenticExperience() {
         ],
         side: 'left',
       });
+      setLoadingProgress(0.28);
 
       // 4. CHAPTER III: MÙA XUÂN & MÙA HÈ 2023 (05.03 - 08.07.2023)
       // Layout: Diagonal Duo (2 ảnh nghiêng so le nghệ thuật)
@@ -185,6 +191,7 @@ export default function QbjectAuthenticExperience() {
         ],
         side: 'left',
       });
+      setLoadingProgress(0.42);
 
       // 6. CHAPTER V: CHUYẾN DU XUÂN ĐẦU NĂM 2025 (02.01 & 17.01.2025)
       // Layout: Quad Gallery (Tuyển chọn 4 ảnh du xuân 02.01.2025 đẹp nhất, không trùng)
@@ -263,6 +270,7 @@ export default function QbjectAuthenticExperience() {
         ],
         side: 'left',
       });
+      setLoadingProgress(0.56);
 
       // Layout: Scrapbook Trio (3 ảnh đan xen độc đáo 22.11.2025)
       const p7Front = await PageTextureGenerator.createInsidePageTexture({
@@ -330,6 +338,7 @@ export default function QbjectAuthenticExperience() {
         ],
         side: 'left',
       });
+      setLoadingProgress(0.68);
 
       // Layout: Dual Stacked
       const p9Front = await PageTextureGenerator.createInsidePageTexture({
@@ -404,6 +413,7 @@ export default function QbjectAuthenticExperience() {
         ],
         side: 'left',
       });
+      setLoadingProgress(0.78);
 
       // Back cover inside & outside using photo 17-01-2025_6.jpg
       const coverBackInside = await PageTextureGenerator.createBackCoverTexture(
@@ -414,6 +424,7 @@ export default function QbjectAuthenticExperience() {
         getMediaUrl('17-01-2025_6.jpg'),
         false
       );
+      setLoadingProgress(0.84);
 
       if (destroyed) return;
 
@@ -503,18 +514,30 @@ export default function QbjectAuthenticExperience() {
       });
 
       flipbookInstanceRef.current = flipbook;
+      setLoadingProgress(0.88);
 
       // Attach 3D atmospheric effects (18 butterflies, floating petals, glowing hearts, fairy dust) directly into Flipbook's 3D Scene
       const atmospheric = new AtmosphericSystem((flipbook as any).scene);
       flipbook.atmospheric = atmospheric;
 
       setTotalPages(pageUrls.length / 2);
-      setIsReady(true);
 
+      let lastPage = -1;
+      let readyReported = false;
       const checkProgress = () => {
         if (!destroyed && flipbook) {
+          const progress = Math.max(0.88, Math.min(1, flipbook.loadingProgress));
+          setLoadingProgress(previous => Math.abs(previous - progress) > 0.005 ? progress : previous);
+          if (flipbook.isReady && !readyReported) {
+            readyReported = true;
+            setLoadingProgress(1);
+            setIsReady(true);
+          }
           const current = Math.round((flipbook as any).progress?.getValue?.() || 0);
-          setCurrentPage(current);
+          if (current !== lastPage) {
+            lastPage = current;
+            setCurrentPage(current);
+          }
           requestAnimationFrame(checkProgress);
         }
       };
@@ -525,17 +548,25 @@ export default function QbjectAuthenticExperience() {
 
     return () => {
       destroyed = true;
+      flipbookInstanceRef.current?.destroy();
+      flipbookInstanceRef.current = null;
       if (container) {
         container.innerHTML = '';
       }
     };
   }, []);
 
+  useEffect(() => {
+    if (!isReady) return;
+    const timeout = window.setTimeout(() => setShowLoading(false), 750);
+    return () => window.clearTimeout(timeout);
+  }, [isReady]);
+
   return (
     <div className="relative w-screen h-screen overflow-hidden select-none bg-black">
       {/* Romantic Warm Loading Screen with floating heart and fairy glow */}
-      {!isReady && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-b from-[#1E1116] via-[#140B0E] to-[#0A0507] text-parchment-100 transition-opacity duration-700">
+      {showLoading && (
+        <div className={`absolute inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-b from-[#1E1116] via-[#140B0E] to-[#0A0507] text-parchment-100 transition-opacity duration-700 ${isReady ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           {/* Ambient Warm Glow Aura */}
           <div className="absolute w-[420px] h-[420px] rounded-full bg-gradient-to-r from-rosewood-400/20 via-pink-400/25 to-champagne-400/20 blur-3xl animate-pulse-glow pointer-events-none" />
 
@@ -554,11 +585,14 @@ export default function QbjectAuthenticExperience() {
 
             {/* Elegant Loading Progress Line */}
             <div className="w-48 sm:w-64 h-[2px] bg-white/10 rounded-full overflow-hidden relative mb-4">
-              <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-transparent via-[#F0B6C3] to-transparent w-1/2 animate-[pulse_1.5s_ease-in-out_infinite]" />
+              <div
+                className="absolute inset-y-0 left-0 bg-gradient-to-r from-[#E295A8] via-[#FFE5B4] to-[#F0B6C3] transition-[width] duration-300 ease-out"
+                style={{ width: `${Math.round(loadingProgress * 100)}%` }}
+              />
             </div>
 
             <p className="font-serif italic text-xs sm:text-sm text-stone-400 tracking-wider">
-              Đang chuẩn bị cuốn nhật ký tình yêu...
+              Đang chuẩn bị cuốn nhật ký tình yêu... {Math.round(loadingProgress * 100)}%
             </p>
           </div>
         </div>

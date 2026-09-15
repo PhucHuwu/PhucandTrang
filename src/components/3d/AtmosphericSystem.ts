@@ -2,8 +2,8 @@ import * as THREE from 'three';
 
 export interface ButterflyEntity {
   group: THREE.Group;
-  leftWing: THREE.Mesh;
-  rightWing: THREE.Mesh;
+  leftWing: THREE.Group;
+  rightWing: THREE.Group;
   baseY: number;
   baseX: number;
   baseZ: number;
@@ -21,22 +21,38 @@ export class AtmosphericSystem {
   glowingHearts: THREE.Group | null = null;
   petals: THREE.Group | null = null;
   butterflies: ButterflyEntity[] = [];
-  butterflyCount = 18;
+  butterflyCount = 12;
+  private compact = typeof window !== 'undefined' && window.innerWidth < 768;
+  private reducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  private lastTime: number | undefined;
+  private motionTime = 0;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
+    this.butterflyCount = this.compact ? 6 : 12;
     this.initDust();
     this.initPetals();
-    this.initGlowingHearts();
     this.initButterflies();
   }
 
   // 1. Magic Golden & Pink Fairy Dust
   initDust() {
-    const count = 380;
+    const count = this.compact ? 35 : 90;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
+
+    const spriteCanvas = document.createElement('canvas');
+    spriteCanvas.width = 64;
+    spriteCanvas.height = 64;
+    const spriteContext = spriteCanvas.getContext('2d')!;
+    const spriteGradient = spriteContext.createRadialGradient(32, 32, 0, 32, 32, 32);
+    spriteGradient.addColorStop(0, 'rgba(255,255,255,0.9)');
+    spriteGradient.addColorStop(0.25, 'rgba(255,245,220,0.45)');
+    spriteGradient.addColorStop(1, 'rgba(255,255,255,0)');
+    spriteContext.fillStyle = spriteGradient;
+    spriteContext.fillRect(0, 0, 64, 64);
+    const sprite = new THREE.CanvasTexture(spriteCanvas);
 
     const romanticPalette = [
       new THREE.Color(0xFFE8EE), // Soft pink
@@ -48,8 +64,9 @@ export class AtmosphericSystem {
 
     for (let i = 0; i < count; i++) {
       // Scaled to the 764x1080 book world coordinate system (-2500 to 2500)
-      positions[i * 3] = (Math.random() - 0.5) * 4500;
-      positions[i * 3 + 1] = (Math.random() - 0.5) * 3200;
+      const side = Math.random() < 0.5 ? -1 : 1;
+      positions[i * 3] = side * (900 + Math.random() * 1400);
+      positions[i * 3 + 1] = (Math.random() - 0.5) * 2500;
       positions[i * 3 + 2] = (Math.random() - 0.5) * 2000 + 300;
 
       const col = romanticPalette[Math.floor(Math.random() * romanticPalette.length)];
@@ -62,10 +79,12 @@ export class AtmosphericSystem {
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
-      size: 16,
+      size: 5,
+      map: sprite,
+      alphaTest: 0.02,
       vertexColors: true,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.35,
       blending: THREE.AdditiveBlending,
     });
 
@@ -76,7 +95,7 @@ export class AtmosphericSystem {
   // 2. Realistic Organic Curved Rose & Cherry Blossom Petals
   initPetals() {
     this.petals = new THREE.Group();
-    const petalCount = 45;
+    const petalCount = this.compact ? 16 : 34;
 
     // Build real organic teardrop / cherry blossom petal curve with subtle notch
     const petalShape = new THREE.Shape();
@@ -114,10 +133,11 @@ export class AtmosphericSystem {
       });
 
       const mesh = new THREE.Mesh(basePetalGeo, mat);
+      const side = Math.random() < 0.5 ? -1 : 1;
       mesh.position.set(
-        (Math.random() - 0.5) * 3600,
+        side * (i % 3 === 0 ? 150 + Math.random() * 550 : 650 + Math.random() * 650),
         Math.random() * 2200 - 600,
-        Math.random() * 1600 - 200
+        100 + Math.random() * 500
       );
       mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
       
@@ -125,6 +145,7 @@ export class AtmosphericSystem {
       mesh.scale.set(scale, scale, scale);
 
       mesh.userData = {
+        nearBook: i % 3 === 0,
         speedY: 1.0 + Math.random() * 1.5,
         speedX: (Math.random() - 0.5) * 1.2,
         rotSpeedX: (Math.random() - 0.5) * 0.02,
@@ -188,7 +209,7 @@ export class AtmosphericSystem {
 
     const forewingGeo = new THREE.ShapeGeometry(forewingShape, 12);
     // Offset pivot to body hinge
-    forewingGeo.translate(6, 4, 0);
+    forewingGeo.translate(0.8, 3, 0);
 
     // 2. Hindwing (Cánh dưới: tròn lượn sóng)
     const hindwingShape = new THREE.Shape();
@@ -198,7 +219,21 @@ export class AtmosphericSystem {
     hindwingShape.bezierCurveTo(-4, -18, -2, -6, 0, 0);
 
     const hindwingGeo = new THREE.ShapeGeometry(hindwingShape, 12);
-    hindwingGeo.translate(4, -4, 0);
+    hindwingGeo.translate(0.8, -2, -0.3);
+
+    // ShapeGeometry uses world coordinates as UVs; normalize each wing once.
+    for (const geometry of [forewingGeo, hindwingGeo]) {
+      geometry.computeBoundingBox();
+      const bounds = geometry.boundingBox!;
+      const positions = geometry.attributes.position;
+      const uv = geometry.attributes.uv;
+      for (let v = 0; v < positions.count; v++) {
+        uv.setXY(v,
+          (positions.getX(v) - bounds.min.x) / (bounds.max.x - bounds.min.x),
+          (positions.getY(v) - bounds.min.y) / (bounds.max.y - bounds.min.y));
+      }
+      uv.needsUpdate = true;
+    }
 
     // Procedural Butterfly Wing Texture Canvas with veins and iridescent borders
     const createWingTexture = (baseColor: string, patternColor: string): THREE.CanvasTexture => {
@@ -209,16 +244,16 @@ export class AtmosphericSystem {
 
       // Base gradient
       const grad = ctx.createRadialGradient(40, 128, 10, 128, 128, 140);
-      grad.addColorStop(0, '#FFFFFF');
+      grad.addColorStop(0, '#998773');
       grad.addColorStop(0.4, baseColor);
       grad.addColorStop(0.85, patternColor);
-      grad.addColorStop(1, '#682535');
+      grad.addColorStop(1, '#645648');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 256, 256);
 
       // Delicate veins
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
-      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = 'rgba(89, 72, 53, 0.22)';
+      ctx.lineWidth = 0.9;
       for (let angle = -0.6; angle <= 0.6; angle += 0.22) {
         ctx.beginPath();
         ctx.moveTo(30, 128);
@@ -229,12 +264,12 @@ export class AtmosphericSystem {
       }
 
       // Fairy dots on margin
-      ctx.fillStyle = '#FFFFFF';
+      ctx.fillStyle = 'rgba(255, 244, 218, 0.65)';
       for (let d = 0; d < 12; d++) {
-        const dotX = 180 + Math.random() * 50;
+        const dotX = 205 + Math.sin(d * Math.PI / 11) * 20;
         const dotY = 50 + d * 14;
         ctx.beginPath();
-        ctx.arc(dotX, dotY, 3, 0, Math.PI * 2);
+        ctx.ellipse(dotX, dotY, 2.2, 3.5, -0.2, 0, Math.PI * 2);
         ctx.fill();
       }
 
@@ -244,12 +279,12 @@ export class AtmosphericSystem {
     };
 
     const butterflyThemes = [
-      { base: '#FFA6BA', border: '#D45D79' },
-      { base: '#FFE2E8', border: '#E87A90' },
-      { base: '#F9D5A7', border: '#D48B54' },
-      { base: '#E8BCC6', border: '#A64B62' },
-      { base: '#FFB8D0', border: '#C84B70' },
-      { base: '#FDE2E8', border: '#E295A8' },
+      { base: '#F0DFC0', border: '#AB8F69' },
+      { base: '#EBDDCB', border: '#AD9882' },
+      { base: '#DEC8A1', border: '#9D805E' },
+      { base: '#E6D0C7', border: '#AF9486' },
+      { base: '#EFE5CF', border: '#B9A583' },
+      { base: '#E9DDC6', border: '#AD9878' },
     ];
 
     for (let i = 0; i < this.butterflyCount; i++) {
@@ -259,11 +294,10 @@ export class AtmosphericSystem {
 
       const wingMat = new THREE.MeshStandardMaterial({
         map: wingTexture,
-        roughness: 0.4,
-        metalness: 0.15,
+        roughness: 0.95,
+        metalness: 0,
         side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.92,
+        transparent: false,
       });
 
       // Left wing assembly (forewing + hindwing)
@@ -290,62 +324,63 @@ export class AtmosphericSystem {
       // Thorax / Abdomen
       const abdomenGeo = new THREE.CylinderGeometry(1.4, 0.6, 26, 8);
       const bodyMat = new THREE.MeshStandardMaterial({
-        color: 0x4A1523,
-        roughness: 0.6,
-        metalness: 0.2,
+        color: 0x615347,
+        roughness: 1,
+        metalness: 0,
       });
       const abdomenMesh = new THREE.Mesh(abdomenGeo, bodyMat);
-      abdomenMesh.rotation.x = Math.PI / 2;
+      abdomenMesh.position.y = -5;
       bodyGroup.add(abdomenMesh);
 
       // Head
       const headGeo = new THREE.SphereGeometry(2.2, 8, 8);
       const headMesh = new THREE.Mesh(headGeo, bodyMat);
-      headMesh.position.set(0, 0, 13);
+      headMesh.position.set(0, 13, 0);
       bodyGroup.add(headMesh);
 
       // Curved Antennas
       const antennaMat = new THREE.MeshBasicMaterial({ color: 0x38161E });
       const leftAntenna = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 14, 4), antennaMat);
-      leftAntenna.position.set(2.5, 3, 18);
-      leftAntenna.rotation.set(Math.PI / 3, 0, Math.PI / 6);
+      leftAntenna.position.set(3.5, 21, 0);
+      leftAntenna.rotation.z = -Math.PI / 6;
 
       const rightAntenna = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 14, 4), antennaMat);
-      rightAntenna.position.set(-2.5, 3, 18);
-      rightAntenna.rotation.set(Math.PI / 3, 0, -Math.PI / 6);
+      rightAntenna.position.set(-3.5, 21, 0);
+      rightAntenna.rotation.z = Math.PI / 6;
 
       bodyGroup.add(leftAntenna);
       bodyGroup.add(rightAntenna);
 
       bGroup.add(bodyGroup);
 
-      const scale = 0.55 + Math.random() * 0.45;
+      const scale = 0.4 + Math.random() * 0.2;
       bGroup.scale.set(scale, scale, scale);
 
       const startAngle = (i / this.butterflyCount) * Math.PI * 2;
-      const radiusX = 850 + Math.random() * 1100;
-      const radiusZ = 600 + Math.random() * 900;
+      const nearBook = i % 3 !== 2;
+      const radiusX = nearBook ? 180 + Math.random() * 120 : 100 + Math.random() * 170;
+      const radiusZ = 80 + Math.random() * 120;
       const baseY = (Math.random() - 0.5) * 1200;
 
       const bEntity: ButterflyEntity = {
         group: bGroup,
-        leftWing: leftWingGroup as any,
-        rightWing: rightWingGroup as any,
+        leftWing: leftWingGroup,
+        rightWing: rightWingGroup,
         baseY,
-        baseX: (Math.random() - 0.5) * 400,
-        baseZ: 200 + Math.random() * 400,
+        baseX: (i % 2 ? -1 : 1) * (nearBook ? 620 + Math.random() * 220 : 1000 + Math.random() * 260),
+        baseZ: nearBook ? 180 + Math.random() * 180 : 250 + Math.random() * 350,
         phase: startAngle,
         speed: 0.0016 + Math.random() * 0.002,
         radiusX,
         radiusZ,
-        wingSpeed: 4.5 + Math.random() * 2.0,
+        wingSpeed: 8 + Math.random() * 3,
         color: theme.base,
       };
 
       bGroup.position.set(
-        Math.cos(startAngle) * radiusX,
-        baseY,
-        Math.sin(startAngle) * radiusZ + bEntity.baseZ
+        bEntity.baseX + Math.cos(startAngle) * radiusX,
+        baseY + Math.sin(startAngle * 2) * 160,
+        Math.sin(startAngle * 0.9) * radiusZ + bEntity.baseZ
       );
 
       this.butterflies.push(bEntity);
@@ -354,12 +389,20 @@ export class AtmosphericSystem {
   }
 
   update(time: number, mouseParallax: { x: number; y: number }) {
+    if (this.reducedMotion) return;
+    const elapsed = this.lastTime === undefined ? 0 : time - this.lastTime;
+    this.lastTime = time;
+    // Discard background-tab gaps rather than jumping across the scene.
+    const dt = elapsed > 0.25 ? 0 : Math.max(0, elapsed);
+    const frame = dt * 60;
+    this.motionTime += dt;
+    time = this.motionTime;
     // 1. Dust motion
     if (this.dustParticles) {
       const pos = this.dustParticles.geometry.attributes.position.array as Float32Array;
       for (let i = 0; i < pos.length / 3; i++) {
-        pos[i * 3 + 1] += Math.sin(time * 0.5 + i) * 0.8;
-        pos[i * 3] += Math.cos(time * 0.3 + i) * 0.5 + mouseParallax.x * 0.4;
+        pos[i * 3 + 1] += Math.sin(time * 0.5 + i) * 0.8 * frame;
+        pos[i * 3] += (Math.cos(time * 0.3 + i) * 0.5 + mouseParallax.x * 0.4) * frame;
       }
       this.dustParticles.geometry.attributes.position.needsUpdate = true;
     }
@@ -367,18 +410,20 @@ export class AtmosphericSystem {
     // 2. Petals floating down with natural leaf fluttering
     if (this.petals) {
       this.petals.children.forEach((mesh) => {
-        mesh.userData.wobblePhase += mesh.userData.wobbleSpeed;
-        mesh.position.y -= mesh.userData.speedY * 0.4;
-        mesh.position.x += Math.sin(mesh.userData.wobblePhase) * 1.5 + mesh.userData.speedX * 0.3;
-        mesh.position.z += Math.cos(mesh.userData.wobblePhase) * 0.8;
+        mesh.userData.wobblePhase += mesh.userData.wobbleSpeed * frame;
+        mesh.position.y -= mesh.userData.speedY * 0.4 * frame;
+        mesh.position.x += (Math.sin(mesh.userData.wobblePhase) * 1.5 + mesh.userData.speedX * 0.3) * frame;
+        mesh.position.z += Math.cos(mesh.userData.wobblePhase) * 0.8 * frame;
 
-        mesh.rotation.x += mesh.userData.rotSpeedX;
-        mesh.rotation.y += Math.sin(mesh.userData.wobblePhase) * 0.02;
-        mesh.rotation.z += mesh.userData.rotSpeedZ;
+        mesh.rotation.x += mesh.userData.rotSpeedX * frame;
+        mesh.rotation.y += Math.sin(mesh.userData.wobblePhase) * 0.02 * frame;
+        mesh.rotation.z += mesh.userData.rotSpeedZ * frame;
 
         if (mesh.position.y < -1200) {
           mesh.position.y = 1400;
-          mesh.position.x = (Math.random() - 0.5) * 3600;
+          const side = Math.random() < 0.5 ? -1 : 1;
+          mesh.position.x = side * (mesh.userData.nearBook ? 150 + Math.random() * 550 : 650 + Math.random() * 650);
+          mesh.position.z = 100 + Math.random() * 500;
         }
       });
     }
@@ -386,7 +431,7 @@ export class AtmosphericSystem {
     // 3. Floating Hearts bobbing
     if (this.glowingHearts) {
       this.glowingHearts.children.forEach((mesh) => {
-        mesh.userData.phase += mesh.userData.speed;
+        mesh.userData.phase += mesh.userData.speed * frame;
         mesh.position.y = mesh.userData.baseY + Math.sin(mesh.userData.phase) * 60;
         mesh.rotation.z = Math.sin(mesh.userData.phase * 0.7) * 0.2;
       });
@@ -394,8 +439,9 @@ export class AtmosphericSystem {
 
     // 4. Butterflies dancing & wing flapping
     this.butterflies.forEach((b) => {
-      b.phase += b.speed;
-      const flap = Math.sin(time * b.wingSpeed);
+      b.phase += b.speed * frame;
+      const glide = THREE.MathUtils.smoothstep(Math.sin(time * 0.65 + b.baseY), 0.55, 0.9);
+      const flap = 0.2 + (0.5 + 0.5 * Math.sin(time * b.wingSpeed + b.baseY)) * (1 - glide) * 0.95;
 
       b.leftWing.rotation.y = flap * 0.75;
       b.rightWing.rotation.y = -flap * 0.75;
@@ -411,8 +457,13 @@ export class AtmosphericSystem {
       b.group.position.x = nextX;
       b.group.position.z = nextZ;
       b.group.position.y = nextY;
-      b.group.rotation.y = targetAngle + Math.PI / 2;
-      b.group.rotation.z = Math.sin(b.phase) * 0.2;
+      // Head follows the projected flight tangent; never spin broadside abruptly.
+      const vx = -Math.sin(b.phase) * b.radiusX;
+      const vy = Math.cos(b.phase * 2) * 320;
+      const heading = Math.atan2(-vx, vy);
+      const difference = Math.atan2(Math.sin(heading - b.group.rotation.z), Math.cos(heading - b.group.rotation.z));
+      b.group.rotation.z += difference * (1 - Math.exp(-1.5 * dt));
+      b.group.rotation.y = Math.sin(b.phase * 0.9) * 0.22;
     });
   }
 
