@@ -272,6 +272,7 @@ export class PageTextureGenerator {
     handwriting?: string;
     media?: PageMediaItem[];
     layout?: PageLayoutType;
+    backgroundSrc?: string;
     side: 'left' | 'right';
   }): Promise<THREE.CanvasTexture> {
     return new Promise((resolve) => {
@@ -365,6 +366,32 @@ export class PageTextureGenerator {
         resolve(texture);
       };
 
+      const drawBackground = (background?: HTMLImageElement) => {
+        if (!background) return;
+        const srcW = background.naturalWidth || background.width;
+        const srcH = background.naturalHeight || background.height;
+        const srcRatio = srcW / srcH;
+        const destRatio = 1024 / 1360;
+        let sx = 0;
+        let sy = 0;
+        let sw = srcW;
+        let sh = srcH;
+        if (srcRatio > destRatio) {
+          sw = srcH * destRatio;
+          sx = (srcW - sw) / 2;
+        } else {
+          sh = srcW / destRatio;
+          sy = (srcH - sh) / 2;
+        }
+
+        // These supplied images are quiet page-wash backgrounds, not foreground art.
+        // Keep them subtle so handwritten content and photographs remain readable.
+        ctx.save();
+        ctx.globalAlpha = 0.14;
+        ctx.drawImage(background, sx, sy, sw, sh, 0, 0, 1024, 1360);
+        ctx.restore();
+      };
+
       /**
        * Draws Polaroid Card with STRICT 100% Aspect Ratio Preservation (Contain Mode inside Matte Card)
        * ZERO Stretching, ZERO Distortion!
@@ -456,6 +483,7 @@ export class PageTextureGenerator {
         ctx.restore();
       };
 
+      const beginRendering = () => {
       const mediaItems = params.media || [];
       if (mediaItems.length === 0) {
         completeRendering();
@@ -608,6 +636,20 @@ export class PageTextureGenerator {
 
         completeRendering();
       };
+      };
+
+      if (params.backgroundSrc) {
+        const background = new Image();
+        background.crossOrigin = 'anonymous';
+        background.onload = () => {
+          drawBackground(background);
+          beginRendering();
+        };
+        background.onerror = () => beginRendering();
+        background.src = params.backgroundSrc;
+      } else {
+        beginRendering();
+      }
     });
   }
 }
