@@ -151,68 +151,6 @@ export class PageTextureGenerator {
           ctx.fillRect(0, 0, 1024, 1360);
         }
 
-        // Soft dark warm tint so text is super crisp and legible
-        ctx.fillStyle = 'rgba(10, 5, 8, 0.45)';
-        ctx.fillRect(0, 0, 1024, 1360);
-
-        if (!isInside) {
-          // Outer back cover: Forever & Always
-          ctx.save();
-          ctx.textAlign = 'center';
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
-          ctx.shadowBlur = 16;
-          ctx.shadowOffsetY = 4;
-
-          ctx.fillStyle = '#FFFFFF';
-          ctx.font = 'bold 54px "Dancing Script", cursive';
-          ctx.fillText('Forever & Always', 512, 650);
-
-          ctx.strokeStyle = '#F0B6C3';
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.moveTo(380, 680);
-          ctx.lineTo(644, 680);
-          ctx.stroke();
-
-          ctx.fillStyle = '#FFE5B4';
-          ctx.font = '600 22px "Montserrat", sans-serif';
-          ctx.letterSpacing = '6px';
-          ctx.fillText('TO BE CONTINUED...', 512, 730);
-
-          ctx.fillStyle = 'rgba(255, 245, 247, 0.9)';
-          ctx.font = 'italic 26px "Dancing Script", cursive';
-          ctx.fillText('Nắm tay nhau đi qua mọi năm tháng...', 512, 800);
-
-          ctx.restore();
-        } else {
-          // Inside back cover: Conclusion note
-          ctx.save();
-          ctx.textAlign = 'center';
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
-          ctx.shadowBlur = 14;
-          ctx.shadowOffsetY = 3;
-
-          ctx.fillStyle = '#FFFFFF';
-          ctx.font = 'bold 44px "Cormorant Garamond", Georgia, serif';
-          ctx.fillText('Cảm Ơn Bạn Vì Đã Đến', 512, 580);
-
-          ctx.fillStyle = '#F0B6C3';
-          ctx.font = 'italic 28px "Dancing Script", cursive';
-          ctx.fillText('"Hạnh phúc là hành trình, không phải đích đến."', 512, 640);
-
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-          ctx.font = '22px "Cormorant Garamond", Georgia, serif';
-          ctx.fillText('Cảm ơn bạn vì đã cùng mình tạo nên cuốn nhật ký này.', 512, 710);
-          ctx.fillText('Cuốn sách khép lại, nhưng tình yêu của hai mình', 512, 745);
-          ctx.fillText('sẽ luôn được viết tiếp mỗi ngày.', 512, 780);
-
-          ctx.fillStyle = '#FFE5B4';
-          ctx.font = 'bold 36px "Dancing Script", cursive';
-          ctx.fillText('Phúc & Trang • Forever & Always', 512, 860);
-
-          ctx.restore();
-        }
-
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         resolve(texture);
@@ -280,16 +218,20 @@ export class PageTextureGenerator {
       canvas.width = 1024;
       canvas.height = 1360;
       const ctx = canvas.getContext('2d')!;
+      const usesBackground = Boolean(params.backgroundSrc);
 
-      // 1. Vintage Paper Background
-      ctx.fillStyle = '#F9F5EC';
-      ctx.fillRect(0, 0, 1024, 1360);
+      // Pages with their own image use it as the full background. Plain pages retain
+      // the journal's ivory paper color and wash.
+      if (!params.backgroundSrc) {
+        ctx.fillStyle = '#F9F5EC';
+        ctx.fillRect(0, 0, 1024, 1360);
 
-      const vGrad = ctx.createRadialGradient(512, 680, 200, 512, 680, 800);
-      vGrad.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
-      vGrad.addColorStop(1, 'rgba(180, 154, 106, 0.12)');
-      ctx.fillStyle = vGrad;
-      ctx.fillRect(0, 0, 1024, 1360);
+        const vGrad = ctx.createRadialGradient(512, 680, 200, 512, 680, 800);
+        vGrad.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
+        vGrad.addColorStop(1, 'rgba(180, 154, 106, 0.12)');
+        ctx.fillStyle = vGrad;
+        ctx.fillRect(0, 0, 1024, 1360);
+      }
 
       // Spine shadow gradient on inner edge
       const spineGrad = ctx.createLinearGradient(
@@ -384,11 +326,41 @@ export class PageTextureGenerator {
           sy = (srcH - sh) / 2;
         }
 
-        // These supplied images are quiet page-wash backgrounds, not foreground art.
-        // Keep them subtle so handwritten content and photographs remain readable.
+        // Build the background and header fade on an offscreen layer. The finished
+        // layer can then be placed behind text without darkening the typography.
+        const backgroundLayer = document.createElement('canvas');
+        backgroundLayer.width = 1024;
+        backgroundLayer.height = 1360;
+        const backgroundContext = backgroundLayer.getContext('2d')!;
+        backgroundContext.drawImage(background, sx, sy, sw, sh, 0, 0, 1024, 1360);
+
+        // Dedicated reading zone for chapter label, title, quote and opening copy.
+        // It fades out before the scrapbook composition begins.
+        const headerFade = backgroundContext.createLinearGradient(0, 0, 0, 470);
+        headerFade.addColorStop(0, 'rgba(249, 245, 236, 0.92)');
+        headerFade.addColorStop(0.28, 'rgba(249, 245, 236, 0.78)');
+        headerFade.addColorStop(0.66, 'rgba(249, 245, 236, 0.38)');
+        headerFade.addColorStop(1, 'rgba(249, 245, 236, 0)');
+        backgroundContext.fillStyle = headerFade;
+        backgroundContext.fillRect(0, 0, 1024, 470);
+
+        // A gentle inner-edge fade keeps the page gutter readable without a hard bar.
+        const gutterFade = backgroundContext.createLinearGradient(
+          params.side === 'left' ? 1024 : 0,
+          0,
+          params.side === 'left' ? 810 : 214,
+          0
+        );
+        gutterFade.addColorStop(0, 'rgba(249, 245, 236, 0.28)');
+        gutterFade.addColorStop(1, 'rgba(249, 245, 236, 0)');
+        backgroundContext.fillStyle = gutterFade;
+        backgroundContext.fillRect(0, 0, 1024, 1360);
+
+        // This runs after the page copy, so destination-over places the prepared
+        // layer beneath every typography and scrapbook item.
         ctx.save();
-        ctx.globalAlpha = 0.14;
-        ctx.drawImage(background, sx, sy, sw, sh, 0, 0, 1024, 1360);
+        ctx.globalCompositeOperation = 'destination-over';
+        ctx.drawImage(backgroundLayer, 0, 0);
         ctx.restore();
       };
 

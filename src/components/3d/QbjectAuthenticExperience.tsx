@@ -29,9 +29,9 @@ export default function QbjectAuthenticExperience() {
       await ensureCustomFontLoaded();
       setLoadingProgress(0.08);
 
-      // 1. FRONT COVER WITH PHOTO "WE.jpg" & FONT 2.OTF
+      // 1. FRONT COVER WITH SUPPLIED first-cover.jpg & FONT 2.OTF
       const coverFront = await PageTextureGenerator.createCoverTexture(
-        getMediaUrl('WE.jpg')
+        '/page_backgrounds/first-cover.jpg'
       );
       setLoadingProgress(0.12);
       const insideBlank = await PageTextureGenerator.createInsidePageTexture({
@@ -423,13 +423,13 @@ export default function QbjectAuthenticExperience() {
       });
       setLoadingProgress(0.78);
 
-      // Back cover inside & outside using photo WE-2.jpg
+      // Back cover inside & outside use the supplied last-cover.jpg collage.
       const coverBackInside = await PageTextureGenerator.createBackCoverTexture(
-        getMediaUrl('WE-2.jpg'),
+        '/page_backgrounds/last-cover.jpg',
         true
       );
       const coverBackOutside = await PageTextureGenerator.createBackCoverTexture(
-        getMediaUrl('WE-2.jpg'),
+        '/page_backgrounds/last-cover.jpg',
         false
       );
       setLoadingProgress(0.84);
