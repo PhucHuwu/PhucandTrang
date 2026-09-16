@@ -31,7 +31,7 @@ export default function QbjectAuthenticExperience() {
 
       // 1. FRONT COVER WITH SUPPLIED first-cover.jpg & FONT 2.OTF
       const coverFront = await PageTextureGenerator.createCoverTexture(
-        '/page_backgrounds/first-cover.jpg'
+        getMediaUrl('backgrounds/first-cover.jpg')
       );
       setLoadingProgress(0.12);
       const insideBlank = await PageTextureGenerator.createInsidePageTexture({
@@ -39,10 +39,8 @@ export default function QbjectAuthenticExperience() {
         title: 'OUR STORY',
         quote: 'A story written one page at a time.',
         textLines: [
-          'Mỗi bức ảnh, mỗi thước phim lưu lại nơi đây',
-          'là từng viên gạch xây nên tình yêu của hai mình.',
         ],
-        backgroundSrc: '/page_backgrounds/page-0.jpg',
+        backgroundSrc: getMediaUrl('backgrounds/page-0.jpg'),
         side: 'left',
       });
       setLoadingProgress(0.16);
@@ -60,10 +58,10 @@ export default function QbjectAuthenticExperience() {
           'thế giới bỗng trở nên thật dịu dàng và ấm áp.',
         ],
         layout: 'dual-columns',
-        backgroundSrc: '/page_backgrounds/page-1.jpg',
+        backgroundSrc: getMediaUrl('backgrounds/page-1.jpg'),
         media: [
-          { src: getMediaUrl('First-meet-13-10-2022.jpg'), caption: '13.10.2022 • Cuộc gặp gỡ định mệnh' },
-          { src: getMediaUrl('First-meet-13-10-2022_2.jpg'), caption: '13.10.2022 • Rung động đầu đời' },
+          { src: getMediaUrl('First-meet-13-10-2022.jpg'), caption: '13.10.2022' },
+          { src: getMediaUrl('First-meet-13-10-2022_2.jpg'), caption: '13.10.2022' },
         ],
         side: 'right',
       });
@@ -78,7 +76,7 @@ export default function QbjectAuthenticExperience() {
           'từng khoảnh khắc trôi qua đều ngập tràn niềm vui và sự xao xuyến.',
         ],
         layout: 'single-hero',
-        backgroundSrc: '/page_backgrounds/page-2.jpg',
+        backgroundSrc: getMediaUrl('backgrounds/page-2.jpg'),
         media: [
           { src: getMediaUrl('First-meet-13-10-2022_3.jpg'), caption: '13.10.2022 • Những ánh nhìn đầu tiên' },
         ],
@@ -94,10 +92,9 @@ export default function QbjectAuthenticExperience() {
         quote: 'Thế cậu đồng ý làm bạn gái tớ không?',
         textLines: [
           'Ngày 20 tháng 10 năm 2022,',
-          'và nụ cười gật đầu của bạn là món quà tuyệt vời nhất.',
         ],
         layout: 'dual-columns',
-        backgroundSrc: '/page_backgrounds/page-3.jpg',
+        backgroundSrc: getMediaUrl('backgrounds/page-3.jpg'),
         media: [
           { src: getMediaUrl('23-12-2022.jpg'), caption: '23.12.2022 • Dạo phố mùa đông' },
           { src: getMediaUrl('25-12-2022.jpg'), caption: '25.12.2022 • Giáng sinh đầu tiên' },
@@ -111,13 +108,12 @@ export default function QbjectAuthenticExperience() {
         chapter: 'Chapter II',
         title: 'Giáng Sinh Ấm Áp',
         textLines: [
-          'Những góc phố lung linh ánh đèn Noel,',
-          'tay trong tay xua đi cái lạnh giá.',
+          'Đêm Noel lung linh ánh đèn đường.',
         ],
         layout: 'single-hero',
-        backgroundSrc: '/page_backgrounds/page-4.jpg',
+        backgroundSrc: getMediaUrl('backgrounds/page-4.jpg'),
         media: [
-          { src: getMediaUrl('25-12-2022_2.jpg'), caption: '25.12.2022 • Hơi ấm ngọt ngào' },
+          { src: getMediaUrl('25-12-2022_2.jpg'), caption: '25.12.2022 • Merry Christmas' },
         ],
         side: 'left',
       });
@@ -135,7 +131,7 @@ export default function QbjectAuthenticExperience() {
           'hai mình cùng đi qua những cung đường mới.',
         ],
         layout: 'diagonal-duo',
-        backgroundSrc: '/page_backgrounds/page-5.jpg',
+        backgroundSrc: getMediaUrl('backgrounds/page-5.jpg'),
         media: [
           { src: getMediaUrl('05-03-2023.jpg'), caption: '05.03.2023 • Mùa xuân bên nhau' },
           { src: getMediaUrl('08-07-2023.jpg'), caption: '08.07.2023 • Mùa hè rạng rỡ' },
@@ -149,7 +145,7 @@ export default function QbjectAuthenticExperience() {
         chapter: 'Chapter III',
         title: 'Kỷ Niệm 1 Năm & Mùa Đông 2023',
         textLines: [
-          'Tròn 1 năm ngày nhận lời yêu và mùa đông ấm cúng.',
+          'Kỷ niệm 1 năm bên nhau.',
         ],
         layout: 'quad-gallery',
         media: [
@@ -168,11 +164,10 @@ export default function QbjectAuthenticExperience() {
         chapter: 'Chapter IV',
         title: 'Những Ngày Tháng 12.2023',
         textLines: [
-          'Gom góp từng khoảnh khắc bình dị cùng bạn.',
         ],
         layout: 'dual-columns',
         media: [
-          { src: getMediaUrl('02-12-2023_3.jpg'), caption: '02.12.2023 • Bình yên bên bạn' },
+          { src: getMediaUrl('02-12-2023_3.jpg'), caption: '02.12.2023' },
           { src: getMediaUrl('26-06-2323_thumb.jpg'), caption: '26.06 • Video kỷ niệm', isVideo: true },
         ],
         side: 'right',
@@ -183,17 +178,17 @@ export default function QbjectAuthenticExperience() {
         pageNumber: 8,
         chapter: 'Chapter IV',
         title: 'Sinh Nhật Bên Nhau 2024',
-        quote: 'Tuổi mới ngập tràn niềm vui cùng bạn',
+        quote: 'Tuổi mới ngập tràn niềm vui',
         textLines: [
           'Ngày 25 tháng 05 năm 2024,',
           'sinh nhật đặc biệt nhất khi luôn có bạn kề cạnh.',
         ],
         layout: 'quad-gallery',
         media: [
-          { src: getMediaUrl('Brithdate-together-25-05-2024_2.jpg'), caption: '25.05.2024 • Thổi nến sinh nhật' },
-          { src: getMediaUrl('Brithdate-together-25-05-2024_3.jpg'), caption: '25.05.2024 • Nụ cười ngọt ngào' },
-          { src: getMediaUrl('Brithdate-together-25-05-2024_4.jpg'), caption: '25.05.2024 • Niềm vui trọn vẹn' },
-          { src: getMediaUrl('Brithdate-together-25-05-2024_thumb.jpg'), caption: 'Video sinh nhật 25.05.2024', isVideo: true },
+          { src: getMediaUrl('Brithdate-together-25-05-2024_2.jpg'), caption: '25.05.2024' },
+          { src: getMediaUrl('Brithdate-together-25-05-2024_3.jpg'), caption: '25.05.2024' },
+          { src: getMediaUrl('Brithdate-together-25-05-2024_4.jpg'), caption: '25.05.2024' },
+          { src: getMediaUrl('Brithdate-together-25-05-2024_thumb.jpg'), caption: '25.05.2024', isVideo: true },
         ],
         side: 'left',
       });
@@ -306,7 +301,7 @@ export default function QbjectAuthenticExperience() {
         ],
         layout: 'dual-columns',
         media: [
-          { src: getMediaUrl('18-04-2016.jpg'), caption: '18.04 • Kỷ niệm' },
+          { src: getMediaUrl('18-04-2016.jpg'), caption: '18.04.2016 • Kỷ niệm' },
           { src: getMediaUrl('First-trip-14-03-2026.jpg'), caption: '14.03.2026 • First Trip' },
         ],
         side: 'left',
@@ -321,10 +316,9 @@ export default function QbjectAuthenticExperience() {
           'Những chuyến đi dài phía trước luôn có hai mình bên nhau.',
         ],
         layout: 'dual-stacked',
-        backgroundSrc: '/page_backgrounds/page-16-17.jpg',
         media: [
-          { src: getMediaUrl('18-04-2026.jpg'), caption: '18.04 • Ngày đẹp trời' },
-          { src: getMediaUrl('18-04-2026_2.jpg'), caption: '18.04 • Hẹn ước mai sau' },
+          { src: getMediaUrl('18-04-2026.jpg'), caption: '18.04.2026 • Ngày đẹp trời' },
+          { src: getMediaUrl('18-04-2026_2.jpg'), caption: '18.04.2026 • Hẹn ước mai sau' },
         ],
         side: 'right',
       });
@@ -339,10 +333,10 @@ export default function QbjectAuthenticExperience() {
           'Loạt khoảnh khắc đẹp ngày 21 tháng 08.',
         ],
         layout: 'dual-stacked',
-        backgroundSrc: '/page_backgrounds/page-16-17.jpg',
+        backgroundSrc: getMediaUrl('backgrounds/page-16-17.jpg'),
         media: [
-          { src: getMediaUrl('21-08-2026.jpg'), caption: '21.08 • Nụ cười xinh' },
-          { src: getMediaUrl('21-08-2026_2.jpg'), caption: '21.08 • Nhẹ nhàng' },
+          { src: getMediaUrl('21-08-2026.jpg'), caption: '21.08.2026 • Nụ cười xinh' },
+          { src: getMediaUrl('21-08-2026_2.jpg'), caption: '21.08.2026 • Nhẹ nhàng' },
         ],
         side: 'left',
       });
@@ -354,12 +348,12 @@ export default function QbjectAuthenticExperience() {
         chapter: 'Chapter IX',
         title: 'Nắng Thu Ngọt Ngào',
         textLines: [
-          'Từng khung hình rạng rỡ của bạn.',
         ],
         layout: 'dual-stacked',
+        backgroundSrc: getMediaUrl('backgrounds/page-16-17.jpg'),
         media: [
-          { src: getMediaUrl('21-08-2026_3.jpg'), caption: '21.08 • Dễ thương' },
-          { src: getMediaUrl('21-08-2026_4.jpg'), caption: '21.08 • Trong trẻo' },
+          { src: getMediaUrl('21-08-2026_3.jpg'), caption: '21.08.2026 • Dễ thương' },
+          { src: getMediaUrl('21-08-2026_4.jpg'), caption: '21.08.2026 • Trong trẻo' },
         ],
         side: 'right',
       });
@@ -377,9 +371,9 @@ export default function QbjectAuthenticExperience() {
         ],
         layout: 'asymmetric-featured',
         media: [
-          { src: getMediaUrl('21-08-2026_5.jpg'), caption: '21.08 • Tỏa nắng' },
-          { src: getMediaUrl('her-pic-1.jpg'), caption: 'Nụ cười tỏa nắng' },
-          { src: getMediaUrl('her-pic-2.jpg'), caption: 'Nét trong trẻo' },
+          { src: getMediaUrl('page18-her-pic-1.jpg'), caption: 'Nét dịu dàng của bạn' },
+          { src: getMediaUrl('page18-her-pic-2.jpg'), caption: 'Một ngày thật đẹp' },
+          { src: getMediaUrl('page18-her-pic-6.jpg'), caption: 'Nụ cười mình thương' },
         ],
         side: 'left',
       });
@@ -394,7 +388,7 @@ export default function QbjectAuthenticExperience() {
         ],
         layout: 'asymmetric-featured',
         media: [
-          { src: getMediaUrl('her-pic-5.jpg'), caption: 'Xinh đẹp & Rạng rỡ' },
+          { src: getMediaUrl('page19-replacement.jpg'), caption: 'Xinh đẹp & Rạng rỡ' },
           { src: getMediaUrl('her-pic-3.jpg'), caption: 'Nét duyên dáng' },
           { src: getMediaUrl('her-pic-4.jpg'), caption: 'Đáng yêu' },
         ],
@@ -413,7 +407,7 @@ export default function QbjectAuthenticExperience() {
           'nơi tình yêu của hai mình vẫn lớn lên từng ngày.',
           'Yêu bạn đến tận cùng những năm tháng dịu dàng.',
         ],
-        handwriting: '~ Yêu bạn trọn vẹn, Phúc ~',
+        handwriting: 'Mình đây…',
         layout: 'dual-columns',
         media: [
           { src: getMediaUrl('me-1.jpg'), caption: 'Chàng trai của bạn' },
@@ -425,11 +419,11 @@ export default function QbjectAuthenticExperience() {
 
       // Back cover inside & outside use the supplied last-cover.jpg collage.
       const coverBackInside = await PageTextureGenerator.createBackCoverTexture(
-        '/page_backgrounds/last-cover.jpg',
+        getMediaUrl('backgrounds/last-cover.jpg'),
         true
       );
       const coverBackOutside = await PageTextureGenerator.createBackCoverTexture(
-        '/page_backgrounds/last-cover.jpg',
+        getMediaUrl('backgrounds/last-cover.jpg'),
         false
       );
       setLoadingProgress(0.84);

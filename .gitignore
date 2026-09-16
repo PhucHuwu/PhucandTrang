@@ -5,3 +5,7 @@ node_modules/
 .DS_Store
 .next/
 out/
+
+# Media is delivered through Cloudinary CDN
+/public/memories/
+/public/page_backgrounds/
