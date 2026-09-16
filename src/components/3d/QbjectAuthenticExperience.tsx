@@ -415,13 +415,13 @@ export default function QbjectAuthenticExperience() {
       });
       setLoadingProgress(0.78);
 
-      // Back cover inside & outside using photo 17-01-2025_6.jpg
+      // Back cover inside & outside using photo WE-2.jpg
       const coverBackInside = await PageTextureGenerator.createBackCoverTexture(
-        getMediaUrl('17-01-2025_6.jpg'),
+        getMediaUrl('WE-2.jpg'),
         true
       );
       const coverBackOutside = await PageTextureGenerator.createBackCoverTexture(
-        getMediaUrl('17-01-2025_6.jpg'),
+        getMediaUrl('WE-2.jpg'),
         false
       );
       setLoadingProgress(0.84);
