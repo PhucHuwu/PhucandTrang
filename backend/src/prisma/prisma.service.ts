@@ -22,7 +22,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       connectionString ||
       'postgresql://postgres:postgres@localhost:5432/phuc_and_trang_db?schema=public';
 
-    const pool = new Pool({ connectionString: effectiveConnectionString });
+    const pool = new Pool({
+      connectionString: effectiveConnectionString,
+      ssl: effectiveConnectionString.includes('sslmode=') ? { rejectUnauthorized: false } : undefined,
+    });
     const adapter = new PrismaPg(pool);
     super({ adapter });
     this.pool = pool;

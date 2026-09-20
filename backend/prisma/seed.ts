@@ -22,9 +22,14 @@ if (isProduction && !process.env.DATABASE_URL) {
 }
 
 const connectionString =
+  process.env.DATABASE_URL_UNPOOLED ||
+  process.env.DIRECT_URL ||
   process.env.DATABASE_URL ||
   'postgresql://postgres:postgres@localhost:5432/phuc_and_trang_db?schema=public';
-const pool = new Pool({ connectionString });
+const pool = new Pool({
+  connectionString,
+  ssl: connectionString.includes('sslmode=') ? { rejectUnauthorized: false } : undefined,
+});
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
