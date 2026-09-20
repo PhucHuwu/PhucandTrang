@@ -21,3 +21,5 @@ backend/.claude/
 backend/.windsurf/
 backend/skills-lock.json
 backend/package-lock.json
+
+.vercel
