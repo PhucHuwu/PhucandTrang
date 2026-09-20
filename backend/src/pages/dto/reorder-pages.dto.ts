@@ -3,36 +3,17 @@ import {
   ValidateNested,
   IsString,
   IsNotEmpty,
-  IsInt,
-  Min,
-  IsOptional,
-  IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { PageSide } from '@prisma/client';
 
 export class PageOrderItemDto {
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ message: 'Page id phải là chuỗi' })
+  @IsNotEmpty({ message: 'Page id không được để trống' })
   id: string;
-
-  @IsInt()
-  @Min(0)
-  @IsOptional()
-  order?: number;
-
-  @IsInt()
-  @Min(0)
-  @IsOptional()
-  pageNumber?: number;
-
-  @IsEnum(PageSide)
-  @IsOptional()
-  side?: PageSide;
 }
 
 export class ReorderPagesDto {
-  @IsArray()
+  @IsArray({ message: 'Danh sách items phải là một mảng' })
   @ValidateNested({ each: true })
   @Type(() => PageOrderItemDto)
   items: PageOrderItemDto[];

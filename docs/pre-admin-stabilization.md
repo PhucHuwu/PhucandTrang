@@ -121,74 +121,68 @@
 
 ## 3. Kết Quả Kiểm Thử Tự Động (Test Verification)
 - **Tổng số test suites**: 12 passed (100%).
-- **Tổng số unit/integration tests**: 54 passed (100%).
+- **Tổng số unit/integration tests**: 59 passed (100%).
   1. `utils/image-fitting.spec.ts`: Test contain, cover, fill, focalPoint crop calculation.
   2. `utils/coordinate-conversion.spec.ts`: Test active area relative-to-element coordinate conversion.
   3. `utils/page-utils.spec.ts`: Test deterministic sequencing, side derivation, leaf/face calculation.
   4. `utils/safe-merge.spec.ts`: Test safe partial deep-merge and prototype pollution blocking.
   5. `utils/text-variable-resolver.spec.ts`: Test variable parsing, pipes, timezone consistency.
   6. `auth/roles.guard.spec.ts`: Test RBAC authorization rules and role gating.
-  7. `pages/pages.service.spec.ts`: Test Option B contract (pageNumber preserved, contiguous order 0..N-1, duplicate insertAfter with integer math).
-  8. `versions/versions.service.spec.ts`: Test cross-book rollback rejection, backgroundMusicId null restoration, single contentRevision bump.
+  7. `pages/pages.service.spec.ts`: Test Option B contract (pageNumber preserved, contiguous order 0..N-1, duplicate insertAfter with integer math, reorder foreign/incomplete/duplicate ID rejections, order/side PATCH rejection).
+  8. `versions/versions.service.spec.ts`: Test cross-book rollback rejection, backgroundMusicId null restoration, atomic execution.
   9. `public/public.service.spec.ts`: Test public document compilation, mediaId resolution, hidden elements filtering, ETag.
   10. `media/media.service.spec.ts`: Test signed upload config, media reference scanner (cover source, cover video poster, page, audio, video).
   11. `common/dto/dto-validation.spec.ts`: Test strict DTO validation for interaction (action, target number/string), background (boolean enabled), and transform.
   12. `app.controller.spec.ts`: Test basic server controller.
-- **Biên dịch**:
+- **Biên dịch & Chạy thực tế**:
   - `backend`: `npm run build` thành công 100%.
-  - `backend start:prod`: `node dist/backend/src/main` smoke test thành công 100%.
+  - `backend start:prod`: `node dist/backend/src/main` smoke test thành công 100% (cổng 4000).
   - `frontend`: `npm run build` thành công 100% (0 errors).
 
 ---
 
-## 4. Architecture Freeze — Prompt 13.8
+## 4. Architecture Freeze — Prompt 13.9 (Final Hotfixes)
 
 Trước khi bước vào Prompt 14 (Admin CMS Foundation), toàn bộ kiến trúc lõi được chính thức đóng băng (freeze) với các nguyên tắc bất biến sau:
 
 1. **Page Ordering & Sequencing Contract (Option B Triệt Để)**:
    - `order`: Số nguyên liên tục `0..N-1`. Là nguồn chân lý vật lý duy nhất cho vị trí lật sách của 3D Flipbook Engine.
    - `pageNumber`: Thuộc tính metadata hiển thị (presentation / display number). Hoàn toàn được bảo tồn qua các thao tác `normalizeBookPageSequence`, `reorder`, `remove`.
-   - `side`: Tự động tính từ `order`: chẵn = `LEFT`, lẻ = `RIGHT`.
-   - `create`: Nếu không truyền `order`, mặc định append cuối (`max(order) + 1`), không gán `order = pageNumber`.
-   - `duplicate(insertAfter=true)` hoạt động hoàn toàn trên số nguyên: dịch chuyển các trang sau bằng integer increment, gán `targetPageNumber` duy nhất (`max(pageNumber) + 1`), và không overwrite display numbers của các trang khác.
+   - `side`: Bắt buộc tự động tính từ `order`: chẵn = `LEFT`, lẻ = `RIGHT`. Client không được quyền tự truyền `side`.
+   - `create`: Nếu không truyền `order`, mặc định append cuối (`max(order) + 1`).
+   - `duplicate(insertAfter=true)`: Hoạt động hoàn toàn trên số nguyên: dịch chuyển các trang sau bằng integer increment, gán `targetPageNumber` duy nhất (`max(pageNumber) + 1`), và không overwrite display numbers của các trang khác.
+   - `PATCH /pages/:id`: Cấm chỉnh sửa trực tiếp `order` hoặc `side`, trả lỗi 400 và hướng dẫn gọi endpoint reorder chuyên biệt.
 
-2. **Element Interaction Actions & Target**:
-   - Định nghĩa duy nhất tại `shared/interactionContract.ts`:
-     `'none' | 'open-video' | 'zoom' | 'open-link' | 'navigate-page' | 'play-audio'`
-   - `target`: Bắt buộc là `string` hoặc `number` (hoặc undefined/null). Bị chặn đứng nếu gửi object hoặc array.
+2. **Reorder Endpoint Là Nguồn Duy Nhất Cho Thứ Tự Trang**:
+   - DTO tối giản: `items: [{ id: string }]`. Vị trí phần tử trong mảng chính là thứ tự `order` mới.
+   - Kiểm tra chặt chẽ:
+     - Toàn bộ page IDs phải thuộc đúng cuốn sách (chặn đứng foreign page).
+     - Không cho phép thiếu trang (phải gửi đủ toàn bộ page set của sách).
+     - Không cho phép trùng lặp page ID.
+   - Cập nhật atomic trong một transaction duy nhất và touch book cache đúng 1 lần.
 
-3. **Cover Storage & Rendering Contract**:
-   - Bìa trước và bìa sau được lưu trong database dưới dạng `cover.front.elements` và `cover.back.elements`.
-   - Generic Canvas Renderer vẽ bìa qua cùng pipeline `renderPageTexture()`, không còn code vẽ cứng tọa độ.
-   - Bìa đặt `showPageNumber = false` để không vẽ số trang footer. Bìa sau nhận đầy đủ `bookContext`.
-   - Media reference checker quét cả `posterMediaId`, `thumbnailUrl`, `posterUrl` trên bìa sách.
+3. **Prisma 7 Seed & Non-Destructive Policy**:
+   - `backend/prisma7.config.ts` cấu hình:
+     ```ts
+     migrations: { path: "prisma/migrations", seed: "ts-node prisma/seed.ts" }
+     ```
+     `npx prisma db seed` chạy trực tiếp qua Prisma 7.
+   - **Mặc định non-destructive**: Không ghi đè sách, trang, phần tử, ảnh bìa, âm thanh hay metadata của Media đã tồn tại. Không reset `contentRevision`.
+   - **Chế độ reset cưỡng chế**: Khi `SEED_FORCE_CANONICAL_BOOK=true`, xóa sạch và tái tạo chính xác 21 trang mẫu và tăng `contentRevision`.
+   - Không đụng chạm các layout template tùy biến (`isSystem: false`).
 
-4. **Single Source of Truth cho `zIndex`**:
-   - `PageElement.zIndex` (`Int` trong DB) là nguồn chân lý duy nhất.
-   - Không còn thuộc tính `transform.zIndex` trong active contracts.
+4. **Production Fail-Fast & Resource Cleanup**:
+   - `PrismaService` và `seed.ts` bắt buộc `DATABASE_URL` khi chạy `NODE_ENV=production`, fail-fast ngay lập tức nếu thiếu hoặc mất kết nối cơ sở dữ liệu.
+   - Quản lý đóng kết nối PostgreSQL Pool (`pool.end()`) triệt để trong `onModuleDestroy()` và khối `finally` của seed script.
 
-5. **Canonical Media & URL Resolution**:
-   - Database lưu `mediaId` (và `posterMediaId` cho video).
-   - Public API compiler quét và tự động phân giải thành `src` (video/ảnh) và `thumbnailUrl` (poster) tại runtime.
+5. **Cover Video Poster Media References**:
+   - `MediaService.checkReferences()` quét đầy đủ `posterMediaId`, `thumbnailUrl`, `posterUrl` trên cả bìa trước và bìa sau.
 
-6. **Mutation & Cache Revision Contract**:
-   - `PublicCacheService.touchBook(bookId)` là nơi duy nhất tăng `contentRevision` và xóa cache khi có bất kỳ mutation nào.
-   - Khi chỉnh sửa hoặc xóa `AudioTrack`, hệ thống tự động touch tất cả các cuốn sách đang dùng bài hát đó.
-   - Rollback phiên bản chỉ tăng `contentRevision` đúng 1 lần, kiểm tra snapshot hoàn chỉnh và từ chối rollback chéo sách (`version.bookId !== bookId`), phục hồi chính xác `backgroundMusicId = null`.
-
-7. **Prisma Seed Non-Destructive Policy**:
-   - Mặc định: `npx prisma db seed` chạy chế độ an toàn (non-destructive), không ghi đè sách, trang, phần tử, ảnh bìa, hoặc reset `contentRevision` đã được quản lý trong CMS.
-   - Chế độ reset cưỡng chế: Khi và chỉ khi đặt `SEED_FORCE_CANONICAL_BOOK=true`, script seed mới tái tạo lại toàn bộ 21 trang mẫu từ mã nguồn và tăng `contentRevision`.
-   - Không xóa hay ghi đè custom layout templates do người dùng tự tạo (`isSystem: false`).
-
-8. **Role Access Control (RBAC) & Production Security**:
-   - `VIEWER`: Đọc dữ liệu CMS qua JWT.
-   - `EDITOR`: Sửa đổi nội dung (sách, trang, phần tử, media, audio).
-   - `ADMIN`: Xóa dữ liệu, cấp quyền, rollback phiên bản.
-   - Public registration bị vô hiệu hóa trên môi trường production.
-   - `start:prod` entrypoint trỏ đúng `node dist/backend/src/main`.
+6. **Renderer Baseline**:
+   - Chế độ `contain` của ảnh nền tự động lót màu nền giấy (`paperColor`) trước khi vẽ ảnh, tránh khoảng trống trong suốt.
+   - Không còn số ảo `999` trên bìa.
 
 ---
 
 ## 5. Xác Nhận Sẵn Sàng Chuyển Giao Cho Prompt 14
-Hệ thống đã đạt toàn bộ 20 điều kiện trong Definition of Done. Cơ sở dữ liệu, API contract, Generic Renderer và cơ chế bảo mật đã chính thức đóng băng ổn định. Sẵn sàng 100% để triển khai Prompt 14 — Admin CMS Foundation!
+Hệ thống đã đạt toàn bộ 22 điều kiện trong Definition of Done. Cơ sở dữ liệu, API contract, Generic Renderer và cơ chế bảo mật đã hoàn thành mọi hotfix và chính thức đóng băng. Sẵn sàng 100% để triển khai Prompt 14 — Admin CMS Foundation!

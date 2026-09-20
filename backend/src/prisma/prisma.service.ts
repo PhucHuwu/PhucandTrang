@@ -5,19 +5,40 @@ import { Pool } from 'pg';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+  private pool: Pool;
+
   constructor() {
-    const connectionString =
-      process.env.DATABASE_URL ||
+    const isProduction = process.env.NODE_ENV === 'production';
+    const connectionString = process.env.DATABASE_URL;
+
+    // Fail-fast in production if DATABASE_URL is missing
+    if (isProduction && !connectionString) {
+      throw new Error(
+        'FATAL: DATABASE_URL environment variable must be provided in production mode!',
+      );
+    }
+
+    const effectiveConnectionString =
+      connectionString ||
       'postgresql://postgres:postgres@localhost:5432/phuc_and_trang_db?schema=public';
-    const pool = new Pool({ connectionString });
+
+    const pool = new Pool({ connectionString: effectiveConnectionString });
     const adapter = new PrismaPg(pool);
     super({ adapter });
+    this.pool = pool;
   }
 
   async onModuleInit() {
+    const isProduction = process.env.NODE_ENV === 'production';
     try {
       await this.$connect();
     } catch (err: any) {
+      if (isProduction) {
+        // Fail-fast: in production, connection failure stops the server immediately
+        throw new Error(
+          `FATAL: Failed to connect to PostgreSQL database in production: ${err?.message || err}`,
+        );
+      }
       console.warn(
         '[PrismaService] Database connection not established (offline mode):',
         err?.message || err,
@@ -28,7 +49,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   async onModuleDestroy() {
     try {
       await this.$disconnect();
-    } catch {
+      await this.pool.end();
+    } catch (err) {
       // Ignored during shutdown
     }
   }

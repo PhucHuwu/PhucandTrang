@@ -8,7 +8,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { PageSide, LayoutMode } from '@prisma/client';
+import { LayoutMode } from '@prisma/client';
 import { PageBackgroundDto } from '../../common/dto/page-background.dto';
 
 export class UpdatePageDto {
@@ -16,14 +16,6 @@ export class UpdatePageDto {
   @Min(0)
   @IsOptional()
   pageNumber?: number;
-
-  @IsEnum(PageSide)
-  @IsOptional()
-  side?: PageSide;
-
-  @IsInt()
-  @IsOptional()
-  order?: number;
 
   @IsString()
   @IsOptional()

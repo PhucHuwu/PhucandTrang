@@ -16,6 +16,11 @@ import 'dotenv/config';
 import { REAL_LAYOUT_PRESETS } from '../src/templates/layout-presets.data';
 import { derivePageSideEnum } from '../src/utils/page-utils';
 
+const isProduction = process.env.NODE_ENV === 'production';
+if (isProduction && !process.env.DATABASE_URL) {
+  throw new Error('FATAL: DATABASE_URL environment variable is required for production database seeding!');
+}
+
 const connectionString =
   process.env.DATABASE_URL ||
   'postgresql://postgres:postgres@localhost:5432/phuc_and_trang_db?schema=public';
@@ -26,8 +31,9 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   console.log('🌱 Starting comprehensive database seed for Phúc & Trang Love Journey...');
 
+  const forceCanonicalReset = process.env.SEED_FORCE_CANONICAL_BOOK === 'true';
+
   // 1. Seed Admin User
-  const isProduction = process.env.NODE_ENV === 'production';
   const adminEmail = process.env.SEED_ADMIN_EMAIL;
   const adminPassword = process.env.SEED_ADMIN_PASSWORD;
   const enableDevSeed = process.env.ENABLE_DEV_SEED === 'true' || !isProduction;
@@ -102,6 +108,16 @@ async function main() {
       const filename = url.split('/').pop() || key;
       const publicId = `${folder}/${filename.replace(/\.[^/.]+$/, '')}`;
 
+      if (!forceCanonicalReset) {
+        // Non-destructive: if media with this URL already exists, preserve its current CMS metadata
+        const existingMedia = await prisma.media.findUnique({ where: { url } });
+        if (existingMedia) {
+          mediaUrlToIdMap.set(url, existingMedia.id);
+          mediaUrlToIdMap.set(key, existingMedia.id);
+          continue;
+        }
+      }
+
       const mediaRecord = await prisma.media.upsert({
         where: { url },
         update: {
@@ -133,30 +149,41 @@ async function main() {
     return mediaUrlToIdMap.get(keyOrUrl);
   };
 
-  // 3. Seed Main Audio Track
-  const audioTrack = await prisma.audioTrack.upsert({
-    where: { id: 'track-van-vat' },
-    update: {
-      volume: 0.8,
-      loop: true,
-      startAt: 0.0,
-      fadeIn: 2.0,
-      fadeOut: 2.0,
-    },
-    create: {
-      id: 'track-van-vat',
-      title: 'Vạn vật như muốn ta bên nhau',
-      artist: 'Hoàng Dũng',
-      src: '/music/van-vat-nhu-muon-ta-ben-nhau.mp3',
-      autoPlay: true,
-      loop: true,
-      volume: 0.8,
-      startAt: 0.0,
-      fadeIn: 2.0,
-      fadeOut: 2.0,
-    },
-  });
-  console.log(`✅ Audio track seeded: ${audioTrack.title}`);
+  // 3. Seed Main Audio Track (Non-destructive unless forceCanonicalReset)
+  let audioTrack: any;
+  if (!forceCanonicalReset) {
+    const existingTrack = await prisma.audioTrack.findUnique({ where: { id: 'track-van-vat' } });
+    if (existingTrack) {
+      console.log(`ℹ️ Preserving existing CMS audio track: "${existingTrack.title}"`);
+      audioTrack = existingTrack;
+    }
+  }
+
+  if (!audioTrack) {
+    audioTrack = await prisma.audioTrack.upsert({
+      where: { id: 'track-van-vat' },
+      update: {
+        volume: 0.8,
+        loop: true,
+        startAt: 0.0,
+        fadeIn: 2.0,
+        fadeOut: 2.0,
+      },
+      create: {
+        id: 'track-van-vat',
+        title: 'Vạn vật như muốn ta bên nhau',
+        artist: 'Hoàng Dũng',
+        src: '/music/van-vat-nhu-muon-ta-ben-nhau.mp3',
+        autoPlay: true,
+        loop: true,
+        volume: 0.8,
+        startAt: 0.0,
+        fadeIn: 2.0,
+        fadeOut: 2.0,
+      },
+    });
+    console.log(`✅ Audio track seeded: ${audioTrack.title}`);
+  }
 
   // 4. Seed Real Layout Templates (Full slots and element prototypes)
   for (const [key, t] of Object.entries(REAL_LAYOUT_PRESETS)) {
@@ -315,8 +342,6 @@ async function main() {
     },
   };
 
-  const forceCanonicalReset = process.env.SEED_FORCE_CANONICAL_BOOK === 'true';
-
   const existingBook = await prisma.book.findUnique({
     where: { slug: 'phuc-and-trang' },
     include: { _count: { select: { pages: true } } },
@@ -341,6 +366,9 @@ async function main() {
       console.warn(
         '⚠️ FORCE CANONICAL SEED ENABLED: Existing CMS content is being overwritten with canonical source.',
       );
+      // Cleanly remove any existing pages and elements to guarantee exactly canonical 21 pages
+      await prisma.page.deleteMany({ where: { bookId: existingBook.id } });
+
       book = await prisma.book.update({
         where: { id: existingBook.id },
         data: {
@@ -986,5 +1014,10 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    try {
+      await prisma.$disconnect();
+    } catch {}
+    try {
+      await pool.end();
+    } catch {}
   });

@@ -9,7 +9,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { PageSide, LayoutMode } from '@prisma/client';
+import { LayoutMode } from '@prisma/client';
 import { PageBackgroundDto } from '../../common/dto/page-background.dto';
 
 export class CreatePageDto {
@@ -20,14 +20,6 @@ export class CreatePageDto {
   @IsInt()
   @Min(0)
   pageNumber: number;
-
-  @IsEnum(PageSide)
-  @IsOptional()
-  side?: PageSide;
-
-  @IsInt()
-  @IsOptional()
-  order?: number;
 
   @IsString()
   @IsOptional()

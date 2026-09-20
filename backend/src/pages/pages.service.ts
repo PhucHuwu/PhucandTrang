@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePageDto } from './dto/create-page.dto';
@@ -100,24 +101,20 @@ export class PagesService {
       );
     }
 
-    // Option B: order is physical sequence (appended at end if not provided)
-    let order = dto.order;
-    if (order === undefined) {
-      const maxOrderPage = await this.prisma.page.findFirst({
-        where: { bookId: dto.bookId },
-        orderBy: { order: 'desc' },
-        select: { order: true },
-      });
-      order = (maxOrderPage?.order ?? -1) + 1;
-    }
-
-    const derivedSide = derivePageSideEnum(order);
+    // Option B: append-only physical order (never assume order = pageNumber)
+    const maxOrderPage = await this.prisma.page.findFirst({
+      where: { bookId: dto.bookId },
+      orderBy: { order: 'desc' },
+      select: { order: true },
+    });
+    const order = (maxOrderPage?.order ?? -1) + 1;
+    const side = derivePageSideEnum(order);
 
     const page = await this.prisma.page.create({
       data: {
         bookId: dto.bookId,
         pageNumber: dto.pageNumber,
-        side: dto.side || derivedSide,
+        side,
         order,
         chapter: dto.chapter,
         title: dto.title,
@@ -146,6 +143,18 @@ export class PagesService {
   async update(id: string, dto: UpdatePageDto, isPatch: boolean = false) {
     const page = await this.findOne(id);
 
+    // Reject direct order or side mutation in normal page update
+    if ('order' in dto && (dto as any).order !== undefined) {
+      throw new BadRequestException(
+        'Use the book reorder endpoint (PUT /api/pages/book/:bookId/reorder) to change physical page order.',
+      );
+    }
+    if ('side' in dto && (dto as any).side !== undefined) {
+      throw new BadRequestException(
+        'Page side is strictly derived from physical order and cannot be manually updated.',
+      );
+    }
+
     if (dto.pageNumber !== undefined && dto.pageNumber !== page.pageNumber) {
       const existing = await this.prisma.page.findUnique({
         where: {
@@ -162,9 +171,6 @@ export class PagesService {
       }
     }
 
-    const targetOrder = dto.order !== undefined ? dto.order : page.order;
-    const derivedSide = derivePageSideEnum(targetOrder);
-
     const background = isPatch && dto.background
       ? safeDeepMerge(page.background as any, dto.background)
       : dto.background;
@@ -173,8 +179,6 @@ export class PagesService {
       where: { id },
       data: {
         ...(dto.pageNumber !== undefined ? { pageNumber: dto.pageNumber } : {}),
-        ...(dto.side !== undefined ? { side: dto.side } : { side: derivedSide }),
-        ...(dto.order !== undefined ? { order: dto.order } : {}),
         ...(dto.chapter !== undefined ? { chapter: dto.chapter } : {}),
         ...(dto.title !== undefined ? { title: dto.title } : {}),
         ...(dto.quote !== undefined ? { quote: dto.quote } : {}),
@@ -192,10 +196,6 @@ export class PagesService {
         audioTrack: true,
       },
     });
-
-    if (dto.order !== undefined) {
-      await this.normalizeBookPageSequence(page.bookId);
-    }
 
     await this.cacheService.touchBook(page.bookId);
     return updated;
@@ -319,24 +319,52 @@ export class PagesService {
     const book = await this.prisma.book.findUnique({ where: { id: bookId } });
     if (!book) throw new NotFoundException(`Book not found: ${bookId}`);
 
+    // Fetch existing pages for this book to validate full set and strict ownership
+    const existingPages = await this.prisma.page.findMany({
+      where: { bookId },
+      select: { id: true, pageNumber: true, order: true },
+    });
+
+    const requestedIds = dto.items.map((item) => item.id);
+    const existingIdSet = new Set(existingPages.map((p) => p.id));
+    const requestedIdSet = new Set(requestedIds);
+
+    // 1. Check duplicate IDs
+    if (requestedIdSet.size !== requestedIds.length) {
+      throw new BadRequestException('Danh sách reorder chứa ID trang bị trùng lặp.');
+    }
+
+    // 2. Check complete page set length
+    if (requestedIds.length !== existingPages.length) {
+      throw new BadRequestException(
+        `Danh sách reorder phải chứa đầy đủ ${existingPages.length} trang của cuốn sách. Nhận được: ${requestedIds.length}.`,
+      );
+    }
+
+    // 3. Check ownership: every requested page MUST belong to this book
+    for (const reqId of requestedIds) {
+      if (!existingIdSet.has(reqId)) {
+        throw new BadRequestException(
+          `Trang "${reqId}" không thuộc về cuốn sách "${bookId}" hoặc không tồn tại.`,
+        );
+      }
+    }
+
+    // 4. Atomic transaction update: order = array index, side = derivePageSideEnum(order)
     const result = await this.prisma.$transaction(async (tx) => {
-      // Reorder physical positions according to dto.items sequence
       for (let i = 0; i < dto.items.length; i++) {
-        const item = dto.items[i];
-        const newOrder = item.order !== undefined ? item.order : i;
+        const pageId = dto.items[i].id;
+        const newOrder = i;
         const derivedSide = derivePageSideEnum(newOrder);
 
         await tx.page.update({
-          where: { id: item.id },
+          where: { id: pageId },
           data: {
             order: newOrder,
             side: derivedSide,
           },
         });
       }
-
-      // Compact orders to contiguous 0..N-1 without modifying pageNumber metadata
-      await this.normalizeBookPageSequence(bookId, tx);
 
       return tx.page.findMany({
         where: { bookId },
@@ -345,6 +373,7 @@ export class PagesService {
       });
     });
 
+    // Touch book once after successful reorder transaction
     await this.cacheService.touchBook(bookId);
     return result;
   }

@@ -3,6 +3,7 @@ import { PagesService } from './pages.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PublicCacheService } from '../public/public-cache.service';
 import { PageSide } from '@prisma/client';
+import { BadRequestException } from '@nestjs/common';
 
 describe('PagesService Option B Contract & Sequencing (Req 1, 2, 3, 4, 5, 6)', () => {
   let service: PagesService;
@@ -44,7 +45,6 @@ describe('PagesService Option B Contract & Sequencing (Req 1, 2, 3, 4, 5, 6)', (
   });
 
   it('Normalize (Option B): should compact order to 0..N-1 while preserving display pageNumber metadata', async () => {
-    // 3 pages with display pageNumbers 10, 30, 50 and orders with gaps 0, 5, 12
     const mockPages = [
       { id: 'p1', pageNumber: 10, order: 0, side: PageSide.LEFT },
       { id: 'p2', pageNumber: 30, order: 5, side: PageSide.LEFT },
@@ -87,18 +87,16 @@ describe('PagesService Option B Contract & Sequencing (Req 1, 2, 3, 4, 5, 6)', (
   it('Reorder (Option B): should update physical order and side without modifying display pageNumber', async () => {
     prisma.book.findUnique.mockResolvedValue({ id: 'book-1' });
 
+    // Existing pages of book-1: p1 and p2
+    prisma.page.findMany.mockResolvedValue([
+      { id: 'p1', pageNumber: 10, order: 0, side: PageSide.LEFT },
+      { id: 'p2', pageNumber: 20, order: 1, side: PageSide.RIGHT },
+    ]);
+
     // Reordering Page B (id: 'p2', pageNumber: 20) before Page A (id: 'p1', pageNumber: 10)
     const reorderDto = {
-      items: [
-        { id: 'p2', order: 0 },
-        { id: 'p1', order: 1 },
-      ],
+      items: [{ id: 'p2' }, { id: 'p1' }],
     };
-
-    prisma.page.findMany.mockResolvedValue([
-      { id: 'p2', pageNumber: 20, order: 0, side: PageSide.LEFT },
-      { id: 'p1', pageNumber: 10, order: 1, side: PageSide.RIGHT },
-    ]);
 
     await service.reorder('book-1', reorderDto);
 
@@ -119,6 +117,80 @@ describe('PagesService Option B Contract & Sequencing (Req 1, 2, 3, 4, 5, 6)', (
     );
 
     expect(cacheService.touchBook).toHaveBeenCalledWith('book-1');
+  });
+
+  it('Reorder: should reject if payload contains foreign page ID belonging to another book', async () => {
+    prisma.book.findUnique.mockResolvedValue({ id: 'book-1' });
+
+    // book-1 only owns p1 and p2
+    prisma.page.findMany.mockResolvedValue([
+      { id: 'p1', pageNumber: 1, order: 0 },
+      { id: 'p2', pageNumber: 2, order: 1 },
+    ]);
+
+    const reorderDto = {
+      items: [{ id: 'p1' }, { id: 'foreign-page-b' }],
+    };
+
+    await expect(service.reorder('book-1', reorderDto)).rejects.toThrow(BadRequestException);
+    expect(prisma.page.update).not.toHaveBeenCalled();
+  });
+
+  it('Reorder: should reject if payload is incomplete (missing pages)', async () => {
+    prisma.book.findUnique.mockResolvedValue({ id: 'book-1' });
+
+    // book-1 owns p1, p2, p3
+    prisma.page.findMany.mockResolvedValue([
+      { id: 'p1', order: 0 },
+      { id: 'p2', order: 1 },
+      { id: 'p3', order: 2 },
+    ]);
+
+    // payload only provides p1 and p2 (missing p3)
+    const incompleteDto = {
+      items: [{ id: 'p1' }, { id: 'p2' }],
+    };
+
+    await expect(service.reorder('book-1', incompleteDto)).rejects.toThrow(BadRequestException);
+    expect(prisma.page.update).not.toHaveBeenCalled();
+  });
+
+  it('Reorder: should reject if payload contains duplicate page IDs', async () => {
+    prisma.book.findUnique.mockResolvedValue({ id: 'book-1' });
+
+    prisma.page.findMany.mockResolvedValue([
+      { id: 'p1', order: 0 },
+      { id: 'p2', order: 1 },
+    ]);
+
+    const duplicateDto = {
+      items: [{ id: 'p1' }, { id: 'p1' }],
+    };
+
+    await expect(service.reorder('book-1', duplicateDto)).rejects.toThrow(BadRequestException);
+    expect(prisma.page.update).not.toHaveBeenCalled();
+  });
+
+  it('Update Page: should reject if client attempts to pass order directly in update', async () => {
+    prisma.page.findUnique.mockResolvedValue({ id: 'p1', bookId: 'book-1', pageNumber: 1 });
+
+    const updateWithOrderDto = {
+      order: 3,
+    } as any;
+
+    await expect(service.update('p1', updateWithOrderDto)).rejects.toThrow(BadRequestException);
+    expect(prisma.page.update).not.toHaveBeenCalled();
+  });
+
+  it('Update Page: should reject if client attempts to pass side directly in update', async () => {
+    prisma.page.findUnique.mockResolvedValue({ id: 'p1', bookId: 'book-1', pageNumber: 1 });
+
+    const updateWithSideDto = {
+      side: 'LEFT',
+    } as any;
+
+    await expect(service.update('p1', updateWithSideDto)).rejects.toThrow(BadRequestException);
+    expect(prisma.page.update).not.toHaveBeenCalled();
   });
 
   it('Delete (Option B): should compact order but preserve remaining pageNumbers', async () => {
