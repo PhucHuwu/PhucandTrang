@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PublicCacheService } from '../public/public-cache.service';
 import { PageSide } from '@prisma/client';
 
-describe('PagesService Normalization & Sequencing (Req 11 & 12)', () => {
+describe('PagesService Normalization & Sequencing (Req 1, 11 & 12)', () => {
   let service: PagesService;
   let prisma: any;
   let cacheService: any;
@@ -14,7 +14,9 @@ describe('PagesService Normalization & Sequencing (Req 11 & 12)', () => {
       page: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
         delete: jest.fn(),
         create: jest.fn(),
       },
@@ -77,5 +79,51 @@ describe('PagesService Normalization & Sequencing (Req 11 & 12)', () => {
         data: { order: 2, pageNumber: 2, side: PageSide.LEFT },
       }),
     );
+  });
+
+  it('should duplicate page with insertAfter=true using purely integer operations (no floats)', async () => {
+    const originalPage = {
+      id: 'p2',
+      bookId: 'book-1',
+      pageNumber: 2,
+      order: 2,
+      side: PageSide.LEFT,
+      background: { type: 'color' },
+      elements: [],
+    };
+
+    prisma.page.findUnique.mockResolvedValue(originalPage);
+    prisma.page.findMany.mockResolvedValue([
+      { id: 'p0', order: 0, side: PageSide.LEFT },
+      { id: 'p1', order: 1, side: PageSide.RIGHT },
+      { id: 'p2', order: 2, side: PageSide.LEFT },
+      { id: 'p2-dup', order: 3, side: PageSide.RIGHT },
+      { id: 'p3', order: 4, side: PageSide.LEFT },
+    ]);
+    prisma.page.create.mockResolvedValue({ id: 'p2-dup', bookId: 'book-1' });
+
+    const result = await service.duplicate('p2', { insertAfter: true });
+
+    // Verify updateMany shifted pages with integer increment
+    expect(prisma.page.updateMany).toHaveBeenCalledWith({
+      where: {
+        bookId: 'book-1',
+        order: { gt: 2 },
+      },
+      data: {
+        order: { increment: 1 },
+      },
+    });
+
+    // Verify page.create was called with an INTEGER order (2 + 1 = 3), never a float like 2.5
+    expect(prisma.page.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          order: 3,
+        }),
+      }),
+    );
+
+    expect(cacheService.touchBook).toHaveBeenCalledWith('book-1');
   });
 });

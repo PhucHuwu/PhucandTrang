@@ -2,6 +2,7 @@ import {
   IsString,
   IsOptional,
   IsNumber,
+  IsBoolean,
   Min,
   Max,
   IsIn,
@@ -48,6 +49,7 @@ export class LinearGradientDto {
 }
 
 export class HeaderFadeDto {
+  @IsBoolean({ message: 'headerFade.enabled phải là boolean' })
   @IsOptional()
   enabled?: boolean;
 
@@ -75,6 +77,7 @@ export class HeaderFadeDto {
 }
 
 export class GutterFadeDto {
+  @IsBoolean({ message: 'gutterFade.enabled phải là boolean' })
   @IsOptional()
   enabled?: boolean;
 

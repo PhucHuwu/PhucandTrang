@@ -120,24 +120,70 @@
 ---
 
 ## 3. Kết Quả Kiểm Thử Tự Động (Test Verification)
-- **Tổng số test suites**: 11 passed (100%).
-- **Tổng số unit/integration tests**: 42 passed (100%).
+- **Tổng số test suites**: 12 passed (100%).
+- **Tổng số unit/integration tests**: 51 passed (100%).
   1. `utils/image-fitting.spec.ts`: Test contain, cover, fill, focalPoint crop calculation.
   2. `utils/coordinate-conversion.spec.ts`: Test active area relative-to-element coordinate conversion.
   3. `utils/page-utils.spec.ts`: Test deterministic sequencing, side derivation, leaf/face calculation.
   4. `utils/safe-merge.spec.ts`: Test safe partial deep-merge and prototype pollution blocking.
   5. `utils/text-variable-resolver.spec.ts`: Test variable parsing, pipes, timezone consistency.
   6. `auth/roles.guard.spec.ts`: Test RBAC authorization rules and role gating.
-  7. `pages/pages.service.spec.ts`: Test page order normalization (0..N-1) and contiguous sequence.
-  8. `versions/versions.service.spec.ts`: Test corrupted snapshot rollback rejection and atomic execution.
+  7. `pages/pages.service.spec.ts`: Test page order normalization (0..N-1), contiguous sequence, duplicate insertAfter.
+  8. `versions/versions.service.spec.ts`: Test cross-book rollback rejection, backgroundMusicId null restoration, atomic execution.
   9. `public/public.service.spec.ts`: Test public document compilation, mediaId resolution, hidden elements filtering, ETag.
   10. `media/media.service.spec.ts`: Test signed upload config, media reference scanner (cover, page, audio, video).
-  11. `app.controller.spec.ts`: Test basic server controller.
+  11. `common/dto/dto-validation.spec.ts`: Test strict DTO validation for interaction, background, and transform.
+  12. `app.controller.spec.ts`: Test basic server controller.
 - **Biên dịch**:
   - `backend`: `npm run build` thành công 100%.
   - `frontend`: `npm run build` thành công 100% (0 errors).
 
 ---
 
-## 4. Xác Nhận Sẵn Sàng Chuyển Giao Cho Prompt 14
-Hệ thống đã đạt toàn bộ 26 điều kiện trong Definition of Done của Prompt 13.6. Cơ sở dữ liệu, API contract, Generic Renderer và cơ chế bảo mật đã đóng băng ổn định để bắt đầu xây dựng giao diện Admin CMS Foundation.
+## 4. Architecture Freeze — Prompt 13.7
+
+Trước khi bước vào Prompt 14 (Admin CMS Foundation), toàn bộ kiến trúc lõi được chính thức đóng băng (freeze) với các nguyên tắc bất biến sau:
+
+1. **Page Ordering & Sequencing Contract (Option B)**:
+   - `order`: Số nguyên liên tục `0..N-1`. Là nguồn chân lý vật lý duy nhất cho vị trí lật sách của 3D Flipbook Engine.
+   - `pageNumber`: Thuộc tính metadata hiển thị (presentation / display number).
+   - `side`: Tự động tính từ `order`: chẵn = `LEFT`, lẻ = `RIGHT`.
+   - Hàm `PagesService.normalizeBookPageSequence()` tự động dọn dẹp khoảng trống sau mọi mutation (`create`, `delete`, `duplicate`, `reorder`).
+   - `duplicate(insertAfter=true)` hoạt động hoàn toàn trên số nguyên, không dùng số thập phân.
+
+2. **Element Interaction Actions**:
+   - Định nghĩa duy nhất tại `shared/interactionContract.ts`:
+     `'none' | 'open-video' | 'zoom' | 'open-link' | 'navigate-page' | 'play-audio'`
+   - `target`: Bắt buộc là `string` hoặc `number`, nghiêm cấm nhận đối tượng/mảng tùy tiện.
+
+3. **Cover Storage & Rendering Contract**:
+   - Bìa trước và bìa sau được lưu trong database dưới dạng `cover.front.elements` và `cover.back.elements`.
+   - Generic Canvas Renderer vẽ bìa qua cùng pipeline `renderPageTexture()`, không còn code vẽ cứng tọa độ.
+   - Bìa đặt `showPageNumber = false` để không vẽ số trang footer. Bìa sau nhận đầy đủ `bookContext`.
+
+4. **Single Source of Truth cho `zIndex`**:
+   - `PageElement.zIndex` (`Int` trong DB) là nguồn chân lý duy nhất.
+   - Không còn thuộc tính `transform.zIndex`.
+
+5. **Canonical Media & URL Resolution**:
+   - Database lưu `mediaId` (và `posterMediaId` cho video).
+   - Public API compiler quét và tự động phân giải thành `src` (video/ảnh) và `thumbnailUrl` (poster) tại runtime.
+
+6. **Mutation & Cache Revision Contract**:
+   - `PublicCacheService.touchBook(bookId)` là nơi duy nhất tăng `contentRevision` và xóa cache khi có bất kỳ mutation nào.
+   - Rollback phiên bản chỉ tăng `contentRevision` đúng 1 lần, kiểm tra snapshot hoàn chỉnh và từ chối rollback chéo sách (`version.bookId !== bookId`).
+
+7. **Role Access Control (RBAC)**:
+   - `VIEWER`: Đọc dữ liệu CMS qua JWT.
+   - `EDITOR`: Sửa đổi nội dung (sách, trang, phần tử, media, audio).
+   - `ADMIN`: Xóa dữ liệu, cấp quyền, rollback phiên bản.
+   - Public registration bị vô hiệu hóa trên môi trường production.
+
+8. **Prisma Migrations**:
+   - `20260920000000_init`: Migration khởi tạo sạch sẽ, không trùng lặp index.
+   - `20260921000000_pre_admin_stabilization`: Cập nhật `User.role = VIEWER` và `books.content_revision`.
+
+---
+
+## 5. Xác Nhận Sẵn Sàng Chuyển Giao Cho Prompt 14
+Hệ thống đã đạt toàn bộ 20 điều kiện trong Definition of Done của Prompt 13.7. Sẵn sàng 100% để triển khai Prompt 14 — Admin CMS Foundation mà không cần điều chỉnh lại data contract.

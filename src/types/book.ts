@@ -20,6 +20,14 @@
  * - width: 0.0 -> 1.0 (fraction of total page width)
  * - height: 0.0 -> 1.0 (fraction of total page height)
  */
+import {
+  ELEMENT_INTERACTION_ACTIONS,
+  ElementInteractionAction,
+} from '../../shared/interactionContract';
+
+export { ELEMENT_INTERACTION_ACTIONS };
+export type { ElementInteractionAction };
+
 export interface ElementTransform {
   /** Normalized X position (0.0 to 1.0) */
   x: number;
@@ -33,8 +41,6 @@ export interface ElementTransform {
   rotation: number;
   /** Scale multiplier. Default: 1.0 */
   scale: number;
-  /** @deprecated Use PageElement.zIndex instead. Kept for legacy normalization only */
-  zIndex?: number;
 }
 
 // ==========================================
@@ -82,7 +88,7 @@ export interface NormalizedRect {
 
 export interface ElementInteraction {
   enabled: boolean;
-  action: 'none' | 'open-video' | 'zoom' | 'navigate-page' | 'open-link';
+  action: ElementInteractionAction;
   /** Target parameter (video URL, external link URL, page number, etc.) */
   target?: string | number;
   /** Hover tooltip title or accessibility label */
@@ -357,6 +363,7 @@ export interface Page {
   /** True if any element was modified, repositioned, resized, added or deleted after applying template */
   isCustomized?: boolean;
   background: PageBackground;
+  showPageNumber?: boolean;
   audioTrackId?: string | null;
   audio?: AudioTrack | null;
   elements: PageElement[];

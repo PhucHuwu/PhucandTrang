@@ -73,6 +73,14 @@ export class VersionsService {
    */
   async rollbackToSnapshot(bookId: string, versionId: string) {
     const version = await this.findOne(versionId);
+
+    // Requirement 2: Reject cross-book rollback attempts before any mutations occur
+    if (version.bookId !== bookId) {
+      throw new BadRequestException(
+        `Bản snapshot "${versionId}" thuộc về cuốn sách khác (${version.bookId}), không thể rollback cho sách ${bookId}.`,
+      );
+    }
+
     const snapshot = version.snapshot as any;
 
     if (!snapshot || typeof snapshot !== 'object') {
@@ -96,7 +104,10 @@ export class VersionsService {
       // 1. Delete current pages (cascade deletes elements)
       await tx.page.deleteMany({ where: { bookId } });
 
-      // 2. Update book fields & bump contentRevision
+      // 2. Update book fields: properly restores backgroundMusicId = null if snapshot has null
+      const backgroundMusicId =
+        'backgroundMusicId' in snapshot ? snapshot.backgroundMusicId : null;
+
       await tx.book.update({
         where: { id: bookId },
         data: {
@@ -107,8 +118,7 @@ export class VersionsService {
           sheName: snapshot.sheName,
           anniversaryDate: snapshot.anniversaryDate ? new Date(snapshot.anniversaryDate) : undefined,
           proposalQuote: snapshot.proposalQuote,
-          backgroundMusicId: snapshot.backgroundMusicId || undefined,
-          contentRevision: { increment: 1 },
+          backgroundMusicId,
         },
       });
 

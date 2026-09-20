@@ -161,15 +161,15 @@ export class PageTextureGenerator {
     );
 
     // 4. Render Background Layer
-    this.renderBackground(ctx, page.background, page.side, imageCache, canvasW, canvasH);
+    this.renderBackground(ctx, page.background, page.side, imageCache, canvasW, canvasH, bookContext);
 
     // 5. Sort Elements strictly by PageElement.zIndex ascending (Single Source of Truth)
     const sortedElements = [...(page.elements || [])].filter(
       (el) => el.visible !== false
     );
     sortedElements.sort((a, b) => {
-      const za = typeof a.zIndex === 'number' ? a.zIndex : (a.transform as any)?.zIndex ?? 1;
-      const zb = typeof b.zIndex === 'number' ? b.zIndex : (b.transform as any)?.zIndex ?? 1;
+      const za = typeof a.zIndex === 'number' ? a.zIndex : 1;
+      const zb = typeof b.zIndex === 'number' ? b.zIndex : 1;
       return za - zb;
     });
 
@@ -178,12 +178,11 @@ export class PageTextureGenerator {
       this.renderElement(ctx, el, imageCache, varContext, canvasW, canvasH);
     }
 
-    // 7. Draw Page Number Footer if positive inside page and not disabled
+    // 7. Draw Page Number Footer if positive inside page and not explicitly disabled
     if (
+      page.showPageNumber !== false &&
       page.pageNumber !== undefined &&
-      page.pageNumber > 0 &&
-      page.pageNumber !== 999 &&
-      (page as any).showPageNumber !== false
+      page.pageNumber > 0
     ) {
       this.renderPageNumberFooter(ctx, page.pageNumber, canvasW, canvasH);
     }
@@ -203,9 +202,16 @@ export class PageTextureGenerator {
     side: 'left' | 'right',
     imageCache: Map<string, HTMLImageElement>,
     canvasW: number,
-    canvasH: number
+    canvasH: number,
+    bookContext?: Partial<Book>
   ) {
     const bgImage = bg?.imageUrl ? imageCache.get(bg.imageUrl) : null;
+
+    // 1. Fill base paper background color before drawing image to avoid transparent blank area (especially in contain mode)
+    ctx.save();
+    ctx.fillStyle = bg?.color || bookContext?.settings?.theme?.paperColor || '#F9F5EC';
+    ctx.fillRect(0, 0, canvasW, canvasH);
+    ctx.restore();
 
     if (bg?.type === 'gradient' && bg.gradient) {
       // Linear Gradient Background
@@ -895,6 +901,7 @@ export class PageTextureGenerator {
       id: 'page-cover-front',
       pageNumber: -1,
       order: -1,
+      showPageNumber: false,
       side: 'right',
       layout: 'custom',
       background: {
@@ -925,6 +932,7 @@ export class PageTextureGenerator {
       id: `page-cover-back-${isInside ? 'inside' : 'outside'}`,
       pageNumber: -1,
       order: -1,
+      showPageNumber: false,
       side: isInside ? 'left' : 'right',
       layout: 'custom',
       background: {

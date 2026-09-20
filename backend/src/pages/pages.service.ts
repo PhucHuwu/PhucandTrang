@@ -201,17 +201,39 @@ export class PagesService {
   async duplicate(id: string, dto?: DuplicatePageDto) {
     const original = await this.findOne(id);
     const insertAfter = dto?.insertAfter ?? false;
-    const initialOrder = insertAfter ? original.order + 0.5 : (dto?.targetPageNumber ?? 99999);
 
     const duplicated = await this.prisma.$transaction(async (tx) => {
-      // Create new page with temporary pageNumber
-      const tempPageNumber = -Math.floor(Math.random() * 1000000) - 1;
+      let targetOrder: number;
+
+      if (insertAfter) {
+        // Shift existing pages with order > original.order by +1 (pure integer operation)
+        await tx.page.updateMany({
+          where: {
+            bookId: original.bookId,
+            order: { gt: original.order },
+          },
+          data: {
+            order: { increment: 1 },
+          },
+        });
+        targetOrder = original.order + 1;
+      } else {
+        const maxPage = await tx.page.findFirst({
+          where: { bookId: original.bookId },
+          orderBy: { order: 'desc' },
+          select: { order: true },
+        });
+        targetOrder = (maxPage?.order ?? 0) + 1;
+      }
+
+      // Create new page with temporary pageNumber to evade unique collision
+      const tempPageNumber = -(Math.floor(Math.random() * 900000) + 100000);
       const newPage = await tx.page.create({
         data: {
           bookId: original.bookId,
           pageNumber: tempPageNumber,
           side: original.side,
-          order: initialOrder,
+          order: targetOrder,
           chapter: original.chapter ? `${original.chapter} (Bản sao)` : undefined,
           title: original.title ? `${original.title} (Copy)` : undefined,
           quote: original.quote,
