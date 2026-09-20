@@ -288,7 +288,20 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
    - Mở rộng linh hoạt:
      - Hỗ trợ cú pháp Pipe Filter: `{{daysTogether | number}}`, `{{couple.he | uppercase}}`.
      - Hỗ trợ hàm `TextVariableResolver.registerVariable()` và `registerFilter()`.
-7. **Giai đoạn 7 (Admin Dashboard & Tối ưu nâng cao)**:
+7. **Giai đoạn 7 (Đã hoàn thành - Pre-Admin Architecture Stabilization & Security Freeze)**:
+   - Chuẩn hóa `PageElement.zIndex` làm source of truth duy nhất, loại bỏ hoàn toàn `transform.zIndex`.
+   - Chuẩn hóa Media Contract với canonical `mediaId`, phân giải URL động trong Public API compiler.
+   - Sửa toàn diện phần tử Video: tách rời video source (`.mp4`) và ảnh poster thumbnail (`.jpg`).
+   - Chuẩn hóa Video ActiveArea: chuyển đổi tọa độ tương đối bên trong element sang tọa độ toàn trang chính xác.
+   - Tách physical leaf/face sequencing khỏi `pageNumber`, sử dụng hàm tập trung `derivePageSide(order)`.
+   - Nạp đầy đủ slots và element prototypes thật vào bảng `LayoutTemplate` trong Database.
+   - Tách Caption ảnh thành phần tử `TEXT` (`variant: 'caption'`) độc lập có thể kéo thả, đổi kiểu dáng.
+   - Hoàn thiện Renderer: `objectFit` + `focalPoint` cho ảnh, `wrapText` tự động cho chữ, nền gradient/color/image.
+   - Chuyển bìa trước và bìa sau sang mô hình generic `Page` + `PageElement[]`, đưa toàn bộ quy trình vẽ về cùng 1 renderer.
+   - Centralized Cache Invalidation với `PublicCacheService.touchBook()` và ETag dựa trên `contentRevision`.
+   - Bảo mật RBAC (`ADMIN`, `EDITOR`, `VIEWER`), bảo vệ toàn bộ mutation routes và endpoint lấy chữ ký Cloudinary.
+   - Seed toàn diện đầy đủ 21 trang kèm elements vào PostgreSQL, decouple production fallback.
+8. **Giai đoạn 8 (Prompt 14+ Admin Dashboard & Visual CMS Foundation)**:
    - Xây dựng giao diện Admin CMS trực quan để quản trị viên chỉnh sửa nội dung, kéo thả layout và tải ảnh mới.
    - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.
    - Di dời/xóa bỏ an toàn các file legacy trong `src/components/spreads` và `src/components/pages`.

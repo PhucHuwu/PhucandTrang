@@ -8,10 +8,12 @@ import {
   Param,
   Query,
   UseGuards,
-  ParseBoolPipe,
 } from '@nestjs/common';
 import { MediaService } from './media.service';
 import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { Role } from '@prisma/client';
 import { CreateMediaDto } from './dto/create-media.dto';
 import { UpdateMediaDto } from './dto/update-media.dto';
 import { QueryMediaDto } from './dto/query-media.dto';
@@ -23,13 +25,17 @@ export class MediaController {
 
   /**
    * Request signed upload config for direct client upload to Cloudinary.
-   * Admin uses this to upload large images, videos, audio without passing files through NestJS.
+   * Admin/Editor authentication is strictly required.
    */
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(Role.ADMIN, Role.EDITOR)
   @Post('signature')
   getSignedUploadConfigPost(@Body() dto: SignedUploadRequestDto) {
     return this.mediaService.getSignedUploadConfig(dto);
   }
 
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(Role.ADMIN, Role.EDITOR)
   @Get('signature')
   getSignedUploadConfigGet(@Query() dto: SignedUploadRequestDto) {
     return this.mediaService.getSignedUploadConfig(dto);
@@ -37,7 +43,6 @@ export class MediaController {
 
   /**
    * Look up media by filename (e.g., '02-01-2025.jpg') or partial URL.
-   * Useful for migrating legacy hardcoded media references to DB records.
    */
   @Get('lookup')
   lookup(@Query('q') query: string) {
@@ -47,6 +52,8 @@ export class MediaController {
   /**
    * Sync legacy cloudinaryUrls.json map into the database.
    */
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(Role.ADMIN)
   @Post('sync-legacy')
   syncLegacy(@Body() legacyMap: Record<string, string>) {
     return this.mediaService.syncLegacyMedia(legacyMap);
@@ -79,14 +86,18 @@ export class MediaController {
   /**
    * Save media metadata after successful direct upload to Cloudinary.
    */
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(Role.ADMIN, Role.EDITOR)
   @Post()
   create(@Body() dto: CreateMediaDto) {
     return this.mediaService.create(dto);
   }
 
   /**
-   * Update media metadata (alt, type, width, height, custom metadata).
+   * Update media metadata.
    */
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(Role.ADMIN, Role.EDITOR)
   @Put(':id')
   update(@Param('id') id: string, @Body() dto: UpdateMediaDto) {
     return this.mediaService.update(id, dto);
@@ -94,10 +105,10 @@ export class MediaController {
 
   /**
    * Safely deletes media.
-   * If media is in use by any page, element, cover, or audio track, halts deletion
-   * and returns 409 Conflict with full references list.
-   * Pass ?force=true to override and delete regardless of references.
+   * If media is in use, rejects with 409 Conflict unless force=true.
    */
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(Role.ADMIN)
   @Delete(':id')
   remove(
     @Param('id') id: string,

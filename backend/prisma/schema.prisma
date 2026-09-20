@@ -50,7 +50,7 @@ model User {
   email        String        @unique
   passwordHash String
   name         String
-  role         Role          @default(ADMIN)
+  role         Role          @default(VIEWER)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   books        Book[]        @relation("UserBooks")
@@ -71,6 +71,7 @@ model Book {
   proposalQuote     String?       @default("Thế cậu đồng ý làm bạn gái tớ không?")
   cover             Json          // { front: { backgroundUrl, title, titleFont, counterBadge, elements }, back: { insideBackgroundUrl, outsideBackgroundUrl, elements } }
   settings          Json          // { dimensions: { pageWidth, pageHeight, canvasResolution }, camera: { fov, distance }, theme: { ... }, atmospheric: { ... } }
+  contentRevision   Int           @default(1) @map("content_revision")
   backgroundMusicId String?       @map("background_music_id")
   backgroundMusic   AudioTrack?   @relation("BookBackgroundMusic", fields: [backgroundMusicId], references: [id], onDelete: SetNull)
   ownerId           String?

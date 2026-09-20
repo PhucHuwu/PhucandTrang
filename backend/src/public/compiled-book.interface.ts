@@ -10,7 +10,8 @@ export interface CompiledElement {
   id: string;
   type: 'TEXT' | 'IMAGE' | 'VIDEO' | 'SHAPE' | 'DECORATION';
   slot: string | null;
-  zIndex: number;
+  order: number;
+  zIndex: number; // SINGLE SOURCE OF TRUTH
   opacity: number;
   transform: {
     x: number;
@@ -19,7 +20,6 @@ export interface CompiledElement {
     height: number;
     rotation: number;
     scale: number;
-    zIndex: number;
   };
   style: Record<string, any> | null;
   data: Record<string, any>;
@@ -39,9 +39,10 @@ export interface CompiledElement {
 
 export interface CompiledPage {
   id: string;
+  order: number;
+  displayPageNumber: number;
   pageNumber: number;
   side: 'left' | 'right';
-  order: number;
   chapter: string | null;
   title: string | null;
   quote: string | null;
@@ -53,6 +54,9 @@ export interface CompiledPage {
     imageUrl?: string;
     color?: string;
     opacity?: number;
+    objectFit?: string;
+    focalPoint?: { x: number; y: number };
+    gradient?: any;
     headerFade?: {
       enabled: boolean;
       color: string;
@@ -89,6 +93,7 @@ export interface CompiledBookDocument {
   slug: string;
   title: string;
   description: string | null;
+  contentRevision: number;
   couple: {
     he: string;
     she: string;
@@ -98,6 +103,7 @@ export interface CompiledBookDocument {
   cover: {
     front: {
       backgroundUrl: string;
+      mediaId?: string;
       title: string;
       titleFont?: string;
       counterBadge?: {
@@ -105,10 +111,14 @@ export interface CompiledBookDocument {
         startDate: string;
         subtitle: string;
       };
+      elements?: CompiledElement[];
     };
     back: {
       insideBackgroundUrl: string;
+      insideMediaId?: string;
       outsideBackgroundUrl: string;
+      outsideMediaId?: string;
+      elements?: CompiledElement[];
     };
   };
   audio: {

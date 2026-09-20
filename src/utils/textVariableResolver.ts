@@ -7,6 +7,7 @@
  * Security & Reliability:
  * - Completely eval-free using pure Regex tokenization
  * - Strict prototype-pollution safeguards against __proto__, constructor, and prototype
+ * - Timezone-safe deterministic day calculation
  * - Fail-safe: Missing or invalid variables will never throw or crash the canvas renderer
  * - Extensible: Supports custom variable handlers and filters
  */
@@ -51,40 +52,69 @@ const FORBIDDEN_KEYS = new Set([
   '__lookupSetter__',
 ]);
 
+export function parseDateParts(
+  dateInput?: string | Date | null
+): { year: number; month: number; day: number } | null {
+  if (!dateInput) return null;
+  if (dateInput instanceof Date) {
+    if (isNaN(dateInput.getTime())) return null;
+    return {
+      year: dateInput.getFullYear(),
+      month: dateInput.getMonth() + 1,
+      day: dateInput.getDate(),
+    };
+  }
+  if (typeof dateInput === 'string') {
+    const isoMatch = dateInput.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);
+    if (isoMatch) {
+      return {
+        year: parseInt(isoMatch[1], 10),
+        month: parseInt(isoMatch[2], 10),
+        day: parseInt(isoMatch[3], 10),
+      };
+    }
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return null;
+    return {
+      year: d.getFullYear(),
+      month: d.getMonth() + 1,
+      day: d.getDate(),
+    };
+  }
+  return null;
+}
+
 /**
  * Format a Date or date string to Vietnamese friendly DD.MM.YYYY
  */
 export function formatLoveDate(dateInput?: string | Date | null): string {
-  if (!dateInput) return '';
-  const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
-  if (isNaN(d.getTime())) return String(dateInput);
-
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  return `${day}.${month}.${year}`;
+  const parts = parseDateParts(dateInput);
+  if (!parts) return '';
+  const day = String(parts.day).padStart(2, '0');
+  const month = String(parts.month).padStart(2, '0');
+  return `${day}.${month}.${parts.year}`;
 }
 
 /**
- * Calculates total elapsed days from anniversary date until today
+ * Calculates total elapsed days from anniversary date until reference date.
+ * Deterministic and timezone-safe by comparing calendar day UTC midnights.
  */
 export function calculateDaysTogether(
   anniversaryInput?: string | Date | null,
   referenceDate: Date = new Date()
 ): number {
-  if (!anniversaryInput) {
-    // Default fallback anniversary date if none specified
-    anniversaryInput = '2022-10-20T00:00:00';
-  }
+  const parts = anniversaryInput
+    ? parseDateParts(anniversaryInput)
+    : { year: 2022, month: 10, day: 20 };
+  if (!parts) return 0;
 
-  const start =
-    typeof anniversaryInput === 'string'
-      ? new Date(anniversaryInput).getTime()
-      : anniversaryInput.getTime();
+  const refParts = parseDateParts(referenceDate);
+  if (!refParts) return 0;
 
-  if (isNaN(start)) return 0;
+  const startUtc = Date.UTC(parts.year, parts.month - 1, parts.day);
+  const refUtc = Date.UTC(refParts.year, refParts.month - 1, refParts.day);
 
-  const diffMs = referenceDate.getTime() - start;
+  const diffMs = refUtc - startUtc;
   return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 }
 
@@ -121,7 +151,6 @@ export class TextVariableResolver {
   private static filters = new Map<string, TextFilter>();
 
   static {
-    // Register built-in text filters
     this.registerFilter('uppercase', (val) => String(val ?? '').toUpperCase());
     this.registerFilter('lowercase', (val) => String(val ?? '').toLowerCase());
     this.registerFilter('number', (val) => {
@@ -131,27 +160,16 @@ export class TextVariableResolver {
     this.registerFilter('date', (val) => formatLoveDate(val));
   }
 
-  /**
-   * Register a custom variable resolver function
-   * e.g. TextVariableResolver.registerVariable('countdown', (ctx) => '...')
-   */
   static registerVariable(key: string, handler: CustomVariableHandler): void {
     if (!key || FORBIDDEN_KEYS.has(key)) return;
     this.customVariables.set(key, handler);
   }
 
-  /**
-   * Register a custom formatting filter
-   * e.g. TextVariableResolver.registerFilter('bold', (val) => `**${val}**`)
-   */
   static registerFilter(name: string, filter: TextFilter): void {
     if (!name || FORBIDDEN_KEYS.has(name)) return;
     this.filters.set(name.toLowerCase(), filter);
   }
 
-  /**
-   * Builds a normalized VariableContext with intelligent defaults
-   */
   static createContext(options?: {
     book?: any;
     page?: any;
@@ -165,7 +183,7 @@ export class TextVariableResolver {
       book.couple?.anniversaryDate ||
       book.anniversaryDate ||
       extra.anniversaryDate ||
-      '2022-10-20T00:00:00';
+      '2022-10-20';
 
     const daysCount = calculateDaysTogether(rawAnniversary);
 
@@ -197,22 +215,11 @@ export class TextVariableResolver {
     return context;
   }
 
-  /**
-   * Resolves all {{variable}} patterns within a string.
-   * Never throws exceptions even if context or variables are null/undefined.
-   *
-   * Supported formats:
-   * - {{variableName}}
-   * - {{object.property}}
-   * - {{variableName | filter}} (e.g. {{daysTogether | number}})
-   */
   static resolve(text: string, context?: VariableContext): string {
     if (!text || typeof text !== 'string') return text ?? '';
     if (!text.includes('{{')) return text;
 
     const ctx = context || this.createContext();
-
-    // Regex matching {{ variable }} or {{ variable | filter }}
     const pattern = /\{\{\s*([a-zA-Z0-9_.]+)(?:\s*\|\s*([a-zA-Z0-9_]+))?\s*\}\}/g;
 
     try {
@@ -220,32 +227,23 @@ export class TextVariableResolver {
         try {
           let resolvedValue: any;
 
-          // 1. Check custom registered variables first
           if (this.customVariables.has(path)) {
             const handler = this.customVariables.get(path)!;
             resolvedValue = handler(ctx);
-          }
-          // 2. Direct top-level check in context
-          else if (Object.prototype.hasOwnProperty.call(ctx, path)) {
+          } else if (Object.prototype.hasOwnProperty.call(ctx, path)) {
             resolvedValue = ctx[path];
-          }
-          // 3. Dot-separated path lookup (e.g. couple.he, book.title)
-          else if (path.includes('.')) {
+          } else if (path.includes('.')) {
             resolvedValue = safeGetPath(ctx, path);
-          }
-          // 4. Special built-in shortcuts
-          else if (path === 'he' && ctx.couple?.he) {
+          } else if (path === 'he' && ctx.couple?.he) {
             resolvedValue = ctx.couple.he;
           } else if (path === 'she' && ctx.couple?.she) {
             resolvedValue = ctx.couple.she;
           }
 
-          // If variable not found, preserve original match to avoid destroying text
           if (resolvedValue === undefined || resolvedValue === null) {
             return match;
           }
 
-          // Apply optional filter if present
           if (filterName) {
             const filter = this.filters.get(filterName.toLowerCase());
             if (filter) {
@@ -255,28 +253,20 @@ export class TextVariableResolver {
 
           return String(resolvedValue);
         } catch {
-          // Safeguard individual tag resolution
           return match;
         }
       });
     } catch {
-      // General safeguard: return raw text if regex replace somehow fails
       return text;
     }
   }
 
-  /**
-   * Resolves an array of text lines (used in multi-line quotes and paragraphs)
-   */
   static resolveLines(lines: string[], context?: VariableContext): string[] {
     if (!Array.isArray(lines)) return [];
     return lines.map((line) => this.resolve(line, context));
   }
 }
 
-/**
- * Functional convenience wrappers
- */
 export function resolveTextVariables(
   text: string,
   context?: VariableContext

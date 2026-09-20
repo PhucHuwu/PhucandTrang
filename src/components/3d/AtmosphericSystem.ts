@@ -22,14 +22,29 @@ export class AtmosphericSystem {
   petals: THREE.Group | null = null;
   butterflies: ButterflyEntity[] = [];
   butterflyCount = 12;
+  private configuredButterflyCount?: number;
+  private configuredPetalCount?: number;
+  private configuredDustCount?: number;
   private compact = typeof window !== 'undefined' && window.innerWidth < 768;
   private reducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   private lastTime: number | undefined;
   private motionTime = 0;
 
-  constructor(scene: THREE.Scene) {
+  constructor(
+    scene: THREE.Scene,
+    options?: {
+      butterflyCount?: number;
+      petalCount?: number;
+      dustCount?: number;
+    }
+  ) {
     this.scene = scene;
-    this.butterflyCount = this.compact ? 6 : 12;
+    this.configuredButterflyCount = options?.butterflyCount;
+    this.configuredPetalCount = options?.petalCount;
+    this.configuredDustCount = options?.dustCount;
+
+    this.butterflyCount =
+      this.configuredButterflyCount ?? (this.compact ? 6 : 12);
     this.initDust();
     this.initPetals();
     this.initButterflies();
@@ -37,7 +52,7 @@ export class AtmosphericSystem {
 
   // 1. Magic Golden & Pink Fairy Dust
   initDust() {
-    const count = this.compact ? 35 : 90;
+    const count = this.configuredDustCount ?? (this.compact ? 35 : 90);
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
@@ -95,7 +110,7 @@ export class AtmosphericSystem {
   // 2. Realistic Organic Curved Rose & Cherry Blossom Petals
   initPetals() {
     this.petals = new THREE.Group();
-    const petalCount = this.compact ? 16 : 34;
+    const petalCount = this.configuredPetalCount ?? (this.compact ? 16 : 34);
 
     // Build real organic teardrop / cherry blossom petal curve with subtle notch
     const petalShape = new THREE.Shape();

@@ -275,7 +275,12 @@ export const PHUC_AND_TRANG_BOOK: Book = {
       backgroundUrl: getMediaUrl('backgrounds/page-7.jpg'),
       media: [
         { src: getMediaUrl('02-12-2023_3.jpg'), caption: '02.12.2023' },
-        { src: getMediaUrl('26-06-2323_thumb.jpg'), caption: '26.06 • Video kỷ niệm', isVideo: true },
+        {
+          src: getMediaUrl('26-06-2323.mp4'),
+          thumbnailUrl: getMediaUrl('26-06-2323_thumb.jpg'),
+          caption: '26.06 • Video kỷ niệm',
+          isVideo: true,
+        },
       ],
     }),
 
@@ -296,7 +301,12 @@ export const PHUC_AND_TRANG_BOOK: Book = {
         { src: getMediaUrl('Brithdate-together-25-05-2024_2.jpg'), caption: '25.05.2024' },
         { src: getMediaUrl('Brithdate-together-25-05-2024_3.jpg'), caption: '25.05.2024' },
         { src: getMediaUrl('Brithdate-together-25-05-2024_4.jpg'), caption: '25.05.2024' },
-        { src: getMediaUrl('Brithdate-together-25-05-2024_thumb.jpg'), caption: '25.05.2024', isVideo: true },
+        {
+          src: getMediaUrl('Brithdate-together-25-05-2024.mp4'),
+          thumbnailUrl: getMediaUrl('Brithdate-together-25-05-2024_thumb.jpg'),
+          caption: '25.05.2024',
+          isVideo: true,
+        },
       ],
     }),
 
@@ -351,7 +361,12 @@ export const PHUC_AND_TRANG_BOOK: Book = {
       backgroundUrl: getMediaUrl('backgrounds/page-11.jpg'),
       media: [
         { src: getMediaUrl('17-01-2025_5.jpg'), caption: '17.01.2025 • Hồn nhiên' },
-        { src: getMediaUrl('17-01-2025_thumb.jpg'), caption: 'Video 17.01.2025', isVideo: true },
+        {
+          src: getMediaUrl('17-01-2025.mp4'),
+          thumbnailUrl: getMediaUrl('17-01-2025_thumb.jpg'),
+          caption: 'Video 17.01.2025',
+          isVideo: true,
+        },
       ],
     }),
 

@@ -97,7 +97,7 @@ describe('MediaService', () => {
       updatedAt: new Date(),
     };
 
-    it('should detect when media is referenced by a Page Element', async () => {
+    it('should detect when media is referenced by PageElement data.src or data.mediaId', async () => {
       prisma.media.findUnique.mockResolvedValue(mockMedia);
       prisma.book.findMany.mockResolvedValue([]);
       prisma.page.findMany.mockResolvedValue([]);
@@ -106,9 +106,10 @@ describe('MediaService', () => {
         {
           id: 'elem-1',
           type: 'IMAGE',
-          slot: 'hero-image',
+          slot: 'primaryImage',
           pageId: 'page-1',
-          data: { url: mockMedia.url },
+          zIndex: 10,
+          data: { src: mockMedia.url, mediaId: mockMedia.id },
           page: {
             pageNumber: 1,
             bookId: 'book-1',
@@ -133,9 +134,10 @@ describe('MediaService', () => {
         {
           id: 'elem-1',
           type: 'IMAGE',
-          slot: 'hero-image',
+          slot: 'primaryImage',
           pageId: 'page-1',
-          data: { url: mockMedia.url },
+          zIndex: 10,
+          data: { src: mockMedia.url, mediaId: mockMedia.id },
           page: {
             pageNumber: 1,
             bookId: 'book-1',
@@ -159,9 +161,10 @@ describe('MediaService', () => {
         {
           id: 'elem-1',
           type: 'IMAGE',
-          slot: 'hero-image',
+          slot: 'primaryImage',
           pageId: 'page-1',
-          data: { url: mockMedia.url },
+          zIndex: 10,
+          data: { src: mockMedia.url, mediaId: mockMedia.id },
           page: {
             pageNumber: 1,
             bookId: 'book-1',

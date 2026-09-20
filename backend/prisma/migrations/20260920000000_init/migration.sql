@@ -25,7 +25,7 @@ CREATE TABLE "users" (
     "email" TEXT NOT NULL,
     "passwordHash" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "role" "Role" NOT NULL DEFAULT 'ADMIN',
+    "role" "Role" NOT NULL DEFAULT 'VIEWER',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -45,6 +45,7 @@ CREATE TABLE "books" (
     "proposalQuote" TEXT DEFAULT 'Thế cậu đồng ý làm bạn gái tớ không?',
     "cover" JSONB NOT NULL,
     "settings" JSONB NOT NULL,
+    "content_revision" INTEGER NOT NULL DEFAULT 1,
     "background_music_id" TEXT,
     "ownerId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

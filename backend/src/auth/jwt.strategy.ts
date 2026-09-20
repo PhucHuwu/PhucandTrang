@@ -6,10 +6,19 @@ import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(config: ConfigService) {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const secret = config.get<string>('JWT_SECRET');
+
+    if (isProduction && (!secret || secret.includes('super_secret_romantic_jwt_key'))) {
+      throw new Error(
+        'FATAL SECURITY ERROR: JWT_SECRET environment variable must be properly set in production mode!',
+      );
+    }
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: config.get<string>('JWT_SECRET') || 'phuc_and_trang_super_secret_romantic_jwt_key_20221020',
+      secretOrKey: secret || 'phuc_and_trang_super_secret_romantic_jwt_key_20221020',
     });
   }
 

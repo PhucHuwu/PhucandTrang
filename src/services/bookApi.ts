@@ -17,24 +17,27 @@ export interface FetchBookResult {
  * Fetches the compiled published book document from the NestJS Backend API.
  * Endpoint: GET /public/books/:slug
  * 
- * Resilience Features:
- * - 3.5s timeout abort controller (avoids freezing UI if local backend is not started).
- * - Graceful fallback to local data (PHUC_AND_TRANG_BOOK) when backend is offline or returns error.
- * - Normalized mapping matching PageTextureGenerator & Flipbook requirements.
+ * Rules:
+ * - In Development: Fallback to local PHUC_AND_TRANG_BOOK if backend is not started.
+ * - In Production: Do NOT silently fallback to hardcoded mock data unless NEXT_PUBLIC_ENABLE_LOCAL_BOOK_FALLBACK=true.
+ * - Null audio from API is respected: audio is null, no playback occurs.
  */
 export async function fetchPublishedBook(
   slug: string = 'phuc-and-trang'
 ): Promise<FetchBookResult> {
   const url = `${API_BASE_URL}/public/books/${slug}`;
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  const allowFallback =
+    process.env.NEXT_PUBLIC_ENABLE_LOCAL_BOOK_FALLBACK === 'true' || isDevelopment;
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
 
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json',
+        Accept: 'application/json',
       },
       signal: controller.signal,
     });
@@ -43,6 +46,10 @@ export async function fetchPublishedBook(
 
     if (response.ok) {
       const data = await response.json();
+
+      // Audio contract: preserve null if API returned null (do not overwrite with fallback)
+      const resolvedAudio = data.audio !== undefined ? data.audio : null;
+
       // Map API CompiledBookDocument into Book model
       const book: Book = {
         id: data.id,
@@ -50,35 +57,51 @@ export async function fetchPublishedBook(
         slug: data.slug,
         description: data.description,
         version: data.version || '2.0.0',
+        contentRevision: data.contentRevision || 1,
         couple: data.couple,
         cover: data.cover,
-        backgroundMusicId: data.audio?.id || data.backgroundMusicId || PHUC_AND_TRANG_BOOK.backgroundMusicId,
-        audio: data.audio || PHUC_AND_TRANG_BOOK.audio,
+        backgroundMusicId: resolvedAudio?.id || null,
+        audio: resolvedAudio,
         settings: data.settings || PHUC_AND_TRANG_BOOK.settings,
         pages: (data.pages || []).map((p: any) => ({
           ...p,
-          audioTrackId: p.audio?.id || p.audioTrackId,
-          audio: p.audio || null,
+          audioTrackId: p.audio?.id || null,
+          audio: p.audio !== undefined ? p.audio : null,
         })),
       };
 
-      console.log(`[BookAPI] Successfully loaded book "${slug}" from backend API (${book.pages.length} pages).`);
+      console.log(
+        `[BookAPI] Successfully loaded book "${slug}" from backend API (revision: ${book.contentRevision}, ${book.pages.length} pages).`
+      );
       return { book, source: 'api' };
     } else {
-      console.warn(`[BookAPI] Backend returned status ${response.status} for "${slug}". Falling back to local data.`);
+      const errorMsg = `Backend API returned status ${response.status}`;
+      console.warn(`[BookAPI] ${errorMsg}`);
+
+      if (allowFallback) {
+        console.info('[BookAPI] Using local fallback story data for development.');
+        return {
+          book: PHUC_AND_TRANG_BOOK,
+          source: 'fallback',
+          error: errorMsg,
+        };
+      }
+
+      throw new Error(errorMsg);
+    }
+  } catch (error: any) {
+    const message =
+      error.name === 'AbortError' ? 'Connection to Backend timed out' : error.message;
+
+    if (allowFallback) {
+      console.info(`[BookAPI] Backend unavailable (${message}). Using local fallback story data.`);
       return {
         book: PHUC_AND_TRANG_BOOK,
         source: 'fallback',
-        error: `HTTP ${response.status}`,
+        error: message,
       };
     }
-  } catch (error: any) {
-    const message = error.name === 'AbortError' ? 'Connection timed out' : error.message;
-    console.info(`[BookAPI] Backend unavailable (${message}). Using local fallback story data.`);
-    return {
-      book: PHUC_AND_TRANG_BOOK,
-      source: 'fallback',
-      error: message,
-    };
+
+    throw new Error(`Failed to load published book: ${message}`);
   }
 }

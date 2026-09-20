@@ -4,13 +4,18 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { BookStatus } from '@prisma/client';
 import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
-import { BookStatus } from '@prisma/client';
+import { PublicCacheService } from '../public/public-cache.service';
+import { safeDeepMerge } from '../utils/safe-merge';
 
 @Injectable()
 export class BooksService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cacheService: PublicCacheService,
+  ) {}
 
   async findAll() {
     return this.prisma.book.findMany({
@@ -70,7 +75,7 @@ export class BooksService {
 
     const backgroundMusicId = dto.backgroundMusicId ?? dto.audioTrackId;
 
-    return this.prisma.book.create({
+    const book = await this.prisma.book.create({
       data: {
         slug: dto.slug,
         title: dto.title,
@@ -91,12 +96,15 @@ export class BooksService {
         backgroundMusic: true,
       },
     });
+
+    await this.cacheService.touchBook(book.id);
+    return book;
   }
 
-  async update(id: string, dto: UpdateBookDto) {
-    await this.findOne(id);
+  async update(id: string, dto: UpdateBookDto, isPatch: boolean = false) {
+    const existingBook = await this.findOne(id);
 
-    if (dto.slug) {
+    if (dto.slug && dto.slug !== existingBook.slug) {
       const existing = await this.prisma.book.findFirst({
         where: {
           slug: dto.slug,
@@ -110,7 +118,16 @@ export class BooksService {
 
     const backgroundMusicId = dto.backgroundMusicId ?? dto.audioTrackId;
 
-    return this.prisma.book.update({
+    // Safe merge for partial JSON objects if PATCH
+    const cover = isPatch && dto.cover
+      ? safeDeepMerge(existingBook.cover as any, dto.cover)
+      : dto.cover;
+
+    const settings = isPatch && dto.settings
+      ? safeDeepMerge(existingBook.settings as any, dto.settings)
+      : dto.settings;
+
+    const updated = await this.prisma.book.update({
       where: { id },
       data: {
         ...(dto.slug ? { slug: dto.slug } : {}),
@@ -121,26 +138,34 @@ export class BooksService {
         ...(dto.sheName !== undefined ? { sheName: dto.sheName } : {}),
         ...(dto.anniversaryDate ? { anniversaryDate: new Date(dto.anniversaryDate) } : {}),
         ...(dto.proposalQuote !== undefined ? { proposalQuote: dto.proposalQuote } : {}),
-        ...(dto.cover !== undefined ? { cover: dto.cover } : {}),
-        ...(dto.settings !== undefined ? { settings: dto.settings } : {}),
+        ...(cover !== undefined ? { cover } : {}),
+        ...(settings !== undefined ? { settings } : {}),
         ...(backgroundMusicId !== undefined ? { backgroundMusicId } : {}),
       },
       include: {
         backgroundMusic: true,
       },
     });
+
+    await this.cacheService.touchBook(id);
+    return updated;
   }
 
   async remove(id: string) {
-    await this.findOne(id);
-    return this.prisma.book.delete({ where: { id } });
+    const book = await this.findOne(id);
+    const result = await this.prisma.book.delete({ where: { id } });
+    this.cacheService.invalidate(book.slug);
+    this.cacheService.invalidate(id);
+    return result;
   }
 
   async updateStatus(id: string, status: BookStatus) {
     await this.findOne(id);
-    return this.prisma.book.update({
+    const updated = await this.prisma.book.update({
       where: { id },
       data: { status },
     });
+    await this.cacheService.touchBook(id);
+    return updated;
   }
 }

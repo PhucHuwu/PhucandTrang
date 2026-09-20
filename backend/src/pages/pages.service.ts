@@ -7,12 +7,16 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreatePageDto } from './dto/create-page.dto';
 import { UpdatePageDto } from './dto/update-page.dto';
 import { ReorderPagesDto } from './dto/reorder-pages.dto';
-import { DuplicatePageDto } from './dto/duplicate-page.dto';
-import { BatchUpdateElementsDto } from '../page-elements/dto/batch-update-elements.dto';
+import { PublicCacheService } from '../public/public-cache.service';
+import { derivePageSideEnum } from '../utils/page-utils';
+import { safeDeepMerge } from '../utils/safe-merge';
 
 @Injectable()
 export class PagesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cacheService: PublicCacheService,
+  ) {}
 
   async findByBook(bookId: string) {
     const book = await this.prisma.book.findUnique({ where: { id: bookId } });
@@ -25,7 +29,7 @@ export class PagesService {
         layoutTemplate: true,
         audioTrack: true,
       },
-      orderBy: { pageNumber: 'asc' },
+      orderBy: { order: 'asc' },
     });
   }
 
@@ -46,7 +50,6 @@ export class PagesService {
     const book = await this.prisma.book.findUnique({ where: { id: dto.bookId } });
     if (!book) throw new NotFoundException(`Book not found: ${dto.bookId}`);
 
-    // Check if pageNumber is already used in this book
     const existing = await this.prisma.page.findUnique({
       where: {
         bookId_pageNumber: {
@@ -61,12 +64,15 @@ export class PagesService {
       );
     }
 
-    return this.prisma.page.create({
+    const order = dto.order !== undefined ? dto.order : dto.pageNumber;
+    const derivedSide = derivePageSideEnum(order);
+
+    const page = await this.prisma.page.create({
       data: {
         bookId: dto.bookId,
         pageNumber: dto.pageNumber,
-        side: dto.side || (dto.pageNumber % 2 === 0 ? 'LEFT' : 'RIGHT'),
-        order: dto.order !== undefined ? dto.order : dto.pageNumber,
+        side: dto.side || derivedSide,
+        order,
         chapter: dto.chapter,
         title: dto.title,
         quote: dto.quote,
@@ -84,9 +90,12 @@ export class PagesService {
         audioTrack: true,
       },
     });
+
+    await this.cacheService.touchBook(dto.bookId);
+    return page;
   }
 
-  async update(id: string, dto: UpdatePageDto) {
+  async update(id: string, dto: UpdatePageDto, isPatch: boolean = false) {
     const page = await this.findOne(id);
 
     if (dto.pageNumber !== undefined && dto.pageNumber !== page.pageNumber) {
@@ -105,11 +114,18 @@ export class PagesService {
       }
     }
 
-    return this.prisma.page.update({
+    const targetOrder = dto.order !== undefined ? dto.order : page.order;
+    const derivedSide = derivePageSideEnum(targetOrder);
+
+    const background = isPatch && dto.background
+      ? safeDeepMerge(page.background as any, dto.background)
+      : dto.background;
+
+    const updated = await this.prisma.page.update({
       where: { id },
       data: {
         ...(dto.pageNumber !== undefined ? { pageNumber: dto.pageNumber } : {}),
-        ...(dto.side !== undefined ? { side: dto.side } : {}),
+        ...(dto.side !== undefined ? { side: dto.side } : { side: derivedSide }),
         ...(dto.order !== undefined ? { order: dto.order } : {}),
         ...(dto.chapter !== undefined ? { chapter: dto.chapter } : {}),
         ...(dto.title !== undefined ? { title: dto.title } : {}),
@@ -119,7 +135,7 @@ export class PagesService {
         ...(dto.layoutMode !== undefined ? { layoutMode: dto.layoutMode } : {}),
         ...(dto.sourceTemplateId !== undefined ? { sourceTemplateId: dto.sourceTemplateId } : {}),
         ...(dto.isCustomized !== undefined ? { isCustomized: dto.isCustomized } : {}),
-        ...(dto.background !== undefined ? { background: dto.background } : {}),
+        ...(background !== undefined ? { background } : {}),
         ...(dto.audioTrackId !== undefined ? { audioTrackId: dto.audioTrackId } : {}),
       },
       include: {
@@ -128,30 +144,34 @@ export class PagesService {
         audioTrack: true,
       },
     });
+
+    await this.cacheService.touchBook(page.bookId);
+    return updated;
   }
 
-  async duplicate(id: string, dto?: DuplicatePageDto) {
+  async duplicate(id: string, targetPageNumber?: number) {
     const original = await this.findOne(id);
 
-    // Determine target pageNumber
-    let targetPageNum = dto?.targetPageNumber;
+    let targetPageNum = targetPageNumber;
     if (targetPageNum === undefined) {
       const maxPage = await this.prisma.page.findFirst({
         where: { bookId: original.bookId },
         orderBy: { pageNumber: 'desc' },
-        select: { pageNumber: true, order: true },
+        select: { pageNumber: true },
       });
-      targetPageNum = (maxPage?.pageNumber ?? 0) + 1;
+      targetPageNum = (maxPage?.pageNumber ?? original.pageNumber) + 1;
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      // 1. Create duplicate page
+    const targetOrder = targetPageNum;
+    const derivedSide = derivePageSideEnum(targetOrder);
+
+    const duplicated = await this.prisma.$transaction(async (tx) => {
       const newPage = await tx.page.create({
         data: {
           bookId: original.bookId,
           pageNumber: targetPageNum,
-          side: targetPageNum % 2 === 0 ? 'LEFT' : 'RIGHT',
-          order: targetPageNum,
+          side: derivedSide,
+          order: targetOrder,
           chapter: original.chapter ? `${original.chapter} (Bản sao)` : undefined,
           title: original.title ? `${original.title} (Copy)` : undefined,
           quote: original.quote,
@@ -186,12 +206,15 @@ export class PagesService {
 
       return newPage;
     });
+
+    await this.cacheService.touchBook(original.bookId);
+    return duplicated;
   }
 
   async remove(id: string) {
-    await this.findOne(id);
-    // Elements cascade delete automatically via schema: onDelete: Cascade
+    const page = await this.findOne(id);
     await this.prisma.page.delete({ where: { id } });
+    await this.cacheService.touchBook(page.bookId);
     return { success: true, message: `Đã xóa trang ${id} cùng tất cả element liên quan` };
   }
 
@@ -199,64 +222,38 @@ export class PagesService {
     const book = await this.prisma.book.findUnique({ where: { id: bookId } });
     if (!book) throw new NotFoundException(`Book not found: ${bookId}`);
 
-    // Update in transaction to avoid unique constraint conflict on (bookId, pageNumber)
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // Step 1: Temporarily set pageNumbers to negative values to evade unique constraint
       for (let i = 0; i < dto.items.length; i++) {
         await tx.page.update({
           where: { id: dto.items[i].id },
-          data: { pageNumber: -(i + 1000) },
+          data: { pageNumber: -(i + 1) * 1000 },
         });
       }
 
-      // Step 2: Apply target pageNumber and order
-      const results = [];
-      for (const item of dto.items) {
+      // Step 2: Assign final page numbers, orders, and derived sides
+      const updatedList = [];
+      for (let i = 0; i < dto.items.length; i++) {
+        const item = dto.items[i];
+        const newOrder = i;
+        const derivedSide = derivePageSideEnum(newOrder);
+
         const updated = await tx.page.update({
           where: { id: item.id },
           data: {
-            order: item.order,
-            pageNumber: item.pageNumber,
-            ...(item.side ? { side: item.side } : { side: item.pageNumber % 2 === 0 ? 'LEFT' : 'RIGHT' }),
+            pageNumber: item.pageNumber !== undefined ? item.pageNumber : i,
+            order: newOrder,
+            side: derivedSide,
           },
+          select: { id: true, pageNumber: true, order: true, side: true, title: true },
         });
-        results.push(updated);
+        updatedList.push(updated);
       }
 
-      return results;
+      return updatedList;
     });
-  }
 
-  async batchUpdateElements(pageId: string, dto: BatchUpdateElementsDto) {
-    await this.findOne(pageId);
-
-    return this.prisma.$transaction(async (tx) => {
-      const results = [];
-      for (const item of dto.elements) {
-        const updated = await tx.pageElement.update({
-          where: { id: item.id },
-          data: {
-            ...(item.transform !== undefined ? { transform: item.transform } : {}),
-            ...(item.style !== undefined ? { style: item.style } : {}),
-            ...(item.data !== undefined ? { data: item.data } : {}),
-            ...(item.interaction !== undefined ? { interaction: item.interaction } : {}),
-            ...(item.zIndex !== undefined ? { zIndex: item.zIndex } : {}),
-            ...(item.order !== undefined ? { order: item.order } : {}),
-            ...(item.visible !== undefined ? { visible: item.visible } : {}),
-            ...(item.locked !== undefined ? { locked: item.locked } : {}),
-            ...(item.opacity !== undefined ? { opacity: item.opacity } : {}),
-          },
-        });
-        results.push(updated);
-      }
-
-      // Mark page as customized
-      await tx.page.update({
-        where: { id: pageId },
-        data: { isCustomized: true },
-      });
-
-      return results;
-    });
+    await this.cacheService.touchBook(bookId);
+    return result;
   }
 }

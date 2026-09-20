@@ -1,7 +1,10 @@
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
 export class AuthService {
@@ -19,8 +22,8 @@ export class AuthService {
     return null;
   }
 
-  async login(email: string, pass: string) {
-    const user = await this.validateUser(email, pass);
+  async login(dto: LoginDto) {
+    const user = await this.validateUser(dto.email, dto.pass);
     if (!user) {
       throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
     }
@@ -31,17 +34,19 @@ export class AuthService {
     };
   }
 
-  async register(email: string, pass: string, name: string) {
-    const existing = await this.prisma.user.findUnique({ where: { email } });
+  async register(dto: RegisterDto) {
+    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) {
       throw new ConflictException('Email này đã được sử dụng');
     }
-    const passwordHash = await bcrypt.hash(pass, 10);
+    const passwordHash = await bcrypt.hash(dto.pass, 10);
+    // Security enforcement: public registration always creates VIEWER role
     const user = await this.prisma.user.create({
       data: {
-        email,
+        email: dto.email,
         passwordHash,
-        name,
+        name: dto.name,
+        role: Role.VIEWER,
       },
       select: {
         id: true,

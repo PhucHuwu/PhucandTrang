@@ -5,10 +5,15 @@ import { UpdatePageElementDto } from './dto/update-page-element.dto';
 import { BatchUpdateElementsDto } from './dto/batch-update-elements.dto';
 import { ReorderElementsDto } from './dto/reorder-elements.dto';
 import { DuplicateElementDto } from './dto/duplicate-element.dto';
+import { PublicCacheService } from '../public/public-cache.service';
+import { safeDeepMerge } from '../utils/safe-merge';
 
 @Injectable()
 export class PageElementsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cacheService: PublicCacheService,
+  ) {}
 
   async findByPage(pageId: string) {
     const page = await this.prisma.page.findUnique({ where: { id: pageId } });
@@ -41,6 +46,9 @@ export class PageElementsService {
       zIndex = (maxEl?.zIndex ?? 0) + 1;
     }
 
+    // Clean transform: strip any accidental duplicate zIndex in transform object
+    const { zIndex: _ignore, ...cleanTransform } = (dto.transform as any) || {};
+
     const element = await this.prisma.pageElement.create({
       data: {
         pageId: dto.pageId,
@@ -51,7 +59,7 @@ export class PageElementsService {
         visible: dto.visible !== undefined ? dto.visible : true,
         locked: dto.locked !== undefined ? dto.locked : false,
         opacity: dto.opacity !== undefined ? dto.opacity : 1.0,
-        transform: dto.transform,
+        transform: cleanTransform,
         style: dto.style,
         data: dto.data,
         interaction: dto.interaction,
@@ -64,11 +72,33 @@ export class PageElementsService {
       data: { isCustomized: true },
     });
 
+    await this.cacheService.touchByPageId(dto.pageId);
     return element;
   }
 
-  async update(id: string, dto: UpdatePageElementDto) {
+  async update(id: string, dto: UpdatePageElementDto, isPatch: boolean = false) {
     const el = await this.findOne(id);
+
+    // Safe merge for partial JSON objects if PATCH
+    let transform = dto.transform;
+    if (dto.transform) {
+      const { zIndex: _ignore, ...cleanDtoTransform } = (dto.transform as any) || {};
+      transform = isPatch
+        ? safeDeepMerge(el.transform as any, cleanDtoTransform)
+        : cleanDtoTransform;
+    }
+
+    const style = isPatch && dto.style
+      ? safeDeepMerge((el.style as any) || {}, dto.style)
+      : dto.style;
+
+    const data = isPatch && dto.data
+      ? safeDeepMerge((el.data as any) || {}, dto.data)
+      : dto.data;
+
+    const interaction = isPatch && dto.interaction
+      ? safeDeepMerge((el.interaction as any) || {}, dto.interaction)
+      : dto.interaction;
 
     const updated = await this.prisma.pageElement.update({
       where: { id },
@@ -80,10 +110,10 @@ export class PageElementsService {
         ...(dto.visible !== undefined ? { visible: dto.visible } : {}),
         ...(dto.locked !== undefined ? { locked: dto.locked } : {}),
         ...(dto.opacity !== undefined ? { opacity: dto.opacity } : {}),
-        ...(dto.transform !== undefined ? { transform: dto.transform } : {}),
-        ...(dto.style !== undefined ? { style: dto.style } : {}),
-        ...(dto.data !== undefined ? { data: dto.data } : {}),
-        ...(dto.interaction !== undefined ? { interaction: dto.interaction } : {}),
+        ...(transform !== undefined ? { transform } : {}),
+        ...(style !== undefined ? { style } : {}),
+        ...(data !== undefined ? { data } : {}),
+        ...(interaction !== undefined ? { interaction } : {}),
       },
     });
 
@@ -93,6 +123,7 @@ export class PageElementsService {
       data: { isCustomized: true },
     });
 
+    await this.cacheService.touchByPageId(el.pageId);
     return updated;
   }
 
@@ -108,15 +139,22 @@ export class PageElementsService {
     const newZIndex = (maxEl?.zIndex ?? 0) + 1;
 
     // Offset coordinates slightly so duplicate is visibly distinct
-    const originalTransform = (original.transform as any) || { x: 0.1, y: 0.1, width: 0.3, height: 0.3, rotation: 0, scale: 1 };
+    const originalTransform = (original.transform as any) || {
+      x: 0.1,
+      y: 0.1,
+      width: 0.3,
+      height: 0.3,
+      rotation: 0,
+      scale: 1,
+    };
     const offsetX = dto?.offsetX !== undefined ? dto.offsetX : 0.02;
     const offsetY = dto?.offsetY !== undefined ? dto.offsetY : 0.02;
 
+    const { zIndex: _ignore, ...restTransform } = originalTransform;
     const duplicatedTransform = {
-      ...originalTransform,
+      ...restTransform,
       x: Math.min(0.95 - (originalTransform.width || 0.1), Math.max(0, originalTransform.x + offsetX)),
       y: Math.min(0.95 - (originalTransform.height || 0.1), Math.max(0, originalTransform.y + offsetY)),
-      zIndex: newZIndex,
     };
 
     const duplicate = await this.prisma.pageElement.create({
@@ -142,82 +180,100 @@ export class PageElementsService {
       data: { isCustomized: true },
     });
 
+    await this.cacheService.touchByPageId(original.pageId);
     return duplicate;
   }
 
   async remove(id: string) {
     const el = await this.findOne(id);
-    await this.prisma.pageElement.delete({ where: { id } });
+    const result = await this.prisma.pageElement.delete({ where: { id } });
 
-    // Mark parent page as customized
     await this.prisma.page.update({
       where: { id: el.pageId },
       data: { isCustomized: true },
     });
 
-    return { success: true, message: `Đã xóa element ${id}` };
+    await this.cacheService.touchByPageId(el.pageId);
+    return result;
   }
 
-  async reorderZIndex(pageId: string, dto: ReorderElementsDto) {
-    const page = await this.prisma.page.findUnique({ where: { id: pageId } });
-    if (!page) throw new NotFoundException(`Page not found: ${pageId}`);
-
-    const results = await this.prisma.$transaction(
-      dto.items.map((item) =>
-        this.prisma.pageElement.update({
-          where: { id: item.id },
-          data: {
-            zIndex: item.zIndex,
-            ...(item.order !== undefined ? { order: item.order } : { order: item.zIndex }),
-          },
-        }),
-      ),
-    );
-
-    // Mark parent page as customized
-    await this.prisma.page.update({
-      where: { id: pageId },
-      data: { isCustomized: true },
-    });
-
-    return results;
-  }
-
-  async batchUpdate(dto: BatchUpdateElementsDto) {
-    if (!dto.elements || dto.elements.length === 0) return [];
-
-    return this.prisma.$transaction(async (tx) => {
-      const results = [];
-      const touchedPageIds = new Set<string>();
-
-      for (const item of dto.elements) {
+  async reorderZIndex(dto: ReorderElementsDto) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updatedList = [];
+      for (const item of dto.items) {
         const updated = await tx.pageElement.update({
           where: { id: item.id },
           data: {
-            ...(item.transform !== undefined ? { transform: item.transform } : {}),
-            ...(item.style !== undefined ? { style: item.style } : {}),
-            ...(item.data !== undefined ? { data: item.data } : {}),
-            ...(item.interaction !== undefined ? { interaction: item.interaction } : {}),
+            zIndex: item.zIndex,
+            order: item.order !== undefined ? item.order : item.zIndex,
+          },
+          select: { id: true, zIndex: true, order: true, pageId: true },
+        });
+        updatedList.push(updated);
+      }
+      return updatedList;
+    });
+
+    if (result.length > 0) {
+      await this.cacheService.touchByPageId(result[0].pageId);
+    }
+
+    return result;
+  }
+
+  async batchUpdate(pageId: string, dto: BatchUpdateElementsDto) {
+    const page = await this.prisma.page.findUnique({ where: { id: pageId } });
+    if (!page) throw new NotFoundException(`Page not found: ${pageId}`);
+
+    const updatedElements = await this.prisma.$transaction(async (tx) => {
+      const results = [];
+      for (const item of dto.elements) {
+        const existing = await tx.pageElement.findUnique({ where: { id: item.id } });
+        if (!existing || existing.pageId !== pageId) {
+          continue;
+        }
+
+        const { zIndex: _ignore, ...cleanTransform } = (item.transform as any) || {};
+
+        const transform = item.transform
+          ? safeDeepMerge(existing.transform as any, cleanTransform)
+          : undefined;
+        const style = item.style
+          ? safeDeepMerge((existing.style as any) || {}, item.style)
+          : undefined;
+        const data = item.data
+          ? safeDeepMerge((existing.data as any) || {}, item.data)
+          : undefined;
+        const interaction = item.interaction
+          ? safeDeepMerge((existing.interaction as any) || {}, item.interaction)
+          : undefined;
+
+        const updated = await tx.pageElement.update({
+          where: { id: item.id },
+          data: {
             ...(item.zIndex !== undefined ? { zIndex: item.zIndex } : {}),
             ...(item.order !== undefined ? { order: item.order } : {}),
             ...(item.visible !== undefined ? { visible: item.visible } : {}),
             ...(item.locked !== undefined ? { locked: item.locked } : {}),
             ...(item.opacity !== undefined ? { opacity: item.opacity } : {}),
+            ...(transform !== undefined ? { transform } : {}),
+            ...(style !== undefined ? { style } : {}),
+            ...(data !== undefined ? { data } : {}),
+            ...(interaction !== undefined ? { interaction } : {}),
           },
         });
         results.push(updated);
-        touchedPageIds.add(updated.pageId);
       }
 
-      // Mark all touched pages as customized
-      for (const pageId of touchedPageIds) {
-        await tx.page.update({
-          where: { id: pageId },
-          data: { isCustomized: true },
-        });
-      }
+      await tx.page.update({
+        where: { id: pageId },
+        data: { isCustomized: true },
+      });
 
       return results;
     });
+
+    await this.cacheService.touchByPageId(pageId);
+    return updatedElements;
   }
 }

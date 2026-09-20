@@ -33,8 +33,8 @@ export interface ElementTransform {
   rotation: number;
   /** Scale multiplier. Default: 1.0 */
   scale: number;
-  /** Layer stacking index. Default: 1 */
-  zIndex: number;
+  /** @deprecated Use PageElement.zIndex instead. Kept for legacy normalization only */
+  zIndex?: number;
 }
 
 // ==========================================
@@ -149,9 +149,12 @@ export interface AudioTrack {
 
 export interface PageMediaItem {
   src: string;
+  thumbnailUrl?: string;
   caption?: string;
   isVideo?: boolean;
   aspectRatio?: number;
+  mediaId?: string;
+  posterMediaId?: string;
 }
 
 // ==========================================
@@ -216,22 +219,28 @@ export interface TextElementData {
 
 export interface ImageElementData {
   mediaId?: string;
-  src: string;
+  src?: string;
   alt?: string;
-  caption?: string;
+  objectFit?: 'cover' | 'contain' | 'fill';
+  focalPoint?: {
+    x: number; // 0.0 to 1.0
+    y: number; // 0.0 to 1.0
+  };
   aspectRatio?: number;
-  objectFit?: 'contain' | 'cover' | 'fill';
+  caption?: string; // legacy support: auto-migrated to independent TEXT element
 }
 
 export interface VideoElementData {
   mediaId?: string;
-  src: string;
-  thumbnailUrl: string;
-  caption?: string;
+  src?: string;
+  posterMediaId?: string;
+  thumbnailUrl?: string;
+  caption?: string; // legacy support
   aspectRatio?: number;
   duration?: number;
   muted?: boolean;
   autoPlay?: boolean;
+  loop?: boolean;
 }
 
 export interface ShapeElementData {
@@ -256,10 +265,12 @@ export interface BasePageElement<TType extends PageElementType, TData> {
   id: string;
   type: TType;
   slot?: string;
-  transform: ElementTransform;
+  order?: number;
+  zIndex: number; // SINGLE SOURCE OF TRUTH
   visible: boolean;
   locked: boolean;
   opacity: number; // 0.0 to 1.0
+  transform: ElementTransform;
   data: TData;
   style?: ElementStyle;
   interaction?: ElementInteraction;
@@ -300,11 +311,26 @@ export interface GutterFadeConfig {
   opacity: number;     // e.g. 0.28
 }
 
+export interface GradientStop {
+  offset: number; // 0.0 to 1.0
+  color: string;
+}
+
+export interface LinearGradientConfig {
+  type: 'linear';
+  angle: number; // in degrees, e.g. 180 (top to bottom)
+  stops: GradientStop[];
+}
+
 export interface PageBackground {
   type: 'color' | 'image' | 'gradient';
   color?: string;      // e.g. '#F9F5EC'
   imageUrl?: string;
+  mediaId?: string;
   opacity?: number;    // 0.0 to 1.0
+  objectFit?: 'cover' | 'contain' | 'fill';
+  focalPoint?: { x: number; y: number };
+  gradient?: LinearGradientConfig;
   headerFade?: HeaderFadeConfig;
   gutterFade?: GutterFadeConfig;
 }
@@ -313,6 +339,7 @@ export interface Page {
   id: string;
   /** Physical sequence in book: 0 for prologue, 1..N for leaves */
   pageNumber: number;
+  order?: number;
   /** Side in two-page spread: 'right' (front face) or 'left' (back face) */
   side: 'left' | 'right';
   chapter?: string;
@@ -328,7 +355,7 @@ export interface Page {
   /** True if any element was modified, repositioned, resized, added or deleted after applying template */
   isCustomized?: boolean;
   background: PageBackground;
-  audioTrackId?: string;
+  audioTrackId?: string | null;
   audio?: AudioTrack | null;
   elements: PageElement[];
   metadata?: PageMetadata;
@@ -412,9 +439,10 @@ export interface CoupleInfo {
 export interface BookCoverConfig {
   front: {
     backgroundUrl: string;
+    mediaId?: string;
     title: string;            // e.g. "Chúng Mình"
-    titleFont: string;        // e.g. "SVN-Housttely Signature"
-    counterBadge: {
+    titleFont?: string;        // e.g. "SVN-Housttely Signature"
+    counterBadge?: {
       enabled: boolean;
       startDate: string;      // "2022-10-20"
       subtitle: string;       // "Bên nhau từ ngày 20.10.2022"
@@ -423,7 +451,9 @@ export interface BookCoverConfig {
   };
   back: {
     insideBackgroundUrl: string;
+    insideMediaId?: string;
     outsideBackgroundUrl: string;
+    outsideMediaId?: string;
     elements?: PageElement[];
   };
 }
@@ -438,10 +468,11 @@ export interface Book {
   slug: string;
   description?: string;
   version: string;
+  contentRevision?: number;
   couple: CoupleInfo;
   cover: BookCoverConfig;
-  backgroundMusicId?: string;
-  audio: AudioTrack;
+  backgroundMusicId?: string | null;
+  audio?: AudioTrack | null;
   settings: BookSettings;
   pages: Page[];
   createdAt?: string;

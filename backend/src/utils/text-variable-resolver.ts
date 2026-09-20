@@ -1,14 +1,5 @@
 /**
  * Dynamic Text Variable Resolver for Love Journey Book (Backend & Universal)
- *
- * Resolves template tags such as {{couple.he}}, {{daysTogether}}, {{currentDate}}
- * inside TEXT elements at runtime without using eval().
- *
- * Security & Reliability:
- * - Completely eval-free using pure Regex tokenization
- * - Strict prototype-pollution safeguards against __proto__, constructor, and prototype
- * - Fail-safe: Missing or invalid variables will never throw or crash
- * - Extensible: Supports custom variable handlers and filters
  */
 
 export interface VariableContext {
@@ -40,7 +31,6 @@ export interface VariableContext {
 export type CustomVariableHandler = (context: VariableContext) => any;
 export type TextFilter = (value: any) => string;
 
-// Blacklisted property names to defend against prototype pollution
 const FORBIDDEN_KEYS = new Set([
   '__proto__',
   'constructor',
@@ -51,45 +41,65 @@ const FORBIDDEN_KEYS = new Set([
   '__lookupSetter__',
 ]);
 
-/**
- * Format a Date or date string to Vietnamese friendly DD.MM.YYYY
- */
-export function formatLoveDate(dateInput?: string | Date | null): string {
-  if (!dateInput) return '';
-  const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
-  if (isNaN(d.getTime())) return String(dateInput);
-
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  return `${day}.${month}.${year}`;
+export function parseDateParts(
+  dateInput?: string | Date | null
+): { year: number; month: number; day: number } | null {
+  if (!dateInput) return null;
+  if (dateInput instanceof Date) {
+    if (isNaN(dateInput.getTime())) return null;
+    return {
+      year: dateInput.getFullYear(),
+      month: dateInput.getMonth() + 1,
+      day: dateInput.getDate(),
+    };
+  }
+  if (typeof dateInput === 'string') {
+    const isoMatch = dateInput.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);
+    if (isoMatch) {
+      return {
+        year: parseInt(isoMatch[1], 10),
+        month: parseInt(isoMatch[2], 10),
+        day: parseInt(isoMatch[3], 10),
+      };
+    }
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return null;
+    return {
+      year: d.getFullYear(),
+      month: d.getMonth() + 1,
+      day: d.getDate(),
+    };
+  }
+  return null;
 }
 
-/**
- * Calculates total elapsed days from anniversary date until today
- */
+export function formatLoveDate(dateInput?: string | Date | null): string {
+  const parts = parseDateParts(dateInput);
+  if (!parts) return '';
+  const day = String(parts.day).padStart(2, '0');
+  const month = String(parts.month).padStart(2, '0');
+  return `${day}.${month}.${parts.year}`;
+}
+
 export function calculateDaysTogether(
   anniversaryInput?: string | Date | null,
   referenceDate: Date = new Date()
 ): number {
-  if (!anniversaryInput) {
-    anniversaryInput = '2022-10-20T00:00:00';
-  }
+  const parts = anniversaryInput
+    ? parseDateParts(anniversaryInput)
+    : { year: 2022, month: 10, day: 20 };
+  if (!parts) return 0;
 
-  const start =
-    typeof anniversaryInput === 'string'
-      ? new Date(anniversaryInput).getTime()
-      : anniversaryInput.getTime();
+  const refParts = parseDateParts(referenceDate);
+  if (!refParts) return 0;
 
-  if (isNaN(start)) return 0;
+  const startUtc = Date.UTC(parts.year, parts.month - 1, parts.day);
+  const refUtc = Date.UTC(refParts.year, refParts.month - 1, refParts.day);
 
-  const diffMs = referenceDate.getTime() - start;
+  const diffMs = refUtc - startUtc;
   return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 }
 
-/**
- * Safely traverses a dot-separated object path without evaluating code.
- */
 export function safeGetPath(obj: any, path: string): any {
   if (!obj || typeof obj !== 'object') return undefined;
 
@@ -112,9 +122,6 @@ export function safeGetPath(obj: any, path: string): any {
   return current;
 }
 
-/**
- * Registry and Extensible Resolver for Dynamic Text Variables
- */
 export class TextVariableResolver {
   private static customVariables = new Map<string, CustomVariableHandler>();
   private static filters = new Map<string, TextFilter>();
@@ -152,7 +159,7 @@ export class TextVariableResolver {
       book.couple?.anniversaryDate ||
       book.anniversaryDate ||
       extra.anniversaryDate ||
-      '2022-10-20T00:00:00';
+      '2022-10-20';
 
     const daysCount = calculateDaysTogether(rawAnniversary);
 

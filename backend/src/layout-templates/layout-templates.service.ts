@@ -1,5 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CreateLayoutTemplateDto } from './dto/create-layout-template.dto';
+import { UpdateLayoutTemplateDto } from './dto/update-layout-template.dto';
 
 @Injectable()
 export class LayoutTemplatesService {
@@ -17,15 +19,35 @@ export class LayoutTemplatesService {
     return template;
   }
 
-  async create(data: any) {
-    return this.prisma.layoutTemplate.create({ data });
+  async create(dto: CreateLayoutTemplateDto) {
+    const existing = await this.prisma.layoutTemplate.findUnique({ where: { id: dto.id } });
+    if (existing) {
+      throw new ConflictException(`Layout template "${dto.id}" already exists`);
+    }
+
+    return this.prisma.layoutTemplate.create({
+      data: {
+        id: dto.id,
+        name: dto.name,
+        description: dto.description,
+        slots: dto.slots as any,
+        prototypes: dto.prototypes as any,
+        isSystem: dto.isSystem ?? false,
+      },
+    });
   }
 
-  async update(id: string, data: any) {
+  async update(id: string, dto: UpdateLayoutTemplateDto) {
     await this.findOne(id);
     return this.prisma.layoutTemplate.update({
       where: { id },
-      data,
+      data: {
+        name: dto.name,
+        description: dto.description,
+        slots: dto.slots ? (dto.slots as any) : undefined,
+        prototypes: dto.prototypes ? (dto.prototypes as any) : undefined,
+        isSystem: dto.isSystem,
+      },
     });
   }
 

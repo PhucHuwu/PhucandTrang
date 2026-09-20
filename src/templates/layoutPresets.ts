@@ -30,10 +30,12 @@ export interface SlotData {
 /**
  * Template element definition with default normalized coordinates (0..1),
  * default styling, and slot assignment.
+ * zIndex is strictly top-level as the single source of truth.
  */
 export interface TemplateElementPrototype {
   slot: string;
   defaultType: 'TEXT' | 'IMAGE' | 'VIDEO' | 'SHAPE' | 'DECORATION';
+  zIndex: number;
   transform: {
     x: number;
     y: number;
@@ -41,7 +43,7 @@ export interface TemplateElementPrototype {
     height: number;
     rotation: number;
     scale: number;
-    zIndex: number;
+    zIndex?: number; // optional legacy backward compatibility
   };
   style?: Record<string, unknown>;
   defaultData?: Record<string, unknown>;
@@ -55,13 +57,14 @@ export interface LayoutPresetDefinition {
 }
 
 /**
- * Common text prototypes used across templates
+ * Common text prototypes used across templates with zIndex as top-level property.
  */
 const COMMON_TEXT_PROTOTYPES: TemplateElementPrototype[] = [
   {
     slot: 'subtitle',
     defaultType: 'TEXT',
-    transform: { x: 0.078, y: 0.062, width: 0.844, height: 0.022, rotation: 0, scale: 1, zIndex: 1 },
+    zIndex: 1,
+    transform: { x: 0.078, y: 0.062, width: 0.844, height: 0.022, rotation: 0, scale: 1 },
     style: {
       color: '#C99A9A',
       fontFamily: 'Montserrat, sans-serif',
@@ -74,7 +77,8 @@ const COMMON_TEXT_PROTOTYPES: TemplateElementPrototype[] = [
   {
     slot: 'header-line',
     defaultType: 'SHAPE',
-    transform: { x: 0.078, y: 0.077, width: 0.844, height: 0.0015, rotation: 0, scale: 1, zIndex: 2 },
+    zIndex: 2,
+    transform: { x: 0.078, y: 0.077, width: 0.844, height: 0.0015, rotation: 0, scale: 1 },
     defaultData: {
       shapeType: 'line',
       strokeColor: 'rgba(201, 154, 154, 0.3)',
@@ -84,7 +88,8 @@ const COMMON_TEXT_PROTOTYPES: TemplateElementPrototype[] = [
   {
     slot: 'title',
     defaultType: 'TEXT',
-    transform: { x: 0.078, y: 0.118, width: 0.844, height: 0.032, rotation: 0, scale: 1, zIndex: 3 },
+    zIndex: 3,
+    transform: { x: 0.078, y: 0.118, width: 0.844, height: 0.032, rotation: 0, scale: 1 },
     style: {
       textAlign: 'left',
       color: '#292522',
@@ -98,7 +103,8 @@ const COMMON_TEXT_PROTOTYPES: TemplateElementPrototype[] = [
   {
     slot: 'quote',
     defaultType: 'TEXT',
-    transform: { x: 0.078, y: 0.150, width: 0.844, height: 0.028, rotation: 0, scale: 1, zIndex: 4 },
+    zIndex: 4,
+    transform: { x: 0.078, y: 0.150, width: 0.844, height: 0.028, rotation: 0, scale: 1 },
     style: {
       textAlign: 'left',
       color: '#94384F',
@@ -111,7 +117,8 @@ const COMMON_TEXT_PROTOTYPES: TemplateElementPrototype[] = [
   {
     slot: 'handwriting',
     defaultType: 'TEXT',
-    transform: { x: 0.078, y: 0.912, width: 0.844, height: 0.030, rotation: 0, scale: 1, zIndex: 90 },
+    zIndex: 90,
+    transform: { x: 0.078, y: 0.912, width: 0.844, height: 0.030, rotation: 0, scale: 1 },
     style: {
       color: '#38161E',
       fontFamily: '"Dancing Script", "Playfair Display", Georgia, cursive',
@@ -136,7 +143,8 @@ export const LAYOUT_PRESETS: Record<LayoutTemplate, LayoutPresetDefinition> = {
       {
         slot: 'primaryImage',
         defaultType: 'IMAGE',
-        transform: { x: 0.068, y: 0.280, width: 0.864, height: 0.580, rotation: 0, scale: 1, zIndex: 10 },
+        zIndex: 10,
+        transform: { x: 0.068, y: 0.280, width: 0.864, height: 0.580, rotation: 0, scale: 1 },
         style: { polaroidFrame: true, washiTape: true },
       },
     ],
@@ -152,13 +160,15 @@ export const LAYOUT_PRESETS: Record<LayoutTemplate, LayoutPresetDefinition> = {
       {
         slot: 'primaryImage',
         defaultType: 'IMAGE',
-        transform: { x: 0.068, y: 0.280, width: 0.420, height: 0.590, rotation: -1.5, scale: 1, zIndex: 10 },
+        zIndex: 10,
+        transform: { x: 0.068, y: 0.280, width: 0.420, height: 0.590, rotation: -1.5, scale: 1 },
         style: { polaroidFrame: true, washiTape: true },
       },
       {
         slot: 'secondaryImage',
         defaultType: 'IMAGE',
-        transform: { x: 0.512, y: 0.280, width: 0.420, height: 0.590, rotation: 1.8, scale: 1, zIndex: 11 },
+        zIndex: 11,
+        transform: { x: 0.512, y: 0.280, width: 0.420, height: 0.590, rotation: 1.8, scale: 1 },
         style: { polaroidFrame: true, washiTape: true },
       },
     ],
@@ -174,13 +184,15 @@ export const LAYOUT_PRESETS: Record<LayoutTemplate, LayoutPresetDefinition> = {
       {
         slot: 'primaryImage',
         defaultType: 'IMAGE',
-        transform: { x: 0.078, y: 0.280, width: 0.844, height: 0.280, rotation: -1.2, scale: 1, zIndex: 10 },
+        zIndex: 10,
+        transform: { x: 0.078, y: 0.280, width: 0.844, height: 0.280, rotation: -1.2, scale: 1 },
         style: { polaroidFrame: true, washiTape: true },
       },
       {
         slot: 'secondaryImage',
         defaultType: 'IMAGE',
-        transform: { x: 0.078, y: 0.585, width: 0.844, height: 0.280, rotation: 1.4, scale: 1, zIndex: 11 },
+        zIndex: 11,
+        transform: { x: 0.078, y: 0.585, width: 0.844, height: 0.280, rotation: 1.4, scale: 1 },
         style: { polaroidFrame: true, washiTape: true },
       },
     ],
@@ -196,19 +208,22 @@ export const LAYOUT_PRESETS: Record<LayoutTemplate, LayoutPresetDefinition> = {
       {
         slot: 'primaryImage',
         defaultType: 'IMAGE',
-        transform: { x: 0.078, y: 0.260, width: 0.844, height: 0.325, rotation: 0.6, scale: 1, zIndex: 10 },
+        zIndex: 10,
+        transform: { x: 0.078, y: 0.260, width: 0.844, height: 0.325, rotation: 0.6, scale: 1 },
         style: { polaroidFrame: true, washiTape: true },
       },
       {
         slot: 'secondaryImage',
         defaultType: 'IMAGE',
-        transform: { x: 0.078, y: 0.605, width: 0.412, height: 0.275, rotation: -1.8, scale: 1, zIndex: 11 },
+        zIndex: 11,
+        transform: { x: 0.078, y: 0.605, width: 0.412, height: 0.275, rotation: -1.8, scale: 1 },
         style: { polaroidFrame: true, washiTape: true },
       },
       {
         slot: 'tertiaryImage',
         defaultType: 'IMAGE',
-        transform: { x: 0.510, y: 0.605, width: 0.412, height: 0.275, rotation: 1.9, scale: 1, zIndex: 12 },
+        zIndex: 12,
+        transform: { x: 0.510, y: 0.605, width: 0.412, height: 0.275, rotation: 1.9, scale: 1 },
         style: { polaroidFrame: true, washiTape: true },
       },
     ],
@@ -224,19 +239,22 @@ export const LAYOUT_PRESETS: Record<LayoutTemplate, LayoutPresetDefinition> = {
       {
         slot: 'primaryImage',
         defaultType: 'IMAGE',
-        transform: { x: 0.068, y: 0.260, width: 0.527, height: 0.290, rotation: -2.0, scale: 1, zIndex: 10 },
+        zIndex: 10,
+        transform: { x: 0.068, y: 0.260, width: 0.527, height: 0.290, rotation: -2.0, scale: 1 },
         style: { polaroidFrame: true, washiTape: true },
       },
       {
         slot: 'secondaryImage',
         defaultType: 'IMAGE',
-        transform: { x: 0.404, y: 0.380, width: 0.527, height: 0.290, rotation: 2.5, scale: 1, zIndex: 11 },
+        zIndex: 11,
+        transform: { x: 0.404, y: 0.380, width: 0.527, height: 0.290, rotation: 2.5, scale: 1 },
         style: { polaroidFrame: true, washiTape: true },
       },
       {
         slot: 'tertiaryImage',
         defaultType: 'IMAGE',
-        transform: { x: 0.156, y: 0.630, width: 0.605, height: 0.290, rotation: -1.0, scale: 1, zIndex: 12 },
+        zIndex: 12,
+        transform: { x: 0.156, y: 0.630, width: 0.605, height: 0.290, rotation: -1.0, scale: 1 },
         style: { polaroidFrame: true, washiTape: true },
       },
     ],
@@ -252,25 +270,29 @@ export const LAYOUT_PRESETS: Record<LayoutTemplate, LayoutPresetDefinition> = {
       {
         slot: 'primaryImage',
         defaultType: 'IMAGE',
-        transform: { x: 0.068, y: 0.280, width: 0.420, height: 0.288, rotation: -1.5, scale: 1, zIndex: 10 },
+        zIndex: 10,
+        transform: { x: 0.068, y: 0.280, width: 0.420, height: 0.288, rotation: -1.5, scale: 1 },
         style: { polaroidFrame: true, washiTape: true },
       },
       {
         slot: 'secondaryImage',
         defaultType: 'IMAGE',
-        transform: { x: 0.512, y: 0.280, width: 0.420, height: 0.288, rotation: 1.8, scale: 1, zIndex: 11 },
+        zIndex: 11,
+        transform: { x: 0.512, y: 0.280, width: 0.420, height: 0.288, rotation: 1.8, scale: 1 },
         style: { polaroidFrame: true, washiTape: true },
       },
       {
         slot: 'tertiaryImage',
         defaultType: 'IMAGE',
-        transform: { x: 0.068, y: 0.585, width: 0.420, height: 0.288, rotation: 1.6, scale: 1, zIndex: 12 },
+        zIndex: 12,
+        transform: { x: 0.068, y: 0.585, width: 0.420, height: 0.288, rotation: 1.6, scale: 1 },
         style: { polaroidFrame: true, washiTape: true },
       },
       {
         slot: 'quaternaryImage',
         defaultType: 'IMAGE',
-        transform: { x: 0.512, y: 0.585, width: 0.420, height: 0.288, rotation: -1.7, scale: 1, zIndex: 13 },
+        zIndex: 13,
+        transform: { x: 0.512, y: 0.585, width: 0.420, height: 0.288, rotation: -1.7, scale: 1 },
         style: { polaroidFrame: true, washiTape: true },
       },
     ],
@@ -286,13 +308,15 @@ export const LAYOUT_PRESETS: Record<LayoutTemplate, LayoutPresetDefinition> = {
       {
         slot: 'primaryImage',
         defaultType: 'IMAGE',
-        transform: { x: 0.068, y: 0.280, width: 0.566, height: 0.360, rotation: -2.5, scale: 1, zIndex: 10 },
+        zIndex: 10,
+        transform: { x: 0.068, y: 0.280, width: 0.566, height: 0.360, rotation: -2.5, scale: 1 },
         style: { polaroidFrame: true, washiTape: true },
       },
       {
         slot: 'secondaryImage',
         defaultType: 'IMAGE',
-        transform: { x: 0.365, y: 0.540, width: 0.566, height: 0.360, rotation: 2.2, scale: 1, zIndex: 11 },
+        zIndex: 11,
+        transform: { x: 0.365, y: 0.540, width: 0.566, height: 0.360, rotation: 2.2, scale: 1 },
         style: { polaroidFrame: true, washiTape: true },
       },
     ],
@@ -308,7 +332,8 @@ export const LAYOUT_PRESETS: Record<LayoutTemplate, LayoutPresetDefinition> = {
       {
         slot: 'primaryImage',
         defaultType: 'IMAGE',
-        transform: { x: 0.068, y: 0.280, width: 0.864, height: 0.580, rotation: 0, scale: 1, zIndex: 10 },
+        zIndex: 10,
+        transform: { x: 0.068, y: 0.280, width: 0.864, height: 0.580, rotation: 0, scale: 1 },
         style: { polaroidFrame: true, washiTape: true },
       },
     ],
@@ -335,29 +360,23 @@ function normalizeMedia(input?: PageMediaItem | string): PageMediaItem | undefin
 
 /**
  * Core API Function: Applies a LayoutTemplate to a Page object.
- * 
- * Flow:
- * 1. Clones the prototype elements from the layout template (ensuring elements can be freely mutated afterward).
- * 2. Populates slots:
- *    - 'title': sets title text
- *    - 'subtitle': sets chapter / subtitle text
- *    - 'quote': sets quote text
- *    - 'primaryImage': sets image or video element
- *    - 'secondaryImage': sets image or video element
- *    - 'tertiaryImage', 'quaternaryImage': sets subsequent images
- *    - 'handwriting': sets signature text
- * 3. Dynamically handles any additional media beyond preset slots.
- * 4. Returns the updated Page with fully populated PageElement[].
- * 
- * Note: Layout is purely the STARTING POINT. Once applied, each PageElement
- * can be freely resized, moved, restyled, or deleted without restrictions.
+ * Generic template processor: can accept either templateId or a LayoutPresetDefinition.
+ *
+ * Rules:
+ * - Each PageElement has top-level `zIndex` as single source of truth.
+ * - Captions become independent `TEXT` elements with `variant: 'caption'`.
+ * - Video elements separate `src` (video) from `thumbnailUrl` (poster).
  */
 export function applyLayoutTemplate(
   page: Partial<Page> & { pageNumber: number; side: 'left' | 'right' },
-  templateId: LayoutTemplate,
+  templateIdOrDef: LayoutTemplate | LayoutPresetDefinition,
   slotData?: SlotData
 ): Page {
-  const preset = LAYOUT_PRESETS[templateId] || LAYOUT_PRESETS['auto'];
+  const preset: LayoutPresetDefinition =
+    typeof templateIdOrDef === 'string'
+      ? LAYOUT_PRESETS[templateIdOrDef] || LAYOUT_PRESETS['auto']
+      : templateIdOrDef;
+
   const elements: PageElement[] = [];
   const pageNum = page.pageNumber;
   const side = page.side;
@@ -381,6 +400,8 @@ export function applyLayoutTemplate(
   // 1. Process Prototypes into real cloned PageElements
   for (const proto of preset.elementPrototypes) {
     const slot = proto.slot;
+    const protoZ = proto.zIndex ?? (proto.transform as any)?.zIndex ?? 1;
+    const { zIndex: _ignore, ...cleanTransform } = (proto.transform as any) || {};
 
     // Subtitle / Chapter Label
     if (slot === 'subtitle') {
@@ -390,7 +411,9 @@ export function applyLayoutTemplate(
           id: `el-sub-${pageNum}`,
           type: 'TEXT',
           slot: 'subtitle',
-          transform: { ...proto.transform },
+          order: protoZ,
+          zIndex: protoZ,
+          transform: cleanTransform,
           visible: true,
           locked: false,
           opacity: 1,
@@ -413,7 +436,9 @@ export function applyLayoutTemplate(
         id: `el-hline-${pageNum}`,
         type: 'SHAPE',
         slot: 'header-line',
-        transform: { ...proto.transform },
+        order: protoZ,
+        zIndex: protoZ,
+        transform: cleanTransform,
         visible: true,
         locked: false,
         opacity: 1,
@@ -434,7 +459,9 @@ export function applyLayoutTemplate(
           id: `el-title-${pageNum}`,
           type: 'TEXT',
           slot: 'title',
-          transform: { ...proto.transform },
+          order: protoZ,
+          zIndex: protoZ,
+          transform: cleanTransform,
           visible: true,
           locked: false,
           opacity: 1,
@@ -456,12 +483,14 @@ export function applyLayoutTemplate(
           id: `el-quote-${pageNum}`,
           type: 'TEXT',
           slot: 'quote',
-          transform: { ...proto.transform },
+          order: protoZ,
+          zIndex: protoZ,
+          transform: cleanTransform,
           visible: true,
           locked: false,
           opacity: 1,
           data: {
-            text: `"${text}"`,
+            text,
             variant: 'quote',
           },
           style: { ...proto.style },
@@ -478,8 +507,10 @@ export function applyLayoutTemplate(
           id: `el-handwriting-${pageNum}`,
           type: 'TEXT',
           slot: 'handwriting',
+          order: protoZ,
+          zIndex: protoZ,
           transform: {
-            ...proto.transform,
+            ...cleanTransform,
             x: side === 'left' ? 0.04 : 0.08,
           },
           visible: true,
@@ -498,7 +529,7 @@ export function applyLayoutTemplate(
       continue;
     }
 
-    // Image Slots: primaryImage, secondaryImage, tertiaryImage, quaternaryImage
+    // Image & Video Slots
     if (
       slot === 'primaryImage' ||
       slot === 'secondaryImage' ||
@@ -508,26 +539,32 @@ export function applyLayoutTemplate(
       const mediaItem = mediaList[imageSlotIndex++];
       if (mediaItem) {
         if (mediaItem.isVideo) {
+          const videoSrc = mediaItem.src;
+          const posterUrl = mediaItem.thumbnailUrl || mediaItem.src;
+
           elements.push({
             id: `el-video-${pageNum}-${imageSlotIndex}`,
             type: 'VIDEO',
             slot,
-            transform: { ...proto.transform },
+            order: imageSlotIndex * 2,
+            zIndex: protoZ,
             visible: true,
             locked: false,
             opacity: 1,
+            transform: cleanTransform,
             data: {
-              src: mediaItem.src,
-              thumbnailUrl: mediaItem.src,
-              caption: mediaItem.caption,
+              src: videoSrc,
+              thumbnailUrl: posterUrl,
               aspectRatio: mediaItem.aspectRatio,
+              mediaId: mediaItem.mediaId,
+              posterMediaId: mediaItem.posterMediaId,
             },
             style: { polaroidFrame: true, washiTape: true },
             interaction: {
               enabled: true,
               action: 'open-video',
-              target: mediaItem.src,
-              title: mediaItem.caption,
+              target: videoSrc,
+              title: mediaItem.caption || 'Xem Video',
               activeArea: { top: 0.1, left: 0.05, width: 0.9, height: 0.85 },
             },
           } as VideoElement);
@@ -536,18 +573,59 @@ export function applyLayoutTemplate(
             id: `el-img-${pageNum}-${imageSlotIndex}`,
             type: 'IMAGE',
             slot,
-            transform: { ...proto.transform },
+            order: imageSlotIndex * 2,
+            zIndex: protoZ,
             visible: true,
             locked: false,
             opacity: 1,
+            transform: cleanTransform,
             data: {
               src: mediaItem.src,
-              caption: mediaItem.caption,
               aspectRatio: mediaItem.aspectRatio,
               objectFit: 'cover',
+              mediaId: mediaItem.mediaId,
             },
             style: { polaroidFrame: true, washiTape: true },
           } as ImageElement);
+        }
+
+        // Requirement 10: Caption becomes an independent TEXT element
+        if (mediaItem.caption) {
+          const captionHeight = 0.035;
+          const captionY = Math.min(
+            0.94,
+            cleanTransform.y + cleanTransform.height + 0.008
+          );
+
+          elements.push({
+            id: `el-cap-${pageNum}-${imageSlotIndex}`,
+            type: 'TEXT',
+            slot: `${slot}-caption`,
+            order: imageSlotIndex * 2 + 1,
+            zIndex: protoZ + 1,
+            visible: true,
+            locked: false,
+            opacity: 1,
+            transform: {
+              x: cleanTransform.x,
+              y: captionY,
+              width: cleanTransform.width,
+              height: captionHeight,
+              rotation: cleanTransform.rotation || 0,
+              scale: cleanTransform.scale || 1,
+            },
+            data: {
+              text: mediaItem.caption,
+              variant: 'caption',
+            },
+            style: {
+              textAlign: 'center',
+              color: '#4A1523',
+              fontFamily: '"Dancing Script", "Playfair Display", Georgia, cursive',
+              fontSize: 19,
+              fontStyle: 'italic',
+            },
+          } as TextElement);
         }
       }
       continue;
@@ -563,6 +641,8 @@ export function applyLayoutTemplate(
       id: `el-body-${pageNum}`,
       type: 'TEXT',
       slot: 'body',
+      order: 5,
+      zIndex: 5,
       transform: {
         x: 0.078,
         y: 0.190,
@@ -570,16 +650,15 @@ export function applyLayoutTemplate(
         height: totalHeight,
         rotation: 0,
         scale: 1,
-        zIndex: 5,
       },
       visible: true,
       locked: false,
       opacity: 1,
       data: {
         text: '',
+        textLines,
         variant: 'body',
         multiline: true,
-        textLines,
       },
       style: {
         textAlign: 'left',
@@ -591,144 +670,28 @@ export function applyLayoutTemplate(
     } as TextElement);
   }
 
-  // 3. Assemble and return full Page (starting in PRESET mode, uncustomized)
-  const metadata = {
-    ...(page.metadata || {}),
-    layoutMode: 'PRESET' as const,
-    sourceTemplateId: templateId,
-    isCustomized: false,
-  };
-
   return {
-    id: page.id || `page-${pageNum}`,
+    id: `page-${pageNum}`,
+    order: pageNum,
+    ...page,
     pageNumber: pageNum,
     side,
-    chapter: slotData?.chapter || page.chapter,
-    title: slotData?.title || page.title,
-    quote: slotData?.quote || page.quote,
-    textLines,
-    handwriting: slotData?.handwriting || page.handwriting,
-    layout: templateId,
-    layoutMode: 'PRESET',
-    sourceTemplateId: templateId,
-    isCustomized: false,
-    background: page.background || {
-      type: 'color',
-      color: '#F9F5EC',
-    },
+    layout: preset.id,
+    sourceTemplateId: preset.id,
+    layoutMode: page.layoutMode || 'PRESET',
+    isCustomized: page.isCustomized || false,
+    background: page.background || { type: 'color', color: '#F9F5EC' },
     elements,
-    metadata,
   };
 }
 
 /**
- * Marks a page as customized, converting it to FREEFORM if desired or keeping sourceTemplateId recorded.
+ * Creates slots metadata for database persistence
  */
-function markPageCustomized(page: Page): void {
-  page.isCustomized = true;
-  if (!page.metadata) {
-    page.metadata = {};
-  }
-  page.metadata.isCustomized = true;
-}
-
-/**
- * Updates an element on a page (moving position, resizing, changing rotation, zIndex, styles, data).
- * Setting isCustomized = true automatically.
- */
-export function updatePageElement(
-  page: Page,
-  elementId: string,
-  patch: Partial<PageElement>
-): Page {
-  const index = page.elements.findIndex((el) => el.id === elementId);
-  if (index === -1) return page;
-
-  const current = page.elements[index];
-  const updated: PageElement = {
-    ...current,
-    ...patch,
-    transform: {
-      ...current.transform,
-      ...(patch.transform || {}),
-    },
-    style: {
-      ...(current.style || {}),
-      ...(patch.style || {}),
-    },
-    data: {
-      ...(current.data as any),
-      ...(patch.data as any),
-    },
-  } as PageElement;
-
-  page.elements[index] = updated;
-  markPageCustomized(page);
-  return page;
-}
-
-/**
- * Adds a new element to a page (even outside preset slots).
- * Setting isCustomized = true automatically.
- */
-export function addPageElement(page: Page, element: PageElement): Page {
-  page.elements.push(element);
-  markPageCustomized(page);
-  return page;
-}
-
-/**
- * Removes an element from a page.
- * Setting isCustomized = true automatically.
- */
-export function removePageElement(page: Page, elementId: string): Page {
-  page.elements = page.elements.filter((el) => el.id !== elementId);
-  markPageCustomized(page);
-  return page;
-}
-
-/**
- * Converts a page from PRESET to FREEFORM mode.
- * The layout template is detached and isCustomized is set to true.
- */
-export function convertPageToFreeform(page: Page): Page {
-  page.layoutMode = 'FREEFORM';
-  markPageCustomized(page);
-  if (page.metadata) {
-    page.metadata.layoutMode = 'FREEFORM';
-  }
-  return page;
-}
-
-/**
- * Creates an entirely freeform page from scratch with no template.
- */
-export function createFreeformPage(params: {
-  id?: string;
-  pageNumber: number;
-  side: 'left' | 'right';
-  background?: Page['background'];
-  elements?: PageElement[];
-  metadata?: Record<string, unknown>;
-}): Page {
-  return {
-    id: params.id || `page-${params.pageNumber}`,
-    pageNumber: params.pageNumber,
-    side: params.side,
-    layout: 'custom',
-    layoutMode: 'FREEFORM',
-    sourceTemplateId: null,
-    isCustomized: true,
-    background: params.background || {
-      type: 'color',
-      color: '#F9F5EC',
-    },
-    elements: params.elements || [],
-    metadata: {
-      ...(params.metadata || {}),
-      layoutMode: 'FREEFORM',
-      sourceTemplateId: null,
-      isCustomized: true,
-    },
-  };
+export function getLayoutSlots(preset: LayoutPresetDefinition) {
+  return preset.elementPrototypes.map((p) => ({
+    name: p.slot,
+    defaultTransform: p.transform,
+    allowedTypes: [p.defaultType],
+  }));
 }

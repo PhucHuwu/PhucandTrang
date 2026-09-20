@@ -33,6 +33,14 @@ export interface MediaReferenceItem {
   description: string;
 }
 
+const ALLOWED_CLOUDINARY_FOLDERS = new Set([
+  'phuc_trang_memories',
+  'phuc_trang_backgrounds',
+  'phuc_trang_audio',
+  'phuc_trang_textures',
+  'phuc_trang_decorations',
+]);
+
 @Injectable()
 export class MediaService {
   constructor(
@@ -43,6 +51,7 @@ export class MediaService {
   /**
    * Generates a signed Cloudinary upload configuration for direct client uploads.
    * Eliminates the need to upload large media files through NestJS server.
+   * Strictly enforces folder whitelisting and validates parameters.
    */
   getSignedUploadConfig(dto: SignedUploadRequestDto): CloudinarySignedConfig {
     const cloudName =
@@ -52,7 +61,12 @@ export class MediaService {
     const apiSecret =
       this.configService.get<string>('CLOUDINARY_API_SECRET') || '';
 
-    const folder = dto.folder || getUploadFolderForType(dto.type);
+    const requestedFolder = dto.folder;
+    const folder =
+      requestedFolder && ALLOWED_CLOUDINARY_FOLDERS.has(requestedFolder)
+        ? requestedFolder
+        : getUploadFolderForType(dto.type);
+
     const resourceType = getResourceTypeForType(dto.type);
     const timestamp = Math.floor(Date.now() / 1000);
 
@@ -158,11 +172,9 @@ export class MediaService {
       throw new BadRequestException('Query filenameOrUrl is required');
     }
 
-    // Try exact url first
     let media = await this.prisma.media.findUnique({ where: { url: filenameOrUrl } });
     if (media) return this.formatMedia(media);
 
-    // Try publicId
     media = await this.prisma.media.findFirst({
       where: {
         OR: [
@@ -182,7 +194,6 @@ export class MediaService {
    * Saves metadata after client uploads directly to Cloudinary.
    */
   async create(dto: CreateMediaDto) {
-    // If URL already exists in media catalog, return existing or update metadata
     const existing = await this.prisma.media.findUnique({ where: { url: dto.url } });
     if (existing) {
       const updated = await this.prisma.media.update({
@@ -241,7 +252,8 @@ export class MediaService {
   }
 
   /**
-   * Checks where this media item is being referenced in Books, Pages, PageElements, and AudioTracks.
+   * Checks where this media item is being referenced across Books, Covers, Pages, Elements, and AudioTracks.
+   * Matches both canonical mediaId, posterMediaId, as well as legacy src and thumbnailUrl URLs.
    */
   async checkReferences(mediaId: string): Promise<{
     media: any;
@@ -262,12 +274,17 @@ export class MediaService {
       return false;
     };
 
-    // 1. Scan Books (front cover, back cover, audio track)
-    const books = await this.prisma.book.findMany();
+    // 1. Scan Books (front cover, back cover, background music)
+    const books = await this.prisma.book.findMany({
+      include: {
+        backgroundMusic: true,
+      },
+    });
+
     for (const book of books) {
       const cover = (book.cover as any) || {};
 
-      if (matchesMedia(cover.front?.backgroundUrl)) {
+      if (matchesMedia(cover.front?.backgroundUrl, cover.front?.mediaId)) {
         references.push({
           targetType: 'BOOK_COVER',
           bookId: book.id,
@@ -278,7 +295,7 @@ export class MediaService {
         });
       }
 
-      if (matchesMedia(cover.back?.insideBackgroundUrl)) {
+      if (matchesMedia(cover.back?.insideBackgroundUrl, cover.back?.insideMediaId)) {
         references.push({
           targetType: 'BOOK_COVER',
           bookId: book.id,
@@ -289,7 +306,7 @@ export class MediaService {
         });
       }
 
-      if (matchesMedia(cover.back?.outsideBackgroundUrl)) {
+      if (matchesMedia(cover.back?.outsideBackgroundUrl, cover.back?.outsideMediaId)) {
         references.push({
           targetType: 'BOOK_COVER',
           bookId: book.id,
@@ -299,20 +316,32 @@ export class MediaService {
           description: `Mặt ngoài bìa sau sách "${book.title}" (Outside Back Cover)`,
         });
       }
+
+      if (matchesMedia(book.backgroundMusic?.src, book.backgroundMusic?.mediaId)) {
+        references.push({
+          targetType: 'AUDIO_TRACK',
+          bookId: book.id,
+          bookTitle: book.title,
+          bookSlug: book.slug,
+          field: 'book.backgroundMusic',
+          description: `Nhạc nền chính của sách "${book.title}"`,
+        });
+      }
     }
 
-    // 2. Scan Pages (background image)
+    // 2. Scan Pages (background image & audio track)
     const pages = await this.prisma.page.findMany({
       include: {
         book: {
           select: { id: true, title: true, slug: true },
         },
+        audioTrack: true,
       },
     });
 
     for (const page of pages) {
       const bg = (page.background as any) || {};
-      if (matchesMedia(bg.imageUrl) || matchesMedia(bg.url)) {
+      if (matchesMedia(bg.imageUrl || bg.url, bg.mediaId)) {
         references.push({
           targetType: 'PAGE_BACKGROUND',
           bookId: page.bookId,
@@ -325,9 +354,22 @@ export class MediaService {
           description: `Hình nền trang số ${page.pageNumber} (${page.chapter || 'Không có chương'} - ${page.title || 'Không có tiêu đề'})`,
         });
       }
+
+      if (matchesMedia(page.audioTrack?.src, page.audioTrack?.mediaId)) {
+        references.push({
+          targetType: 'AUDIO_TRACK',
+          bookId: page.bookId,
+          bookTitle: page.book?.title,
+          bookSlug: page.book?.slug,
+          pageId: page.id,
+          pageNumber: page.pageNumber,
+          field: 'page.audioTrack',
+          description: `Nhạc nền riêng của trang số ${page.pageNumber}`,
+        });
+      }
     }
 
-    // 3. Scan Page Elements (image url, video url, poster url, audio url)
+    // 3. Scan Page Elements (src, url, mediaId, thumbnailUrl, posterUrl, posterMediaId)
     const elements = await this.prisma.pageElement.findMany({
       include: {
         page: {
@@ -341,10 +383,10 @@ export class MediaService {
     for (const elem of elements) {
       const data = (elem.data as any) || {};
 
-      const urlMatched = matchesMedia(data.url, data.mediaId);
-      const posterMatched = matchesMedia(data.posterUrl);
+      const srcMatched = matchesMedia(data.src || data.url, data.mediaId);
+      const posterMatched = matchesMedia(data.thumbnailUrl || data.posterUrl, data.posterMediaId);
 
-      if (urlMatched) {
+      if (srcMatched) {
         references.push({
           targetType: 'PAGE_ELEMENT',
           bookId: elem.page?.bookId,
@@ -355,12 +397,12 @@ export class MediaService {
           elementId: elem.id,
           elementType: elem.type,
           slot: elem.slot || undefined,
-          field: 'data.url',
+          field: 'data.src',
           description: `Phần tử ${elem.type} (slot: ${elem.slot || 'tự do'}) tại trang ${elem.page?.pageNumber}`,
         });
       }
 
-      if (posterMatched && !urlMatched) {
+      if (posterMatched && !srcMatched) {
         references.push({
           targetType: 'PAGE_ELEMENT',
           bookId: elem.page?.bookId,
@@ -371,21 +413,26 @@ export class MediaService {
           elementId: elem.id,
           elementType: elem.type,
           slot: elem.slot || undefined,
-          field: 'data.posterUrl',
+          field: 'data.thumbnailUrl',
           description: `Ảnh poster video (slot: ${elem.slot || 'tự do'}) tại trang ${elem.page?.pageNumber}`,
         });
       }
     }
 
-    // 4. Scan Audio Tracks
+    // 4. Scan Audio Tracks table directly
     const audioTracks = await this.prisma.audioTrack.findMany();
     for (const track of audioTracks) {
-      if (matchesMedia(track.src)) {
-        references.push({
-          targetType: 'AUDIO_TRACK',
-          field: 'src',
-          description: `Nhạc nền bài hát "${track.title}"`,
-        });
+      if (matchesMedia(track.src, track.mediaId)) {
+        const alreadyFound = references.some(
+          (r) => r.targetType === 'AUDIO_TRACK' && r.description.includes(track.title),
+        );
+        if (!alreadyFound) {
+          references.push({
+            targetType: 'AUDIO_TRACK',
+            field: 'src',
+            description: `Bản nhạc "${track.title}"`,
+          });
+        }
       }
     }
 
@@ -398,7 +445,7 @@ export class MediaService {
 
   /**
    * Safely deletes a media item.
-   * If the media is in use and force is false, halts deletion and returns the list of references.
+   * Halts deletion with 409 Conflict if in use unless force is true.
    */
   async remove(id: string, force: boolean = false) {
     const { media, references, isInUse } = await this.checkReferences(id);
@@ -426,8 +473,7 @@ export class MediaService {
   }
 
   /**
-   * Bulk import or sync existing legacy `cloudinaryUrls.json` into the PostgreSQL Media table.
-   * Helps eliminate hardcoded dependencies on cloudinaryUrls.json.
+   * Bulk import or sync existing legacy cloudinaryUrls.json map into the PostgreSQL Media table.
    */
   async syncLegacyMedia(legacyMap: Record<string, string>) {
     let createdCount = 0;
@@ -449,7 +495,6 @@ export class MediaService {
         folder = 'phuc_trang_audio';
       }
 
-      // Extract publicId
       const urlParts = url.split('/');
       const filename = urlParts[urlParts.length - 1];
       const publicId = `${folder}/${filename.replace(/\.[^/.]+$/, '')}`;
@@ -498,12 +543,18 @@ export class MediaService {
   }
 
   /**
-   * Formats media record safely: converts BigInt to Number and ensures ISO date strings.
+   * Formats media record safely: converts BigInt to safe Number or String without precision loss.
    */
   private formatMedia(media: any) {
+    let sizeValue: number | string | null = null;
+    if (media.size !== null && media.size !== undefined) {
+      const big = BigInt(media.size);
+      sizeValue = big <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(big) : big.toString();
+    }
+
     return {
       ...media,
-      size: media.size ? Number(media.size) : null,
+      size: sizeValue,
       createdAt: media.createdAt instanceof Date ? media.createdAt.toISOString() : media.createdAt,
       updatedAt: media.updatedAt instanceof Date ? media.updatedAt.toISOString() : media.updatedAt,
     };

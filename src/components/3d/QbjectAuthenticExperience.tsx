@@ -10,6 +10,8 @@ import { ensureCustomFontLoaded } from '@/data/fontLoader';
 import { fetchPublishedBook } from '@/services/bookApi';
 import { Book } from '@/types/book';
 import { BookOpen, RefreshCw } from 'lucide-react';
+import { deriveFaceIndex } from '@/utils/pageUtils';
+import { computeActiveAreaPageRect } from '@/utils/coordinateConversion';
 
 export default function QbjectAuthenticExperience() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -91,22 +93,34 @@ export default function QbjectAuthenticExperience() {
 
         // 7. Dynamically derive 3D raycast pageActiveAreas from book.pages elements
         const pageActiveAreas: PageActiveArea[] = [];
-        book.pages.forEach((page) => {
-          const leafIndex = page.pageNumber === 0 ? 0 : Math.ceil(page.pageNumber / 2);
-          const faceIndex = page.side === 'right' ? leafIndex * 2 : leafIndex * 2 + 1;
+        book.pages.forEach((page, physicalIndex) => {
+          const faceIndex = deriveFaceIndex(physicalIndex);
 
           page.elements.forEach((el) => {
             if (el.type === 'VIDEO' || el.interaction?.action === 'open-video') {
-              const videoUrl = el.type === 'VIDEO' ? el.data.src : String(el.interaction?.target);
-              const activeRect = el.interaction?.activeArea;
+              const videoUrl =
+                el.type === 'VIDEO'
+                  ? el.data.src
+                  : String(el.interaction?.target || '');
+              if (!videoUrl) return;
+
+              // Compute normalized page coordinates using element bounding box and relative activeArea
+              const rect = computeActiveAreaPageRect(
+                el.transform,
+                el.interaction?.activeArea
+              );
+
               pageActiveAreas.push({
                 faceIndex,
                 video: videoUrl,
-                top: activeRect?.top ?? el.transform.y,
-                left: activeRect?.left ?? el.transform.x,
-                width: activeRect?.width ?? el.transform.width,
-                height: activeRect?.height ?? el.transform.height,
-                title: el.interaction?.title || (el.data as any).caption || 'Xem Video',
+                top: rect.top,
+                left: rect.left,
+                width: rect.width,
+                height: rect.height,
+                title:
+                  el.interaction?.title ||
+                  (el.data as any).caption ||
+                  'Xem Video',
               });
             }
           });
@@ -138,9 +152,17 @@ export default function QbjectAuthenticExperience() {
 
         flipbookInstanceRef.current = flipbook;
 
-        // 9. Attach 3D atmospheric environment (18 butterflies, floating petals, fairy dust)
-        if (book.settings.atmospheric.enabled) {
-          const atmospheric = new AtmosphericSystem((flipbook as any).scene);
+        // 9. Attach 3D atmospheric environment (butterflies, floating petals, fairy dust)
+        if (book.settings.atmospheric?.enabled !== false) {
+          const atmos = book.settings.atmospheric;
+          const atmospheric = new AtmosphericSystem(
+            (flipbook as any).scene,
+            {
+              butterflyCount: atmos?.butterflyCount,
+              petalCount: atmos?.petalCount,
+              dustCount: atmos?.dustCount,
+            }
+          );
           flipbook.atmospheric = atmospheric;
         }
 
