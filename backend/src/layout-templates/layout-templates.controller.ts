@@ -16,35 +16,35 @@ import { Role } from '@prisma/client';
 import { CreateLayoutTemplateDto } from './dto/create-layout-template.dto';
 import { UpdateLayoutTemplateDto } from './dto/update-layout-template.dto';
 
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('layout-templates')
 export class LayoutTemplatesController {
   constructor(private templatesService: LayoutTemplatesService) {}
 
+  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
   @Get()
   async findAll() {
     return this.templatesService.findAll();
   }
 
+  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.templatesService.findOne(id);
   }
 
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(Role.ADMIN)
   @Post()
   async create(@Body() dto: CreateLayoutTemplateDto) {
     return this.templatesService.create(dto);
   }
 
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(Role.ADMIN)
   @Put(':id')
   async update(@Param('id') id: string, @Body() dto: UpdateLayoutTemplateDto) {
     return this.templatesService.update(id, dto);
   }
 
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(Role.ADMIN)
   @Delete(':id')
   async remove(@Param('id') id: string) {

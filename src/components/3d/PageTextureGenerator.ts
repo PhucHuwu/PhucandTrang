@@ -17,6 +17,7 @@ import {
   TextVariableResolver,
   VariableContext,
 } from '@/utils/textVariableResolver';
+import { computeImageFit } from '@/utils/imageFitting';
 
 // Re-export types for consumers
 export type { PageMediaItem, PageLayoutType };
@@ -177,8 +178,13 @@ export class PageTextureGenerator {
       this.renderElement(ctx, el, imageCache, varContext, canvasW, canvasH);
     }
 
-    // 7. Draw Page Number Footer if positive inside page
-    if (page.pageNumber !== undefined && page.pageNumber > 0) {
+    // 7. Draw Page Number Footer if positive inside page and not disabled
+    if (
+      page.pageNumber !== undefined &&
+      page.pageNumber > 0 &&
+      page.pageNumber !== 999 &&
+      (page as any).showPageNumber !== false
+    ) {
       this.renderPageNumberFooter(ctx, page.pageNumber, canvasW, canvasH);
     }
 
@@ -221,24 +227,19 @@ export class PageTextureGenerator {
       // Photo Background with objectFit & focalPoint
       const srcW = bgImage.naturalWidth || bgImage.width;
       const srcH = bgImage.naturalHeight || bgImage.height;
-      const srcRatio = srcW / srcH;
-      const destRatio = canvasW / canvasH;
 
-      const focalX = Math.min(1, Math.max(0, bg.focalPoint?.x ?? 0.5));
-      const focalY = Math.min(1, Math.max(0, bg.focalPoint?.y ?? 0.5));
-
-      let sx = 0, sy = 0, sw = srcW, sh = srcH;
-      if (srcRatio > destRatio) {
-        sw = srcH * destRatio;
-        sx = (srcW - sw) * focalX;
-      } else {
-        sh = srcW / destRatio;
-        sy = (srcH - sh) * focalY;
-      }
+      const fit = computeImageFit(
+        srcW,
+        srcH,
+        canvasW,
+        canvasH,
+        bg.objectFit || 'cover',
+        bg.focalPoint || { x: 0.5, y: 0.5 }
+      );
 
       ctx.save();
       ctx.globalAlpha = bg.opacity ?? 1.0;
-      ctx.drawImage(bgImage, sx, sy, sw, sh, 0, 0, canvasW, canvasH);
+      ctx.drawImage(bgImage, fit.sx, fit.sy, fit.sw, fit.sh, fit.dx, fit.dy, fit.dw, fit.dh);
       ctx.restore();
 
       // Draw Header Reading Zone Fade
@@ -531,16 +532,12 @@ export class PageTextureGenerator {
     const maxImgW = Math.max(10, boxW - padding * 2);
     const maxImgH = Math.max(10, boxH - padding * 2 - captionSpace);
 
-    let finalImgW = maxImgW;
-    let finalImgH = finalImgW / srcRatio;
+    const objectFit = el.data.objectFit || (usePolaroid ? 'contain' : 'cover');
+    const focalPoint = el.data.focalPoint || { x: 0.5, y: 0.5 };
+    const fit = computeImageFit(srcW, srcH, maxImgW, maxImgH, objectFit, focalPoint);
 
-    if (finalImgH > maxImgH) {
-      finalImgH = maxImgH;
-      finalImgW = finalImgH * srcRatio;
-    }
-
-    const cardW = Math.round(finalImgW + padding * 2);
-    const cardH = Math.round(finalImgH + padding * 2 + captionSpace);
+    const cardW = Math.round(fit.dw + padding * 2);
+    const cardH = Math.round(fit.dh + padding * 2 + captionSpace);
 
     if (usePolaroid) {
       // White Card Mount
@@ -566,27 +563,10 @@ export class PageTextureGenerator {
       }
     }
 
-    // Compute Source Cropping with objectFit & focalPoint
-    const objectFit = el.data.objectFit || (usePolaroid ? 'contain' : 'cover');
-    const focalX = Math.min(1, Math.max(0, el.data.focalPoint?.x ?? 0.5));
-    const focalY = Math.min(1, Math.max(0, el.data.focalPoint?.y ?? 0.5));
-
-    let sx = 0, sy = 0, sw = srcW, sh = srcH;
-    if (objectFit === 'cover') {
-      const destRatio = finalImgW / finalImgH;
-      if (srcRatio > destRatio) {
-        sw = srcH * destRatio;
-        sx = (srcW - sw) * focalX;
-      } else {
-        sh = srcW / destRatio;
-        sy = (srcH - sh) * focalY;
-      }
-    }
-
-    // Draw Image
-    const imgX = -cardW / 2 + padding;
-    const imgY = -cardH / 2 + padding;
-    ctx.drawImage(img, sx, sy, sw, sh, imgX, imgY, finalImgW, finalImgH);
+    // Draw Image with exact fit coordinates
+    const imgX = -cardW / 2 + padding + fit.dx;
+    const imgY = -cardH / 2 + padding + fit.dy;
+    ctx.drawImage(img, fit.sx, fit.sy, fit.sw, fit.sh, imgX, imgY, fit.dw, fit.dh);
 
     // Optional Washi Tape on top
     if (usePolaroid && s.washiTape !== false) {
@@ -943,8 +923,8 @@ export class PageTextureGenerator {
 
     const backCoverPage: Page = {
       id: `page-cover-back-${isInside ? 'inside' : 'outside'}`,
-      pageNumber: 999,
-      order: 999,
+      pageNumber: -1,
+      order: -1,
       side: isInside ? 'left' : 'right',
       layout: 'custom',
       background: {

@@ -19,24 +19,53 @@ async function main() {
   console.log('🌱 Starting comprehensive database seed for Phúc & Trang Love Journey...');
 
   // 1. Seed Admin User
-  const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@phucandtrang.love';
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'PhucAndTrang@20221020';
-  const passwordHash = await bcrypt.hash(adminPassword, 10);
+  const isProduction = process.env.NODE_ENV === 'production';
+  const adminEmail = process.env.SEED_ADMIN_EMAIL;
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+  const enableDevSeed = process.env.ENABLE_DEV_SEED === 'true' || !isProduction;
 
-  const admin = await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: {
-      passwordHash,
-      role: Role.ADMIN,
-    },
-    create: {
-      email: adminEmail,
-      passwordHash,
-      name: 'Phúc & Trang Admin',
-      role: Role.ADMIN,
-    },
-  });
-  console.log(`✅ Admin user seeded: ${admin.email}`);
+  let admin: any = null;
+
+  if (adminEmail && adminPassword) {
+    const existing = await prisma.user.findUnique({ where: { email: adminEmail } });
+    if (existing) {
+      console.log(`ℹ️ Admin user ${adminEmail} already exists. Preserving existing password.`);
+      admin = existing;
+    } else {
+      const passwordHash = await bcrypt.hash(adminPassword, 10);
+      admin = await prisma.user.create({
+        data: {
+          email: adminEmail,
+          passwordHash,
+          name: 'Phúc & Trang Admin',
+          role: Role.ADMIN,
+        },
+      });
+      console.log(`✅ Admin user seeded: ${admin.email}`);
+    }
+  } else if (enableDevSeed) {
+    const devEmail = 'admin@phucandtrang.love';
+    const existing = await prisma.user.findUnique({ where: { email: devEmail } });
+    if (existing) {
+      console.log(`ℹ️ Dev admin user already exists. Preserving existing password.`);
+      admin = existing;
+    } else {
+      const passwordHash = await bcrypt.hash('PhucAndTrang@20221020', 10);
+      admin = await prisma.user.create({
+        data: {
+          email: devEmail,
+          passwordHash,
+          name: 'Phúc & Trang Admin (Dev)',
+          role: Role.ADMIN,
+        },
+      });
+      console.log(`✅ Dev admin user seeded: ${admin.email}`);
+    }
+  } else {
+    throw new Error(
+      'FATAL: SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD environment variables are required for production seeding!',
+    );
+  }
 
   // 2. Seed Legacy Cloudinary Media Catalog
   const mediaUrlToIdMap = new Map<string, string>();
@@ -129,14 +158,14 @@ async function main() {
         name: t.name,
         description: t.description,
         slots: t.slots as any,
-        prototypes: t.prototypes as any,
+        prototypes: (t.elementPrototypes || (t as any).prototypes) as any,
       },
       create: {
         id: t.id,
         name: t.name,
         description: t.description,
         slots: t.slots as any,
-        prototypes: t.prototypes as any,
+        prototypes: (t.elementPrototypes || (t as any).prototypes) as any,
         isSystem: true,
       },
     });
@@ -177,12 +206,88 @@ async function main() {
             startDate: '2022-10-20',
             subtitle: 'Bên nhau từ ngày {{anniversaryDate}}',
           },
+          elements: [
+            {
+              id: 'cover-title',
+              type: 'TEXT',
+              slot: 'title',
+              order: 1,
+              zIndex: 10,
+              visible: true,
+              locked: true,
+              opacity: 1,
+              transform: { x: 0.068, y: 0.55, width: 0.86, height: 0.08, rotation: 0, scale: 1 },
+              style: {
+                textAlign: 'left',
+                color: '#FFFFFF',
+                fontFamily: '"SVN-Housttely Signature", "Coldwell Bridges", cursive, serif',
+                fontSize: 60,
+                letterSpacing: 1,
+                shadow: { color: 'rgba(0, 0, 0, 0.85)', blur: 12, offsetX: 0, offsetY: 3 },
+              },
+              data: { text: 'Chúng Mình', variant: 'title' },
+            },
+            {
+              id: 'cover-divider',
+              type: 'SHAPE',
+              slot: 'divider',
+              order: 2,
+              zIndex: 11,
+              visible: true,
+              locked: true,
+              opacity: 1,
+              transform: { x: 0.068, y: 0.625, width: 0.28, height: 0.002, rotation: 0, scale: 1 },
+              data: { shapeType: 'line', strokeColor: '#F0B6C3', strokeWidth: 2 },
+            },
+            {
+              id: 'cover-days-counter',
+              type: 'TEXT',
+              slot: 'counter',
+              order: 3,
+              zIndex: 12,
+              visible: true,
+              locked: true,
+              opacity: 1,
+              transform: { x: 0.068, y: 0.65, width: 0.86, height: 0.05, rotation: 0, scale: 1 },
+              style: {
+                textAlign: 'left',
+                color: '#FFE5B4',
+                fontFamily: 'Montserrat, sans-serif',
+                fontSize: 32,
+                fontWeight: 'bold',
+                letterSpacing: 1,
+                shadow: { color: 'rgba(0, 0, 0, 0.85)', blur: 12, offsetX: 0, offsetY: 3 },
+              },
+              data: { text: '{{daysTogether | number}} NGÀY', variant: 'title' },
+            },
+            {
+              id: 'cover-subtitle',
+              type: 'TEXT',
+              slot: 'subtitle',
+              order: 4,
+              zIndex: 13,
+              visible: true,
+              locked: true,
+              opacity: 1,
+              transform: { x: 0.068, y: 0.685, width: 0.86, height: 0.04, rotation: 0, scale: 1 },
+              style: {
+                textAlign: 'left',
+                color: 'rgba(255, 245, 247, 0.9)',
+                fontFamily: '"Dancing Script", cursive',
+                fontSize: 24,
+                fontStyle: 'italic',
+                shadow: { color: 'rgba(0, 0, 0, 0.85)', blur: 12, offsetX: 0, offsetY: 3 },
+              },
+              data: { text: 'Bên nhau từ ngày {{anniversaryDate}}', variant: 'quote' },
+            },
+          ],
         },
         back: {
           insideBackgroundUrl: lastCoverUrl,
           insideMediaId: getMediaId(lastCoverUrl),
           outsideBackgroundUrl: lastCoverUrl,
           outsideMediaId: getMediaId(lastCoverUrl),
+          elements: [],
         },
       },
       settings: {
@@ -678,8 +783,8 @@ async function main() {
 
     // Media & Caption elements based on layout preset
     const preset = REAL_LAYOUT_PRESETS[p.layout] || REAL_LAYOUT_PRESETS['auto'];
-    const mediaSlots = preset.prototypes.filter(
-      (pr) => pr.slot === 'primaryImage' || pr.slot === 'secondaryImage' || pr.slot === 'tertiaryImage' || pr.slot === 'quaternaryImage',
+    const mediaSlots = (preset.elementPrototypes || (preset as any).prototypes).filter(
+      (pr: any) => pr.slot === 'primaryImage' || pr.slot === 'secondaryImage' || pr.slot === 'tertiaryImage' || pr.slot === 'quaternaryImage',
     );
 
     for (let mIdx = 0; mIdx < p.items.length; mIdx++) {
@@ -791,26 +896,37 @@ async function main() {
   }
   console.log(`✅ Seeded all 21 pages and elements into PostgreSQL.`);
 
-  // 8. Seed Initial Version Snapshot
+  // 8. Seed Initial Version Snapshot with full complete pages & elements snapshot
+  const fullBookForSnapshot = await prisma.book.findUnique({
+    where: { id: book.id },
+    include: {
+      backgroundMusic: true,
+      pages: {
+        orderBy: { order: 'asc' },
+        include: {
+          elements: { orderBy: { zIndex: 'asc' } },
+          layoutTemplate: true,
+          audioTrack: true,
+        },
+      },
+    },
+  });
+
   await prisma.bookVersion.upsert({
     where: { id: 'initial-version-200' },
-    update: {},
+    update: {
+      snapshot: fullBookForSnapshot as any,
+    },
     create: {
       id: 'initial-version-200',
       bookId: book.id,
       version: '2.0.0',
-      snapshot: {
-        bookId: book.id,
-        slug: book.slug,
-        title: book.title,
-        status: book.status,
-        pagesCount: pagesData.length,
-      },
+      snapshot: fullBookForSnapshot as any,
       changelog: 'Khởi tạo hoàn chỉnh 21 trang với đầy đủ elements, captions, videos, và layout presets.',
       createdById: admin.id,
     },
   });
-  console.log('✅ Initial version snapshot 2.0.0 created.');
+  console.log('✅ Initial version snapshot 2.0.0 created with complete pages.');
 
   console.log('🎉 Database seeding completed successfully! Ready for production.');
 }

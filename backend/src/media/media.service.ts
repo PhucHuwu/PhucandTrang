@@ -54,12 +54,26 @@ export class MediaService {
    * Strictly enforces folder whitelisting and validates parameters.
    */
   getSignedUploadConfig(dto: SignedUploadRequestDto): CloudinarySignedConfig {
-    const cloudName =
-      this.configService.get<string>('CLOUDINARY_CLOUD_NAME') || 'dlvpiesfj';
-    const apiKey =
-      this.configService.get<string>('CLOUDINARY_API_KEY') || '935512575175661';
-    const apiSecret =
-      this.configService.get<string>('CLOUDINARY_API_SECRET') || '';
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME');
+    const apiKey = this.configService.get<string>('CLOUDINARY_API_KEY');
+    const apiSecret = this.configService.get<string>('CLOUDINARY_API_SECRET');
+
+    if (isProduction && (!cloudName || !apiKey || !apiSecret)) {
+      throw new BadRequestException(
+        'Cloudinary service is unconfigured in production. CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET are all required.',
+      );
+    }
+
+    const effectiveCloudName = cloudName || 'dlvpiesfj';
+    const effectiveApiKey = apiKey || '935512575175661';
+    const effectiveSecret = apiSecret || '';
+
+    if (!effectiveSecret) {
+      throw new BadRequestException(
+        'CLOUDINARY_API_SECRET is not configured on this server. Cannot generate signed upload configuration without valid secret.',
+      );
+    }
 
     const requestedFolder = dto.folder;
     const folder =
@@ -83,12 +97,12 @@ export class MediaService {
       paramsToSign.tags = dto.tags.join(',');
     }
 
-    const signature = generateCloudinarySignature(paramsToSign, apiSecret);
-    const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
+    const signature = generateCloudinarySignature(paramsToSign, effectiveSecret);
+    const uploadUrl = `https://api.cloudinary.com/v1_1/${effectiveCloudName}/${resourceType}/upload`;
 
     return {
-      cloudName,
-      apiKey,
+      cloudName: effectiveCloudName,
+      apiKey: effectiveApiKey,
       timestamp,
       signature,
       folder,
@@ -315,6 +329,39 @@ export class MediaService {
           field: 'cover.back.outsideBackgroundUrl',
           description: `Mặt ngoài bìa sau sách "${book.title}" (Outside Back Cover)`,
         });
+      }
+
+      // Scan cover elements (front & back)
+      for (const el of cover.front?.elements || []) {
+        const d = el.data || {};
+        if (matchesMedia(d.src || d.url, d.mediaId)) {
+          references.push({
+            targetType: 'BOOK_COVER',
+            bookId: book.id,
+            bookTitle: book.title,
+            bookSlug: book.slug,
+            elementId: el.id,
+            elementType: el.type,
+            field: 'cover.front.elements',
+            description: `Phần tử ${el.type} trên bìa trước sách "${book.title}"`,
+          });
+        }
+      }
+
+      for (const el of cover.back?.elements || []) {
+        const d = el.data || {};
+        if (matchesMedia(d.src || d.url, d.mediaId)) {
+          references.push({
+            targetType: 'BOOK_COVER',
+            bookId: book.id,
+            bookTitle: book.title,
+            bookSlug: book.slug,
+            elementId: el.id,
+            elementType: el.type,
+            field: 'cover.back.elements',
+            description: `Phần tử ${el.type} trên bìa sau sách "${book.title}"`,
+          });
+        }
       }
 
       if (matchesMedia(book.backgroundMusic?.src, book.backgroundMusic?.mediaId)) {

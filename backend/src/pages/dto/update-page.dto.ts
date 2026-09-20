@@ -3,11 +3,13 @@ import {
   IsOptional,
   IsInt,
   IsEnum,
-  IsObject,
   IsBoolean,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { PageSide, LayoutMode } from '@prisma/client';
+import { PageBackgroundDto } from '../../common/dto/page-background.dto';
 
 export class UpdatePageDto {
   @IsInt()
@@ -55,9 +57,10 @@ export class UpdatePageDto {
   @IsOptional()
   isCustomized?: boolean;
 
-  @IsObject()
+  @ValidateNested()
+  @Type(() => PageBackgroundDto)
   @IsOptional()
-  background?: Record<string, any>;
+  background?: PageBackgroundDto;
 
   @IsString()
   @IsOptional()

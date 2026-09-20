@@ -25,7 +25,7 @@ CREATE TABLE "users" (
     "email" TEXT NOT NULL,
     "passwordHash" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "role" "Role" NOT NULL DEFAULT 'VIEWER',
+    "role" "Role" NOT NULL DEFAULT 'ADMIN',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -45,7 +45,6 @@ CREATE TABLE "books" (
     "proposalQuote" TEXT DEFAULT 'Thế cậu đồng ý làm bạn gái tớ không?',
     "cover" JSONB NOT NULL,
     "settings" JSONB NOT NULL,
-    "content_revision" INTEGER NOT NULL DEFAULT 1,
     "background_music_id" TEXT,
     "ownerId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -196,9 +195,6 @@ CREATE INDEX "page_elements_pageId_zIndex_idx" ON "page_elements"("pageId", "zIn
 
 -- CreateIndex
 CREATE INDEX "page_elements_type_idx" ON "page_elements"("type");
-
--- CreateIndex
-CREATE INDEX "media_type_idx" ON "media"("type");
 
 -- CreateIndex
 CREATE INDEX "book_versions_bookId_version_idx" ON "book_versions"("bookId", "version");

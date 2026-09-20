@@ -19,6 +19,7 @@ import { UpdateMediaDto } from './dto/update-media.dto';
 import { QueryMediaDto } from './dto/query-media.dto';
 import { SignedUploadRequestDto } from './dto/signed-upload.dto';
 
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('media')
 export class MediaController {
   constructor(private mediaService: MediaService) {}
@@ -27,14 +28,12 @@ export class MediaController {
    * Request signed upload config for direct client upload to Cloudinary.
    * Admin/Editor authentication is strictly required.
    */
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(Role.ADMIN, Role.EDITOR)
   @Post('signature')
   getSignedUploadConfigPost(@Body() dto: SignedUploadRequestDto) {
     return this.mediaService.getSignedUploadConfig(dto);
   }
 
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(Role.ADMIN, Role.EDITOR)
   @Get('signature')
   getSignedUploadConfigGet(@Query() dto: SignedUploadRequestDto) {
@@ -44,6 +43,7 @@ export class MediaController {
   /**
    * Look up media by filename (e.g., '02-01-2025.jpg') or partial URL.
    */
+  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
   @Get('lookup')
   lookup(@Query('q') query: string) {
     return this.mediaService.lookup(query);
@@ -52,7 +52,6 @@ export class MediaController {
   /**
    * Sync legacy cloudinaryUrls.json map into the database.
    */
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(Role.ADMIN)
   @Post('sync-legacy')
   syncLegacy(@Body() legacyMap: Record<string, string>) {
@@ -62,6 +61,7 @@ export class MediaController {
   /**
    * List media items with pagination, filtering by type/provider, and text search.
    */
+  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
   @Get()
   findAll(@Query() query: QueryMediaDto) {
     return this.mediaService.findAll(query);
@@ -70,6 +70,7 @@ export class MediaController {
   /**
    * Get single media details by ID.
    */
+  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.mediaService.findOne(id);
@@ -78,6 +79,7 @@ export class MediaController {
   /**
    * Inspect all references in books, pages, elements, and audio tracks where this media is used.
    */
+  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
   @Get(':id/references')
   checkReferences(@Param('id') id: string) {
     return this.mediaService.checkReferences(id);
@@ -86,7 +88,6 @@ export class MediaController {
   /**
    * Save media metadata after successful direct upload to Cloudinary.
    */
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(Role.ADMIN, Role.EDITOR)
   @Post()
   create(@Body() dto: CreateMediaDto) {
@@ -96,7 +97,6 @@ export class MediaController {
   /**
    * Update media metadata.
    */
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(Role.ADMIN, Role.EDITOR)
   @Put(':id')
   update(@Param('id') id: string, @Body() dto: UpdateMediaDto) {
@@ -107,7 +107,6 @@ export class MediaController {
    * Safely deletes media.
    * If media is in use, rejects with 409 Conflict unless force=true.
    */
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(Role.ADMIN)
   @Delete(':id')
   remove(

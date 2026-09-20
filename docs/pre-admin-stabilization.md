@@ -1,154 +1,143 @@
-# Pre-Admin CMS Stabilization & Architecture Freeze
+# Pre-Admin CMS Stabilization & Architecture Freeze (Prompt 13.6)
 > Tài liệu tổng hợp toàn bộ các chuẩn hóa kiến trúc dữ liệu, API contract, bảo mật và tính đồng nhất giữa Backend NestJS, Database PostgreSQL, Generic 2D Canvas Renderer và Three.js WebGL Flipbook Engine trước khi bước vào xây dựng Admin CMS Foundation (Prompt 14).
 
 ---
 
 ## 1. Tóm Tắt Các Thay Đổi Kiến Trúc Đã Chuẩn Hóa
 
-### 1.1. Single Source of Truth cho `zIndex`
-- **Trước đây**: `zIndex` tồn tại song song ở cả `PageElement.zIndex` trong database và `transform.zIndex` trong JSON frontend.
-- **Hiện tại**:
-  - `PageElement.zIndex` là nguồn chân lý duy nhất (`number`).
-  - Loại bỏ hoàn toàn `zIndex` khỏi `ElementTransform`.
-  - `PageTextureGenerator` sắp xếp các phần tử bằng:
-    ```ts
-    elements.sort((a, b) => a.zIndex - b.zIndex);
-    ```
-  - Tất cả DTOs, mutation methods (`create`, `duplicate`, `reorder`, `batchUpdate`) và database seed đều tuân thủ contract này. Có backward normalization tự động nếu dữ liệu legacy còn sót lại.
+### 1.1. Chiến Lược Migration Prisma Bắt Buộc (Prisma Migration Strategy)
+- **Khôi phục migration ban đầu sạch**:
+  - `backend/prisma/migrations/20260920000000_init/migration.sql` được đưa về đúng trạng thái gốc, loại bỏ hoàn toàn lỗi duplicate index `media_type_idx`.
+- **Tạo migration mới cho stabilization**:
+  - `backend/prisma/migrations/20260921000000_pre_admin_stabilization/migration.sql`:
+    - Thay đổi default role của `User.role` thành `'VIEWER'`.
+    - Bổ sung cột `content_revision` (INTEGER NOT NULL DEFAULT 1) vào bảng `books`.
+- Cả hai trường hợp database mới tinh và database đã chạy init cũ đều có migration path 100% hợp lệ.
 
-### 1.2. Chuẩn Hóa Media Contract & Canonical `mediaId`
-- **Quy tắc**:
-  - Trong PostgreSQL: Lưu khóa ngoại `mediaId` (và `posterMediaId` cho video) trỏ về bảng `Media`.
-  - Trong Public API: Backend tự động batch query bảng `Media` và phân giải `mediaId` thành URL `src` và `thumbnailUrl` chính xác tại runtime.
-  - Generic Page Renderer chỉ nhận URL `src` trực tiếp mà không cần thực hiện thêm request nào.
+### 1.2. Bảo Vệ Toàn Bộ Admin Read APIs (Admin Read Route Protection)
+- Chỉ có 2 nhóm endpoint mở công khai không cần JWT:
+  - `GET /api/public/**`
+  - `POST /api/auth/login` (và `POST /api/auth/register` ở development)
+- Tất cả các endpoint quản trị còn lại đều bắt buộc JWT:
+  - `/books/**`
+  - `/pages/**`
+  - `/page-elements/**`
+  - `/layout-templates/**`
+  - `/media/**`
+  - `/audio/**`
+  - `/versions/**`
+- Phân quyền theo RBAC:
+  - `VIEWER`, `EDITOR`, `ADMIN`: Có quyền xem (`GET`) thông tin CMS/draft/references.
+  - `EDITOR`, `ADMIN`: Có quyền sửa đổi/thêm mới (`POST`, `PUT`, `PATCH`).
+  - `ADMIN`: Có quyền xóa (`DELETE`), rollback version, quản lý hệ thống.
 
-### 1.3. Khắc Phục Hoàn Toàn Phần Tử Video (`VIDEO`)
-- Phân biệt rõ ràng giữa luồng phát video và ảnh poster tĩnh:
-  ```ts
-  {
-    type: 'VIDEO',
-    data: {
-      src: 'https://.../phuc_trang_memories/26-06-2323.mp4',
-      thumbnailUrl: 'https://.../phuc_trang_memories/26-06-2323_thumb.jpg',
-      aspectRatio: 16 / 9
-    }
-  }
-  ```
-- 3 video kỷ niệm hiện tại (`26-06-2323.mp4`, `Brithdate-together-25-05-2024.mp4`, `17-01-2025.mp4`) đã được trỏ đúng file video MP4 thay vì mở nhầm file ảnh JPG thumbnail.
+### 1.3. Vô Hiệu Hóa Đăng Ký Công Khai Ở Production (Disable Public Register)
+- Endpoint `POST /api/auth/register` tự động chặn và trả lỗi `403 Forbidden` khi chạy ở môi trường `production`.
+- Ở môi trường `development`, đăng ký luôn tạo tài khoản mang quyền `VIEWER`, client tuyệt đối không thể tự nâng quyền lên `ADMIN`.
 
-### 1.4. Video ActiveArea & Raycasting Coordinate System
-- Tạo helper chuyển đổi tọa độ chuẩn `computeActiveAreaPageRect(transform, relativeActiveArea)`:
-  - Nếu không có `activeArea`, hitbox bao phủ 100% diện tích `transform`.
-  - Nếu có `activeArea`, tọa độ của nó là tỉ lệ phần trăm tương đối [0..1] bên trong phần tử:
-    ```ts
-    pageLeft = element.transform.x + activeArea.left * element.transform.width;
-    pageTop = element.transform.y + activeArea.top * element.transform.height;
-    pageWidth = activeArea.width * element.transform.width;
-    pageHeight = activeArea.height * element.transform.height;
-    ```
-- Hitbox click video trong 3D WebGL khớp chính xác từng điểm ảnh với khung polaroid trên mặt trang.
+### 1.4. Quản Lý Thông Tin Seed Admin An Toàn (Admin Seed Credentials)
+- Production yêu cầu biến môi trường `SEED_ADMIN_EMAIL` và `SEED_ADMIN_PASSWORD`. Nếu thiếu, script seed sẽ dừng lại với thông báo lỗi rõ ràng thay vì dùng password hardcode.
+- Ở development, cho phép dùng tài khoản dev khi `ENABLE_DEV_SEED=true` hoặc `NODE_ENV !== 'production'`.
+- Cơ chế kiểm tra an toàn: Không tự ý reset password của tài khoản admin đã tồn tại khi chạy lại `prisma db seed`.
 
-### 1.5. Tách Rời Thứ Tự Trang Vật Lý Khỏi `pageNumber`
-- `order` (0-indexed) là source of truth duy nhất quyết định thứ tự xếp trang và sequencing của 3D Flipbook.
-- `pageNumber` đóng vai trò là số trang hiển thị (metadata).
-- Hàm phân loại mặt trang tập trung `derivePageSide(order)`:
-  - `order` chẵn (0, 2, 4...): mặt trái (`'left'` / `PageSide.LEFT`).
-  - `order` lẻ (1, 3, 5...): mặt phải (`'right'` / `PageSide.RIGHT`).
-- Đảm bảo khi thêm, bớt, nhân bản hay sắp xếp lại trang, các mặt lá lật và video click zones không bị xáo trộn.
+### 1.5. Khắc Phục Lỗi Renderer Bìa Sau (Back Cover Generic Renderer)
+- Bìa sau (inside và outside) sử dụng `pageNumber = -1` (thay vì số ảo `999`), ngăn chặn hoàn toàn việc Generic Renderer vẽ footer `— 999 —` lên bìa sách.
+- Truyền đầy đủ `bookContext` vào `createBackCoverTexture(url, isInside, book)` để bìa sau thừa hưởng đúng canvas resolution, elements từ DB và dynamic text variables.
 
-### 1.6. Real LayoutTemplate Trong Cơ Sở Dữ Liệu
-- Bảng `LayoutTemplate` trong PostgreSQL không còn lưu array rỗng `slots: [], prototypes: []`.
-- Cả 9 layout presets (`single-hero`, `dual-columns`, `dual-stacked`, `asymmetric-featured`, `scrapbook-trio`, `quad-gallery`, `diagonal-duo`, `auto`, `custom`) đều được nạp đầy đủ cấu hình slots và element prototypes hoàn chỉnh.
-- `applyLayoutTemplate` hoạt động theo nguyên lý generic prototype: sau khi dàn trang khởi tạo, các element hoàn toàn độc lập, có thể di chuyển, kéo dãn, xoay, đổi màu và xóa tự do.
+### 1.6. Bìa Trước và Bìa Sau Hoàn Toàn Do Database Điều Khiển (Database-Driven Covers)
+- Cấu hình bìa trước trong PostgreSQL chứa đầy đủ danh sách `elements`:
+  - Tiêu đề "Chúng Mình" (`TEXT`)
+  - Đường kẻ phân cách (`SHAPE`)
+  - Bộ đếm ngày yêu `{{daysTogether | number}} NGÀY` (`TEXT`)
+  - Lời đề tựa `Bên nhau từ ngày {{anniversaryDate}}` (`TEXT`)
+- Public API compiler quét và phân giải `mediaId` cho cả các phần tử trên bìa trước và bìa sau.
+- Media reference checker quét cả `cover.front.elements` và `cover.back.elements` để ngăn chặn xóa nhầm ảnh đang dùng trên bìa.
 
-### 1.7. Caption Trở Thành Phần Tử `TEXT` Độc Lập
-- Thay vì vẽ chữ caption gộp chung trong hàm vẽ ảnh, `applyLayoutTemplate` sinh ra một phần tử `TEXT` độc lập mang `variant: 'caption'`, mang `zIndex` riêng và nằm ngay dưới khung ảnh.
-- Quản trị viên CMS sau này có thể di chuyển, đổi font chữ, đổi màu, căn lề hoặc ẩn/xóa caption như bất kỳ khối text nào.
-- Vẫn duy trì cơ chế đọc `image.data.caption` cũ để backward compatibility.
+### 1.7. Thuật Toán `objectFit` và `focalPoint` Chuẩn Xác
+- Xây dựng module tính toán tọa độ thuần toán học `shared/imageFitting.ts` (`computeImageFit`):
+  - **`contain`**: Giữ nguyên tỉ lệ ảnh, thu phóng vừa vặn bên trong hộp đích và căn giữa, không cắt xén.
+  - **`cover`**: Lấp đầy 100% hộp đích, cắt bỏ phần thừa của ảnh nguồn dựa trên điểm neo `focalPoint: { x, y }` (0..1).
+  - **`fill`**: Kéo dãn trực tiếp ảnh nguồn để phủ kín toàn bộ hộp đích.
+- Áp dụng đồng bộ cho cả phần tử `IMAGE` và nền trang `PageBackground`.
 
-### 1.8. Nâng Cấp Nền Tảng Renderer (Image, Text, Background, Cover)
-- **Image Renderer**: Hỗ trợ `objectFit` (`'cover'`, `'contain'`, `'fill'`) kết hợp tọa độ điểm neo crop ảnh `focalPoint: { x, y }` (0.0 đến 1.0).
-- **Text Renderer**: Tích hợp thuật toán tự động xuống dòng `wrapText` theo chiều rộng hộp phần tử `boxW`. Biến động `{{...}}` được phân giải trước khi tính độ rộng dòng.
-- **Background Renderer**: Hỗ trợ đầy đủ 3 loại nền: `'color'`, `'image'` (kèm `focalPoint`), và `'gradient'` (linear gradient nhiều stop), đồng thời bảo lưu dải chuyển mờ mép gáy `gutterFade` và vùng chữ đọc `headerFade`.
-- **Generic Cover Renderer**: Bìa trước và bìa sau được định nghĩa bằng đối tượng `Page` và danh sách `PageElement[]` đồng nhất, đưa toàn bộ quy trình vẽ về một hàm duy nhất `PageTextureGenerator.renderPageTexture()`.
-- **Canvas Resolution**: Hỗ trợ độ phân giải linh hoạt lấy từ `book.settings.dimensions.canvasResolution` (mặc định 1024x1360).
+### 1.8. Chuẩn Hóa Thứ Tự Trang và Mặt Lật Sau Mutation (Page Order & Side Normalization)
+- Bổ sung phương thức `normalizeBookPageSequence(bookId)` trong `PagesService`:
+  - Sau mọi thao tác thêm, xóa, nhân bản (`duplicate`), hoặc sắp xếp lại (`reorder`), hệ thống tự động đánh số lại `order` liên tục từ `0` đến `N-1`.
+  - Tự động gán lại mặt lật `side`: `order` chẵn = `LEFT`, `order` lẻ = `RIGHT`.
+- Phương thức `duplicate` hỗ trợ cờ `insertAfter?: boolean` để chèn trang mới ngay sau trang gốc thay vì luôn đẩy về cuối sách.
 
-### 1.9. Public API Cache, Revision & ETag
-- Thêm trường `contentRevision` vào model `Book`.
-- Xây dựng `PublicCacheService` với phương thức `touchBook(bookId)`:
-  - Tự động tăng `contentRevision` và xóa cache mỗi khi có thay đổi ở sách, trang, phần tử, ảnh bìa, âm thanh hay layout.
-- ETag của Public API được tính bằng:
-  ```text
-  ETag = "{bookId}-rev{contentRevision}-v{version}"
-  ```
-  Ngăn chặn triệt để tình trạng người xem nhận dữ liệu cache cũ khi trang đã được chỉnh sửa.
+### 1.9. Cache Invalidation Cho Audio và Rollback An Toàn (Audio & Version Rollback Cache)
+- Khi thêm, sửa, xóa `AudioTrack`, hệ thống tự động tìm tất cả sách (`backgroundMusicId`) và trang (`audioTrackId`) có liên quan để gọi `PublicCacheService.touchBook(bookId)`.
+- Phương thức `rollbackToSnapshot` kiểm tra nghiêm ngặt cấu trúc snapshot: Nếu snapshot không chứa danh sách trang hợp lệ (`pages` array), hệ thống từ chối rollback ngay lập tức để bảo vệ dữ liệu sách hiện tại.
+- Khi rollback thành công, hệ thống tăng `contentRevision` và xóa sạch cache để Public API phản ánh ngay lập tức.
 
-### 1.10. Bảo Mật Toàn Diện (Security Hardening)
-- **Xác thực quyền hạn (RBAC)**:
-  - Cung cấp `@Roles(Role.ADMIN, Role.EDITOR)` và `RolesGuard`.
-  - Chỉ route `GET /public/**` và `POST /auth/login` là mở công khai.
-  - Tất cả API sửa đổi (Books, Pages, Elements, Audio, Media, Versions) đều yêu cầu JWT Token hợp lệ cùng vai trò phù hợp.
-- **Đăng ký người dùng**:
-  - Public registration (`POST /auth/register`) chỉ tạo tài khoản quyền `VIEWER`. Chỉ quản trị viên `ADMIN` mới có thể cấp quyền `EDITOR` hoặc `ADMIN`.
-- **Cloudinary Signature**:
-  - Endpoint lấy chữ ký upload `POST /media/signature` bắt buộc đăng nhập (ADMIN/EDITOR), áp dụng whitelist chặt chẽ các thư mục cho phép (`phuc_trang_memories`, `phuc_trang_backgrounds`, `phuc_trang_audio`...).
-- **JWT & CORS**:
-  - Ép buộc khai báo `JWT_SECRET` chuyên biệt ở môi trường production.
-  - Cấu hình whitelist tên miền an toàn qua `CORS_ORIGINS`.
-- **BigInt Serialization**:
-  - Không monkey-patch global `BigInt.prototype.toJSON`. Kích thước file media được chuyển đổi an toàn theo `Number.MAX_SAFE_INTEGER`.
+### 1.10. Validation DTO Chặt Chẽ (Strict Nested DTOs)
+- `ElementTransformDto`: Kiểm tra kiểu số hữu hạn, `width > 0`, `height > 0`, `scale > 0`, `rotation` (-3600..3600), tọa độ `x`, `y` (-2..3).
+- `PageBackgroundDto`: Kiểm tra `type` (`'color'`, `'image'`, `'gradient'`), `opacity` (0..1), `focalPoint` (x/y 0..1), `objectFit`, `gradient.stops`.
+- `ElementInteractionDto`: Kiểm tra `enabled`, `action` (trong danh sách cho phép), `activeArea` (`left`, `top`, `width > 0`, `height > 0`).
+- Bảo tồn ngữ nghĩa `safeDeepMerge`: Khi gửi request `PATCH`, các trường lồng nhau không bị xóa mất dữ liệu cũ và chặn đứng prototype pollution (`__proto__`, `constructor`, `prototype`).
 
-### 1.11. Decouple Fallback Môi Trường Production
-- Cấu hình biến môi trường `NEXT_PUBLIC_ENABLE_LOCAL_BOOK_FALLBACK`.
-- Ở môi trường `development`, khi chưa bật backend, giao diện tự động dùng fallback `PHUC_AND_TRANG_BOOK` để lập trình viên làm việc thuận tiện.
-- Ở môi trường `production`, nếu backend offline, hệ thống hiển thị màn hình báo lỗi sang trọng kèm nút tải lại trang, tuyệt đối không âm thầm nuốt lỗi và hiển thị dữ liệu hardcode cũ.
-- Khi backend trả về `audio: null`, website tắt nhạc nền và không hiển thị đĩa nhạc, không cưỡng ép phát nhạc từ local.
+### 1.11. Loại Bỏ Trùng Lặp Nguồn Chân Lý (Shared Workspace Module)
+- Toàn bộ definitions của 9 Layout Presets, `imageFitting`, `coordinateConversion`, `safeMerge`, `textVariableResolver` và `pageUtils` được đặt tập trung tại thư mục `shared/`.
+- Cả Frontend Next.js và Backend NestJS đều import trực tiếp từ nguồn chân lý duy nhất này, loại bỏ hoàn toàn nguy cơ sửa một bên mà quên bên còn lại.
+- Hỗ trợ `LayoutTemplateId = BuiltInLayoutTemplateId | string` để không bị xung đột kiểu khi quản trị viên tạo thêm layout tùy biến trong CMS.
 
-### 1.12. Timezone-Safe Dynamic Variables
-- Thuật toán `calculateDaysTogether` được chuẩn hóa theo giờ UTC Midnight giữa ngày kỷ niệm (20.10.2022) và ngày tham chiếu.
-- Đảm bảo tính toán chính xác 100% số ngày yêu nhau dù người dùng truy cập ở bất kỳ múi giờ nào (Việt Nam UTC+7, Mỹ UTC-5 hay Châu Âu UTC+1), loại bỏ hoàn toàn lỗi lệch 1 ngày do timezone offset.
+### 1.12. Serializer BigInt và Cấu Hình Cloudinary & CORS
+- `AudioService` chuẩn hóa `media.size` thành safe number hoặc string, loại bỏ global monkey-patch `BigInt.prototype.toJSON`.
+- Kiểm tra bắt buộc biến môi trường Cloudinary (`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`) ở production.
+- Cấu hình CORS production hỗ trợ domain chính thức `https://love.phuchuwu.io.vn` bên cạnh whitelist tùy biến qua `CORS_ORIGINS`.
 
 ---
 
-## 2. Danh Sách Lệnh Kiểm Tra & Dựng Database
+## 2. Ma Trận Quyền Hạn API (API Access Matrix)
 
-1. **Khởi tạo Prisma Client**:
-   ```bash
-   cd backend
-   npx prisma generate
-   ```
-2. **Nạp toàn bộ dữ liệu 21 trang vào PostgreSQL**:
-   ```bash
-   cd backend
-   npx prisma db seed
-   ```
-3. **Chạy bộ kiểm thử tự động (Unit & Integration Tests)**:
-   ```bash
-   cd backend
-   npm test
-   ```
-   *(Toàn bộ 34 bài test thuộc 8 test suites đều vượt qua 100%)*
-4. **Kiểm tra biên dịch production**:
-   ```bash
-   # Backend NestJS
-   cd backend
-   npm run build
-
-   # Frontend Next.js
-   cd ..
-   npm run build
-   ```
+| Endpoint | Anonymous | VIEWER | EDITOR | ADMIN |
+| :--- | :---: | :---: | :---: | :---: |
+| `GET /api/public/**` | ✅ | ✅ | ✅ | ✅ |
+| `POST /api/auth/login` | ✅ | ✅ | ✅ | ✅ |
+| `POST /api/auth/register` | ✅ *(dev only)* | ❌ | ❌ | ❌ |
+| `GET /api/books/**` | ❌ (401) | ✅ | ✅ | ✅ |
+| `POST /api/books` | ❌ (401) | ❌ (403) | ✅ | ✅ |
+| `PUT/PATCH /api/books/:id` | ❌ (401) | ❌ (403) | ✅ | ✅ |
+| `DELETE /api/books/:id` | ❌ (401) | ❌ (403) | ❌ (403) | ✅ |
+| `GET /api/pages/**` | ❌ (401) | ✅ | ✅ | ✅ |
+| `POST/PUT/PATCH /api/pages/**` | ❌ (401) | ❌ (403) | ✅ | ✅ |
+| `DELETE /api/pages/:id` | ❌ (401) | ❌ (403) | ❌ (403) | ✅ |
+| `GET /api/page-elements/**` | ❌ (401) | ✅ | ✅ | ✅ |
+| `POST/PUT/PATCH /api/page-elements/**` | ❌ (401) | ❌ (403) | ✅ | ✅ |
+| `DELETE /api/page-elements/:id` | ❌ (401) | ❌ (403) | ❌ (403) | ✅ |
+| `GET /api/media/**` | ❌ (401) | ✅ | ✅ | ✅ |
+| `POST /api/media/signature` | ❌ (401) | ❌ (403) | ✅ | ✅ |
+| `POST/PUT /api/media/**` | ❌ (401) | ❌ (403) | ✅ | ✅ |
+| `DELETE /api/media/:id` | ❌ (401) | ❌ (403) | ❌ (403) | ✅ |
+| `GET /api/audio/**` | ❌ (401) | ✅ | ✅ | ✅ |
+| `POST/PUT /api/audio/**` | ❌ (401) | ❌ (403) | ✅ | ✅ |
+| `DELETE /api/audio/:id` | ❌ (401) | ❌ (403) | ❌ (403) | ✅ |
+| `GET /api/versions/**` | ❌ (401) | ✅ | ✅ | ✅ |
+| `POST /api/versions/book/:id/snapshot` | ❌ (401) | ❌ (403) | ✅ | ✅ |
+| `POST /api/versions/book/:id/rollback/:verId` | ❌ (401) | ❌ (403) | ❌ (403) | ✅ |
 
 ---
 
-## 3. Checklist Xác Nhận Sẵn Sàng Cho Prompt 14 (Admin CMS Foundation)
-- [x] Không còn hardcode nội dung câu chuyện trong 3D Engine.
-- [x] Toàn bộ 21 trang của cuốn sách "Chúng Mình" được lưu trữ nguyên vẹn trong PostgreSQL.
-- [x] `PageElement.zIndex` đồng nhất 100% giữa Database, Backend DTO và Frontend Canvas Renderer.
-- [x] Bảng `LayoutTemplate` trong Database có đầy đủ prototype để CMS hiển thị và áp dụng.
-- [x] Video element phân tách rõ ràng video source (`.mp4`) và ảnh bìa poster (`.jpg`).
-- [x] Tọa độ click chuột Video ActiveArea raycasting chuẩn xác với khung ảnh polaroid.
-- [x] Caption ảnh đã tách thành khối `TEXT` độc lập cho phép kéo thả và tùy chỉnh tự do.
-- [x] Cơ chế safe deep-merge hỗ trợ hoàn hảo phương thức `PATCH` cho các thao tác chỉnh sửa thuộc tính trong tương lai.
-- [x] Endpoint lấy chữ ký Cloudinary và CRUD dữ liệu được bảo vệ an toàn bằng JWT và RBAC.
-- [x] Cả hai dự án Frontend và Backend biên dịch không lỗi (0 TypeScript errors).
+## 3. Kết Quả Kiểm Thử Tự Động (Test Verification)
+- **Tổng số test suites**: 11 passed (100%).
+- **Tổng số unit/integration tests**: 42 passed (100%).
+  1. `utils/image-fitting.spec.ts`: Test contain, cover, fill, focalPoint crop calculation.
+  2. `utils/coordinate-conversion.spec.ts`: Test active area relative-to-element coordinate conversion.
+  3. `utils/page-utils.spec.ts`: Test deterministic sequencing, side derivation, leaf/face calculation.
+  4. `utils/safe-merge.spec.ts`: Test safe partial deep-merge and prototype pollution blocking.
+  5. `utils/text-variable-resolver.spec.ts`: Test variable parsing, pipes, timezone consistency.
+  6. `auth/roles.guard.spec.ts`: Test RBAC authorization rules and role gating.
+  7. `pages/pages.service.spec.ts`: Test page order normalization (0..N-1) and contiguous sequence.
+  8. `versions/versions.service.spec.ts`: Test corrupted snapshot rollback rejection and atomic execution.
+  9. `public/public.service.spec.ts`: Test public document compilation, mediaId resolution, hidden elements filtering, ETag.
+  10. `media/media.service.spec.ts`: Test signed upload config, media reference scanner (cover, page, audio, video).
+  11. `app.controller.spec.ts`: Test basic server controller.
+- **Biên dịch**:
+  - `backend`: `npm run build` thành công 100%.
+  - `frontend`: `npm run build` thành công 100% (0 errors).
+
+---
+
+## 4. Xác Nhận Sẵn Sàng Chuyển Giao Cho Prompt 14
+Hệ thống đã đạt toàn bộ 26 điều kiện trong Definition of Done của Prompt 13.6. Cơ sở dữ liệu, API contract, Generic Renderer và cơ chế bảo mật đã đóng băng ổn định để bắt đầu xây dựng giao diện Admin CMS Foundation.

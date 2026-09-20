@@ -72,11 +72,13 @@ export default function QbjectAuthenticExperience() {
         // 5. Render back cover (inside & outside)
         const coverBackInside = await PageTextureGenerator.createBackCoverTexture(
           book.cover.back.insideBackgroundUrl,
-          true
+          true,
+          book
         );
         const coverBackOutside = await PageTextureGenerator.createBackCoverTexture(
           book.cover.back.outsideBackgroundUrl,
-          false
+          false,
+          book
         );
         if (destroyed) return;
         setLoadingProgress(0.86);

@@ -9,8 +9,12 @@ import {
   IsNumber,
   Min,
   Max,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ElementType } from '@prisma/client';
+import { ElementTransformDto } from '../../common/dto/element-transform.dto';
+import { ElementInteractionDto } from '../../common/dto/element-interaction.dto';
 
 export class CreatePageElementDto {
   @IsString()
@@ -46,9 +50,10 @@ export class CreatePageElementDto {
   @IsOptional()
   opacity?: number;
 
-  @IsObject()
+  @ValidateNested()
+  @Type(() => ElementTransformDto)
   @IsNotEmpty()
-  transform: Record<string, any>;
+  transform: ElementTransformDto;
 
   @IsObject()
   @IsOptional()
@@ -58,7 +63,8 @@ export class CreatePageElementDto {
   @IsNotEmpty()
   data: Record<string, any>;
 
-  @IsObject()
+  @ValidateNested()
+  @Type(() => ElementInteractionDto)
   @IsOptional()
-  interaction?: Record<string, any>;
+  interaction?: ElementInteractionDto;
 }

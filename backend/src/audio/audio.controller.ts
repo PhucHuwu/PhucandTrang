@@ -16,28 +16,29 @@ import { Role } from '@prisma/client';
 import { CreateAudioTrackDto } from './dto/create-audio-track.dto';
 import { UpdateAudioTrackDto } from './dto/update-audio-track.dto';
 
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('audio')
 export class AudioController {
   constructor(private audioService: AudioService) {}
 
+  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
   @Get()
   async findAll() {
     return this.audioService.findAll();
   }
 
+  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.audioService.findOne(id);
   }
 
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(Role.ADMIN, Role.EDITOR)
   @Post()
   async create(@Body() dto: CreateAudioTrackDto) {
     return this.audioService.create(dto);
   }
 
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(Role.ADMIN, Role.EDITOR)
   @Put(':id')
   async update(
@@ -47,7 +48,6 @@ export class AudioController {
     return this.audioService.update(id, dto);
   }
 
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(Role.ADMIN)
   @Delete(':id')
   async remove(@Param('id') id: string) {

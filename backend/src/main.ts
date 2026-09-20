@@ -20,6 +20,7 @@ async function bootstrap() {
       corsOrigin = process.env.CORS_ORIGINS.split(',').map((s) => s.trim());
     } else {
       corsOrigin = [
+        'https://love.phuchuwu.io.vn',
         'https://phucandtrang.love',
         'https://phuc-and-trang.vercel.app',
         /\.vercel\.app$/,

@@ -117,17 +117,29 @@ export class PublicService {
   }
 
   /**
-   * Scans all mediaIds referenced in covers, backgrounds, elements, and audio,
+   * Scans all mediaIds referenced in covers, cover elements, backgrounds, elements, and audio,
    * then fetches them in one batch to resolve canonical runtime URLs.
    */
   private async collectAndResolveMedia(book: any): Promise<Map<string, any>> {
     const mediaIdSet = new Set<string>();
 
-    // 1. Cover mediaIds
+    // 1. Cover background & cover elements mediaIds
     const cover = (book.cover as any) || {};
     if (cover.front?.mediaId) mediaIdSet.add(cover.front.mediaId);
     if (cover.back?.insideMediaId) mediaIdSet.add(cover.back.insideMediaId);
     if (cover.back?.outsideMediaId) mediaIdSet.add(cover.back.outsideMediaId);
+
+    for (const el of cover.front?.elements || []) {
+      const d = (el.data as any) || {};
+      if (d.mediaId) mediaIdSet.add(d.mediaId);
+      if (d.posterMediaId) mediaIdSet.add(d.posterMediaId);
+    }
+
+    for (const el of cover.back?.elements || []) {
+      const d = (el.data as any) || {};
+      if (d.mediaId) mediaIdSet.add(d.mediaId);
+      if (d.posterMediaId) mediaIdSet.add(d.posterMediaId);
+    }
 
     // 2. Background music
     if (book.backgroundMusic?.mediaId) {
@@ -158,6 +170,80 @@ export class PublicService {
     }
 
     return mediaMap;
+  }
+
+  /**
+   * Compiles an individual element, resolving canonical media URLs and normalizing transform.
+   */
+  private compileElement(
+    el: any,
+    mediaMap: Map<string, any>,
+    images: Set<string>,
+    allUrls: Set<string>,
+    videos: Array<{ url: string; thumbnailUrl?: string; caption?: string }>,
+  ): CompiledElement {
+    const rawData = (el.data as any) || {};
+    const data: Record<string, any> = { ...rawData };
+
+    // Resolve Image canonical URL
+    if (el.type === 'IMAGE') {
+      const resolvedSrc =
+        (rawData.mediaId && mediaMap.get(rawData.mediaId)?.url) || rawData.src;
+      data.src = resolvedSrc;
+      if (resolvedSrc) {
+        images.add(resolvedSrc);
+        allUrls.add(resolvedSrc);
+      }
+    }
+
+    // Resolve Video canonical URL and poster thumbnail
+    if (el.type === 'VIDEO') {
+      const resolvedSrc =
+        (rawData.mediaId && mediaMap.get(rawData.mediaId)?.url) || rawData.src;
+      const resolvedPoster =
+        (rawData.posterMediaId && mediaMap.get(rawData.posterMediaId)?.url) ||
+        rawData.thumbnailUrl;
+
+      data.src = resolvedSrc;
+      data.thumbnailUrl = resolvedPoster;
+
+      if (resolvedSrc) {
+        allUrls.add(resolvedSrc);
+        videos.push({
+          url: resolvedSrc,
+          thumbnailUrl: resolvedPoster,
+          caption: rawData.caption,
+        });
+      }
+      if (resolvedPoster) {
+        images.add(resolvedPoster);
+        allUrls.add(resolvedPoster);
+      }
+    }
+
+    // Ensure transform has no duplicate zIndex
+    const rawTransform = (el.transform as any) || {};
+    const transform = {
+      x: Number(rawTransform.x ?? 0),
+      y: Number(rawTransform.y ?? 0),
+      width: Number(rawTransform.width ?? 0.5),
+      height: Number(rawTransform.height ?? 0.5),
+      rotation: Number(rawTransform.rotation ?? 0),
+      scale: Number(rawTransform.scale ?? 1),
+    };
+
+    return {
+      id: el.id,
+      type: el.type,
+      slot: el.slot || null,
+      order: el.order ?? el.zIndex ?? 1,
+      zIndex: el.zIndex ?? 1,
+      opacity: el.opacity ?? 1.0,
+      transform,
+      style: el.style as any,
+      data,
+      interaction: el.interaction as any,
+    };
   }
 
   /**
@@ -226,6 +312,15 @@ export class PublicService {
       allUrls.add(backOutsideBg);
     }
 
+    // Compile cover elements (if any)
+    const frontCoverElements = (cover.front?.elements || [])
+      .filter((el: any) => el.visible !== false)
+      .map((el: any) => this.compileElement(el, mediaMap, images, allUrls, videos));
+
+    const backCoverElements = (cover.back?.elements || [])
+      .filter((el: any) => el.visible !== false)
+      .map((el: any) => this.compileElement(el, mediaMap, images, allUrls, videos));
+
     // 3. Pages & Elements: sort strictly by order ASC
     const rawPages = [...(book.pages || [])].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
 
@@ -271,70 +366,9 @@ export class PublicService {
         .filter((el: any) => el.visible !== false)
         .sort((a: any, b: any) => (a.zIndex ?? 1) - (b.zIndex ?? 1));
 
-      const compiledElements: CompiledElement[] = rawElements.map((el: any) => {
-        const rawData = (el.data as any) || {};
-        const data: Record<string, any> = { ...rawData };
-
-        // Resolve Image canonical URL
-        if (el.type === 'IMAGE') {
-          const resolvedSrc =
-            (rawData.mediaId && mediaMap.get(rawData.mediaId)?.url) || rawData.src;
-          data.src = resolvedSrc;
-          if (resolvedSrc) {
-            images.add(resolvedSrc);
-            allUrls.add(resolvedSrc);
-          }
-        }
-
-        // Resolve Video canonical URL and poster thumbnail
-        if (el.type === 'VIDEO') {
-          const resolvedSrc =
-            (rawData.mediaId && mediaMap.get(rawData.mediaId)?.url) || rawData.src;
-          const resolvedPoster =
-            (rawData.posterMediaId && mediaMap.get(rawData.posterMediaId)?.url) ||
-            rawData.thumbnailUrl;
-
-          data.src = resolvedSrc;
-          data.thumbnailUrl = resolvedPoster;
-
-          if (resolvedSrc) {
-            allUrls.add(resolvedSrc);
-            videos.push({
-              url: resolvedSrc,
-              thumbnailUrl: resolvedPoster,
-              caption: rawData.caption,
-            });
-          }
-          if (resolvedPoster) {
-            images.add(resolvedPoster);
-            allUrls.add(resolvedPoster);
-          }
-        }
-
-        // Ensure transform has no duplicate zIndex
-        const rawTransform = (el.transform as any) || {};
-        const transform = {
-          x: Number(rawTransform.x ?? 0),
-          y: Number(rawTransform.y ?? 0),
-          width: Number(rawTransform.width ?? 0.5),
-          height: Number(rawTransform.height ?? 0.5),
-          rotation: Number(rawTransform.rotation ?? 0),
-          scale: Number(rawTransform.scale ?? 1),
-        };
-
-        return {
-          id: el.id,
-          type: el.type,
-          slot: el.slot || null,
-          order: el.order ?? el.zIndex ?? 1,
-          zIndex: el.zIndex ?? 1,
-          opacity: el.opacity ?? 1.0,
-          transform,
-          style: el.style as any,
-          data,
-          interaction: el.interaction as any,
-        };
-      });
+      const compiledElements: CompiledElement[] = rawElements.map((el: any) =>
+        this.compileElement(el, mediaMap, images, allUrls, videos),
+      );
 
       // Side is deterministically derived from physical order index
       const derivedSide = derivePageSide(physicalIndex);
@@ -388,11 +422,13 @@ export class PublicService {
         front: {
           ...cover.front,
           backgroundUrl: frontBg,
+          elements: frontCoverElements,
         },
         back: {
           ...cover.back,
           insideBackgroundUrl: backInsideBg,
           outsideBackgroundUrl: backOutsideBg,
+          elements: backCoverElements,
         },
       },
       audio: compiledAudio,

@@ -6,13 +6,61 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAudioTrackDto } from './dto/create-audio-track.dto';
 import { UpdateAudioTrackDto } from './dto/update-audio-track.dto';
+import { PublicCacheService } from '../public/public-cache.service';
 
 @Injectable()
 export class AudioService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cacheService: PublicCacheService,
+  ) {}
+
+  private serializeMedia(media: any) {
+    if (!media) return null;
+    let sizeVal: number | string | null = null;
+    if (media.size !== null && media.size !== undefined) {
+      const big = BigInt(media.size);
+      sizeVal = big <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(big) : big.toString();
+    }
+    return {
+      ...media,
+      size: sizeVal,
+    };
+  }
+
+  private serializeTrack(track: any) {
+    if (!track) return null;
+    return {
+      ...track,
+      media: this.serializeMedia(track.media),
+    };
+  }
+
+  async touchAffectedBooks(audioTrackId: string): Promise<void> {
+    try {
+      const books = await this.prisma.book.findMany({
+        where: { backgroundMusicId: audioTrackId },
+        select: { id: true },
+      });
+      const pages = await this.prisma.page.findMany({
+        where: { audioTrackId },
+        select: { bookId: true },
+      });
+
+      const bookIds = new Set<string>();
+      books.forEach((b) => bookIds.add(b.id));
+      pages.forEach((p) => bookIds.add(p.bookId));
+
+      for (const bId of bookIds) {
+        await this.cacheService.touchBook(bId);
+      }
+    } catch {
+      this.cacheService.invalidate();
+    }
+  }
 
   async findAll() {
-    return this.prisma.audioTrack.findMany({
+    const tracks = await this.prisma.audioTrack.findMany({
       include: {
         media: {
           select: {
@@ -32,6 +80,8 @@ export class AudioService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    return tracks.map((t) => this.serializeTrack(t));
   }
 
   async findOne(id: string) {
@@ -58,7 +108,7 @@ export class AudioService {
       throw new NotFoundException(`Audio track not found: ${id}`);
     }
 
-    return track;
+    return this.serializeTrack(track);
   }
 
   async create(dto: CreateAudioTrackDto) {
@@ -80,7 +130,7 @@ export class AudioService {
       throw new BadRequestException('Audio src or valid mediaId must be provided');
     }
 
-    return this.prisma.audioTrack.create({
+    const created = await this.prisma.audioTrack.create({
       data: {
         title: dto.title,
         artist: dto.artist,
@@ -98,6 +148,8 @@ export class AudioService {
         media: true,
       },
     });
+
+    return this.serializeTrack(created);
   }
 
   async update(id: string, dto: UpdateAudioTrackDto) {
@@ -117,7 +169,7 @@ export class AudioService {
       }
     }
 
-    return this.prisma.audioTrack.update({
+    const updated = await this.prisma.audioTrack.update({
       where: { id },
       data: {
         title: dto.title,
@@ -136,10 +188,30 @@ export class AudioService {
         media: true,
       },
     });
+
+    // Invalidate caches of all books using this audio track
+    await this.touchAffectedBooks(id);
+
+    return this.serializeTrack(updated);
   }
 
   async remove(id: string) {
     await this.findOne(id);
-    return this.prisma.audioTrack.delete({ where: { id } });
+
+    // Invalidate affected books before removing
+    await this.touchAffectedBooks(id);
+
+    // Cleanly unlink from books and pages before deleting
+    await this.prisma.book.updateMany({
+      where: { backgroundMusicId: id },
+      data: { backgroundMusicId: null },
+    });
+    await this.prisma.page.updateMany({
+      where: { audioTrackId: id },
+      data: { audioTrackId: null },
+    });
+
+    const deleted = await this.prisma.audioTrack.delete({ where: { id } });
+    return this.serializeTrack(deleted);
   }
 }

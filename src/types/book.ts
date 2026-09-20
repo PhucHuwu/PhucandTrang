@@ -161,7 +161,7 @@ export interface PageMediaItem {
 // 4. Layout Templates
 // ==========================================
 
-export type LayoutTemplate =
+export type BuiltInLayoutTemplateId =
   | 'auto'
   | 'single-hero'          // 1 large prominent image or portrait
   | 'dual-stacked'         // 2 horizontal/landscape photos stacked vertically
@@ -172,6 +172,8 @@ export type LayoutTemplate =
   | 'diagonal-duo'         // 2 cards tilted with soft diagonal overlap
   | 'custom';              // Freeform element positioning
 
+export type LayoutTemplate = BuiltInLayoutTemplateId | string;
+export type LayoutTemplateId = LayoutTemplate;
 export type PageLayoutType = LayoutTemplate;
 
 /**

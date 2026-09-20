@@ -62,7 +62,7 @@ export class PageElementsService {
         transform: cleanTransform,
         style: dto.style,
         data: dto.data,
-        interaction: dto.interaction,
+        interaction: (dto.interaction as any) || undefined,
       },
     });
 
@@ -110,10 +110,10 @@ export class PageElementsService {
         ...(dto.visible !== undefined ? { visible: dto.visible } : {}),
         ...(dto.locked !== undefined ? { locked: dto.locked } : {}),
         ...(dto.opacity !== undefined ? { opacity: dto.opacity } : {}),
-        ...(transform !== undefined ? { transform } : {}),
+        ...(transform !== undefined ? { transform: transform as any } : {}),
         ...(style !== undefined ? { style } : {}),
         ...(data !== undefined ? { data } : {}),
-        ...(interaction !== undefined ? { interaction } : {}),
+        ...(interaction !== undefined ? { interaction: interaction as any } : {}),
       },
     });
 

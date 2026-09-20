@@ -125,6 +125,49 @@ describe('MediaService', () => {
       expect(result.references[0].pageNumber).toBe(1);
     });
 
+    it('should detect when media is referenced by front cover elements or background', async () => {
+      prisma.media.findUnique.mockResolvedValue(mockMedia);
+      prisma.page.findMany.mockResolvedValue([]);
+      prisma.pageElement.findMany.mockResolvedValue([]);
+      prisma.audioTrack.findMany.mockResolvedValue([]);
+      prisma.book.findMany.mockResolvedValue([
+        {
+          id: 'book-1',
+          title: 'Chúng Mình',
+          slug: 'phuc-and-trang',
+          cover: {
+            front: {
+              backgroundUrl: 'other.jpg',
+              elements: [
+                { id: 'cover-el-1', type: 'IMAGE', data: { mediaId: 'media-1' } },
+              ],
+            },
+            back: {},
+          },
+        },
+      ]);
+
+      const result = await service.checkReferences('media-1');
+      expect(result.isInUse).toBe(true);
+      expect(result.references[0].targetType).toBe('BOOK_COVER');
+      expect(result.references[0].description).toContain('bìa trước');
+    });
+
+    it('should detect when media is referenced by audio track', async () => {
+      prisma.media.findUnique.mockResolvedValue(mockMedia);
+      prisma.book.findMany.mockResolvedValue([]);
+      prisma.page.findMany.mockResolvedValue([]);
+      prisma.pageElement.findMany.mockResolvedValue([]);
+      prisma.audioTrack.findMany.mockResolvedValue([
+        { id: 'track-1', title: 'Vạn vật', src: mockMedia.url, mediaId: mockMedia.id },
+      ]);
+
+      const result = await service.checkReferences('media-1');
+      expect(result.isInUse).toBe(true);
+      expect(result.references[0].targetType).toBe('AUDIO_TRACK');
+      expect(result.references[0].description).toContain('Vạn vật');
+    });
+
     it('should throw ConflictException with references when trying to delete media that is in use', async () => {
       prisma.media.findUnique.mockResolvedValue(mockMedia);
       prisma.book.findMany.mockResolvedValue([]);

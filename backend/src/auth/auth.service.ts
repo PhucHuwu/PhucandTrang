@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { Role } from '@prisma/client';
@@ -35,12 +40,20 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
+    // Project is a private CMS: Public registration is strictly disabled in production
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException(
+        'Đăng ký tài khoản công khai bị vô hiệu hóa trên môi trường production. Vui lòng liên hệ quản trị viên hệ thống.',
+      );
+    }
+
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) {
       throw new ConflictException('Email này đã được sử dụng');
     }
     const passwordHash = await bcrypt.hash(dto.pass, 10);
-    // Security enforcement: public registration always creates VIEWER role
+
+    // Registration in dev always forces VIEWER role
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,

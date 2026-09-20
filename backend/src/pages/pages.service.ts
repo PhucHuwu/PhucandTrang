@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreatePageDto } from './dto/create-page.dto';
 import { UpdatePageDto } from './dto/update-page.dto';
 import { ReorderPagesDto } from './dto/reorder-pages.dto';
+import { DuplicatePageDto } from './dto/duplicate-page.dto';
 import { PublicCacheService } from '../public/public-cache.service';
 import { derivePageSideEnum } from '../utils/page-utils';
 import { safeDeepMerge } from '../utils/safe-merge';
@@ -17,6 +18,48 @@ export class PagesService {
     private prisma: PrismaService,
     private cacheService: PublicCacheService,
   ) {}
+
+  /**
+   * Normalizes page order (0..N-1) and sides (LEFT/RIGHT) to guarantee contiguous sequence without gaps.
+   */
+  async normalizeBookPageSequence(bookId: string, customTx?: any): Promise<void> {
+    const execute = async (tx: any) => {
+      const pages = await tx.page.findMany({
+        where: { bookId },
+        orderBy: [{ order: 'asc' }, { pageNumber: 'asc' }, { createdAt: 'asc' }],
+        select: { id: true, order: true, side: true, pageNumber: true },
+      });
+
+      // Step 1: Temporarily set pageNumbers to negative to avoid unique constraint collisions
+      for (let i = 0; i < pages.length; i++) {
+        await tx.page.update({
+          where: { id: pages[i].id },
+          data: { pageNumber: -(i + 1) * 1000 },
+        });
+      }
+
+      // Step 2: Assign contiguous 0..N-1 order, pageNumber, and side
+      for (let i = 0; i < pages.length; i++) {
+        const side = derivePageSideEnum(i);
+        await tx.page.update({
+          where: { id: pages[i].id },
+          data: {
+            order: i,
+            pageNumber: i,
+            side,
+          },
+        });
+      }
+    };
+
+    if (customTx) {
+      await execute(customTx);
+    } else {
+      await this.prisma.$transaction(async (tx) => {
+        await execute(tx);
+      });
+    }
+  }
 
   async findByBook(bookId: string) {
     const book = await this.prisma.book.findUnique({ where: { id: bookId } });
@@ -81,7 +124,7 @@ export class PagesService {
         layoutMode: dto.layoutMode || 'PRESET',
         sourceTemplateId: dto.sourceTemplateId,
         isCustomized: dto.isCustomized || false,
-        background: dto.background,
+        background: dto.background as any,
         audioTrackId: dto.audioTrackId,
       },
       include: {
@@ -91,8 +134,10 @@ export class PagesService {
       },
     });
 
+    await this.normalizeBookPageSequence(dto.bookId);
     await this.cacheService.touchBook(dto.bookId);
-    return page;
+
+    return this.findOne(page.id);
   }
 
   async update(id: string, dto: UpdatePageDto, isPatch: boolean = false) {
@@ -135,7 +180,7 @@ export class PagesService {
         ...(dto.layoutMode !== undefined ? { layoutMode: dto.layoutMode } : {}),
         ...(dto.sourceTemplateId !== undefined ? { sourceTemplateId: dto.sourceTemplateId } : {}),
         ...(dto.isCustomized !== undefined ? { isCustomized: dto.isCustomized } : {}),
-        ...(background !== undefined ? { background } : {}),
+        ...(background !== undefined ? { background: background as any } : {}),
         ...(dto.audioTrackId !== undefined ? { audioTrackId: dto.audioTrackId } : {}),
       },
       include: {
@@ -145,33 +190,28 @@ export class PagesService {
       },
     });
 
+    if (dto.order !== undefined) {
+      await this.normalizeBookPageSequence(page.bookId);
+    }
+
     await this.cacheService.touchBook(page.bookId);
     return updated;
   }
 
-  async duplicate(id: string, targetPageNumber?: number) {
+  async duplicate(id: string, dto?: DuplicatePageDto) {
     const original = await this.findOne(id);
-
-    let targetPageNum = targetPageNumber;
-    if (targetPageNum === undefined) {
-      const maxPage = await this.prisma.page.findFirst({
-        where: { bookId: original.bookId },
-        orderBy: { pageNumber: 'desc' },
-        select: { pageNumber: true },
-      });
-      targetPageNum = (maxPage?.pageNumber ?? original.pageNumber) + 1;
-    }
-
-    const targetOrder = targetPageNum;
-    const derivedSide = derivePageSideEnum(targetOrder);
+    const insertAfter = dto?.insertAfter ?? false;
+    const initialOrder = insertAfter ? original.order + 0.5 : (dto?.targetPageNumber ?? 99999);
 
     const duplicated = await this.prisma.$transaction(async (tx) => {
+      // Create new page with temporary pageNumber
+      const tempPageNumber = -Math.floor(Math.random() * 1000000) - 1;
       const newPage = await tx.page.create({
         data: {
           bookId: original.bookId,
-          pageNumber: targetPageNum,
-          side: derivedSide,
-          order: targetOrder,
+          pageNumber: tempPageNumber,
+          side: original.side,
+          order: initialOrder,
           chapter: original.chapter ? `${original.chapter} (Bản sao)` : undefined,
           title: original.title ? `${original.title} (Copy)` : undefined,
           quote: original.quote,
@@ -198,13 +238,18 @@ export class PagesService {
             })),
           },
         },
+      });
+
+      // Normalize sequence in the same transaction
+      await this.normalizeBookPageSequence(original.bookId, tx);
+
+      return tx.page.findUnique({
+        where: { id: newPage.id },
         include: {
           elements: { orderBy: { zIndex: 'asc' } },
           layoutTemplate: true,
         },
       });
-
-      return newPage;
     });
 
     await this.cacheService.touchBook(original.bookId);
@@ -214,6 +259,7 @@ export class PagesService {
   async remove(id: string) {
     const page = await this.findOne(id);
     await this.prisma.page.delete({ where: { id } });
+    await this.normalizeBookPageSequence(page.bookId);
     await this.cacheService.touchBook(page.bookId);
     return { success: true, message: `Đã xóa trang ${id} cùng tất cả element liên quan` };
   }
@@ -232,25 +278,26 @@ export class PagesService {
       }
 
       // Step 2: Assign final page numbers, orders, and derived sides
-      const updatedList = [];
       for (let i = 0; i < dto.items.length; i++) {
         const item = dto.items[i];
         const newOrder = i;
         const derivedSide = derivePageSideEnum(newOrder);
 
-        const updated = await tx.page.update({
+        await tx.page.update({
           where: { id: item.id },
           data: {
-            pageNumber: item.pageNumber !== undefined ? item.pageNumber : i,
+            pageNumber: i,
             order: newOrder,
             side: derivedSide,
           },
-          select: { id: true, pageNumber: true, order: true, side: true, title: true },
         });
-        updatedList.push(updated);
       }
 
-      return updatedList;
+      return tx.page.findMany({
+        where: { bookId },
+        orderBy: { order: 'asc' },
+        select: { id: true, pageNumber: true, order: true, side: true, title: true },
+      });
     });
 
     await this.cacheService.touchBook(bookId);

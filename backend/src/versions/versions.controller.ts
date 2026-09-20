@@ -13,21 +13,23 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '@prisma/client';
 
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('versions')
 export class VersionsController {
   constructor(private versionsService: VersionsService) {}
 
+  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
   @Get('book/:bookId')
   async findByBook(@Param('bookId') bookId: string) {
     return this.versionsService.findByBook(bookId);
   }
 
+  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.versionsService.findOne(id);
   }
 
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(Role.ADMIN, Role.EDITOR)
   @Post('book/:bookId/snapshot')
   async createSnapshot(
@@ -43,7 +45,6 @@ export class VersionsController {
     );
   }
 
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(Role.ADMIN)
   @Post('book/:bookId/rollback/:versionId')
   async rollbackToSnapshot(
