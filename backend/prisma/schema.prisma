@@ -1,0 +1,209 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum BookStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PageSide {
+  LEFT
+  RIGHT
+}
+
+enum ElementType {
+  TEXT
+  IMAGE
+  VIDEO
+  SHAPE
+  DECORATION
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  AUDIO
+  BACKGROUND
+  TEXTURE
+  DECORATION
+}
+
+enum LayoutMode {
+  PRESET
+  FREEFORM
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String
+  name         String
+  role         Role          @default(ADMIN)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  books        Book[]        @relation("UserBooks")
+  versions     BookVersion[] @relation("UserVersions")
+
+  @@map("users")
+}
+
+model Book {
+  id                String        @id @default(uuid())
+  slug              String        @unique
+  title             String
+  description       String?
+  status            BookStatus    @default(DRAFT)
+  heName            String        @default("Phúc")
+  sheName           String        @default("Trang")
+  anniversaryDate   DateTime      @default("2022-10-20T00:00:00Z")
+  proposalQuote     String?       @default("Thế cậu đồng ý làm bạn gái tớ không?")
+  cover             Json          // { front: { backgroundUrl, title, titleFont, counterBadge, elements }, back: { insideBackgroundUrl, outsideBackgroundUrl, elements } }
+  settings          Json          // { dimensions: { pageWidth, pageHeight, canvasResolution }, camera: { fov, distance }, theme: { ... }, atmospheric: { ... } }
+  backgroundMusicId String?       @map("background_music_id")
+  backgroundMusic   AudioTrack?   @relation("BookBackgroundMusic", fields: [backgroundMusicId], references: [id], onDelete: SetNull)
+  ownerId           String?
+  owner             User?         @relation("UserBooks", fields: [ownerId], references: [id])
+  pages             Page[]
+  versions          BookVersion[]
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([status])
+  @@index([slug])
+  @@map("books")
+}
+
+model Page {
+  id               String          @id @default(uuid())
+  bookId           String
+  book             Book            @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  pageNumber       Int
+  side             PageSide        @default(RIGHT)
+  order            Int             @default(0)
+  chapter          String?
+  title            String?
+  quote            String?
+  handwriting      String?
+  layoutTemplateId String?
+  layoutTemplate   LayoutTemplate? @relation(fields: [layoutTemplateId], references: [id])
+  layoutMode       LayoutMode      @default(PRESET)
+  sourceTemplateId String?
+  isCustomized     Boolean         @default(false)
+  background       Json            // { type: "image"|"color", imageUrl, color, headerFade, gutterFade }
+  audioTrackId     String?         @map("audio_track_id")
+  audioTrack       AudioTrack?     @relation("PageAudioTrack", fields: [audioTrackId], references: [id], onDelete: SetNull)
+  elements         PageElement[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@unique([bookId, pageNumber])
+  @@index([bookId, order])
+  @@map("pages")
+}
+
+model PageElement {
+  id          String      @id @default(uuid())
+  pageId      String
+  page        Page        @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  type        ElementType
+  slot        String?
+  order       Int         @default(0)
+  zIndex      Int         @default(1)
+  visible     Boolean     @default(true)
+  locked      Boolean     @default(false)
+  opacity     Float       @default(1.0)
+  transform   Json        // { x, y, width, height, rotation, scale, zIndex }
+  style       Json?       // { fontFamily, fontSize, color, padding, border, shadow... }
+  data        Json        // { text, textLines, src, alt, caption, aspectRatio, ... }
+  interaction Json?       // { enabled, action, target, title, activeArea }
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([pageId, zIndex])
+  @@index([type])
+  @@map("page_elements")
+}
+
+model LayoutTemplate {
+  id          String   @id
+  name        String
+  description String?
+  slots       Json
+  prototypes  Json
+  isSystem    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  pages       Page[]
+
+  @@map("layout_templates")
+}
+
+model Media {
+  id          String       @id @default(uuid())
+  type        MediaType    @default(IMAGE)
+  provider    String       @default("CLOUDINARY")
+  url         String       @unique
+  publicId    String?
+  width       Int?
+  height      Int?
+  mimeType    String?
+  size        BigInt?
+  alt         String?
+  metadata    Json?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  audioTracks AudioTrack[]
+
+  @@index([type])
+  @@index([publicId])
+  @@map("media")
+}
+
+model AudioTrack {
+  id              String      @id @default(uuid())
+  title           String
+  artist          String?
+  src             String
+  mediaId         String?     @map("media_id")
+  media           Media?      @relation(fields: [mediaId], references: [id], onDelete: SetNull)
+  volume          Float       @default(0.8)
+  loop            Boolean     @default(true)
+  startAt         Float       @default(0.0)
+  fadeIn          Float       @default(0.0)
+  fadeOut         Float       @default(0.0)
+  durationSeconds Float?
+  autoPlay        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  books           Book[]      @relation("BookBackgroundMusic")
+  pages           Page[]      @relation("PageAudioTrack")
+
+  @@map("audio_tracks")
+}
+
+model BookVersion {
+  id          String   @id @default(uuid())
+  bookId      String
+  book        Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  version     String
+  snapshot    Json
+  changelog   String?
+  createdById String?
+  createdBy   User?    @relation("UserVersions", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([bookId, version])
+  @@map("book_versions")
+}

@@ -2,6 +2,7 @@ package-lock.json
 node_modules/
 .vercel
 .env*.local
+.env
 .DS_Store
 .next/
 out/
@@ -9,3 +10,14 @@ out/
 # Media is delivered through Cloudinary CDN
 /public/memories/
 /public/page_backgrounds/
+
+# Backend Build & Dependencies
+backend/dist/
+backend/node_modules/
+backend/.env
+backend/.env.*
+backend/.agents/
+backend/.claude/
+backend/.windsurf/
+backend/skills-lock.json
+backend/package-lock.json

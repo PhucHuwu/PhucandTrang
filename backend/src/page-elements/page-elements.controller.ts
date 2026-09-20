@@ -1,0 +1,79 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
+import { PageElementsService } from './page-elements.service';
+import { CreatePageElementDto } from './dto/create-page-element.dto';
+import { UpdatePageElementDto } from './dto/update-page-element.dto';
+import { BatchUpdateElementsDto } from './dto/batch-update-elements.dto';
+import { ReorderElementsDto } from './dto/reorder-elements.dto';
+import { DuplicateElementDto } from './dto/duplicate-element.dto';
+import { AuthGuard } from '@nestjs/passport';
+
+@Controller('page-elements')
+export class PageElementsController {
+  constructor(private elementsService: PageElementsService) {}
+
+  @Get('page/:pageId')
+  async findByPage(@Param('pageId') pageId: string) {
+    return this.elementsService.findByPage(pageId);
+  }
+
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    return this.elementsService.findOne(id);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post()
+  async create(@Body() dto: CreatePageElementDto) {
+    return this.elementsService.create(dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Put(':id')
+  async update(@Param('id') id: string, @Body() dto: UpdatePageElementDto) {
+    return this.elementsService.update(id, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post(':id/duplicate')
+  async duplicate(
+    @Param('id') id: string,
+    @Body() dto: DuplicateElementDto,
+  ) {
+    return this.elementsService.duplicate(id, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete(':id')
+  async remove(@Param('id') id: string) {
+    return this.elementsService.remove(id);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Put('page/:pageId/reorder')
+  async reorderZIndex(
+    @Param('pageId') pageId: string,
+    @Body() dto: ReorderElementsDto,
+  ) {
+    return this.elementsService.reorderZIndex(pageId, dto);
+  }
+
+  /**
+   * Batch update multiple elements in a single transaction
+   * Example: PATCH /api/page-elements/batch
+   */
+  @UseGuards(AuthGuard('jwt'))
+  @Patch('batch')
+  async batchUpdate(@Body() dto: BatchUpdateElementsDto) {
+    return this.elementsService.batchUpdate(dto);
+  }
+}

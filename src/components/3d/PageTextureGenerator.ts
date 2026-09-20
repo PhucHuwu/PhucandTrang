@@ -1,52 +1,767 @@
 import * as THREE from 'three';
+import {
+  Book,
+  Page,
+  PageElement,
+  PageBackground,
+  PageMediaItem,
+  PageLayoutType,
+  LayoutTemplate,
+  TextElement,
+  ImageElement,
+  VideoElement,
+  ShapeElement,
+  DecorationElement,
+} from '@/types/book';
+import { applyLayoutTemplate } from '@/templates/layoutPresets';
+import {
+  TextVariableResolver,
+  VariableContext,
+  resolveTextVariables,
+} from '@/utils/textVariableResolver';
 
-export interface PageMediaItem {
-  src: string;
-  caption?: string;
-  isVideo?: boolean;
+// Re-export types for consumers
+export type { PageMediaItem, PageLayoutType };
+
+export const CANVAS_WIDTH = 1024;
+export const CANVAS_HEIGHT = 1360;
+
+/**
+ * Loads an HTMLImageElement asynchronously with crossOrigin enabled.
+ */
+function loadImageAsync(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => {
+      // Return 1x1 transparent fallback image on network/CORS error
+      const fallback = new Image();
+      fallback.onload = () => resolve(fallback);
+      fallback.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    };
+    img.src = src;
+  });
 }
 
-export type PageLayoutType = 
-  | 'auto'
-  | 'single-hero'       // 1 ảnh lớn tràn viền trang nhã (3:4 hoặc 9:16)
-  | 'dual-stacked'      // 2 ảnh ngang/vuông xếp trên dưới
-  | 'dual-columns'      // 2 ảnh dọc thanh mảnh đứng cạnh nhau
-  | 'asymmetric-featured' // 1 ảnh lớn chủ đạo + 2 ảnh nhỏ bên cạnh
-  | 'scrapbook-trio'    // 3 ảnh so le phong cách dán ảnh scrapbook
-  | 'quad-gallery'      // Lưới 4 ảnh polaroid thanh lịch
-  | 'diagonal-duo';     // 2 ảnh góc nghiêng đè nhẹ nghệ thuật
-
+/**
+ * Generic Page Renderer that renders a normalized Page model into a 1024x1360 THREE.CanvasTexture.
+ * 
+ * Flow:
+ * 1. Preload all media assets (backgrounds, images, video posters, decoration icons).
+ * 2. Render page.background (image with fade zones or ivory paper color).
+ * 3. Render page.elements strictly in ascending order of transform.zIndex.
+ * 4. Export high-fidelity THREE.CanvasTexture with SRGBColorSpace.
+ */
 export class PageTextureGenerator {
-  static createCoverTexture(photoSrc: string): Promise<THREE.CanvasTexture> {
+  // =========================================================================
+  // 1. GENERIC PAGE RENDERER (Prompt 3 Core Goal)
+  // =========================================================================
+
+  /**
+   * Primary entry point: Renders a content-driven Page into a THREE.CanvasTexture.
+   * Only reads:
+   * - page.background
+   * - page.elements (sorted by zIndex)
+   * Resolves dynamic text variables (e.g. {{couple.he}}, {{daysTogether}}, {{currentDate}}).
+   */
+  static async renderPageTexture(
+    page: Page,
+    bookContext?: Partial<Book>
+  ): Promise<THREE.CanvasTexture> {
+    const canvas = document.createElement('canvas');
+    canvas.width = CANVAS_WIDTH;
+    canvas.height = CANVAS_HEIGHT;
+    const ctx = canvas.getContext('2d')!;
+
+    // 1. Ensure custom fonts are ready
+    if (typeof document !== 'undefined' && document.fonts) {
+      try {
+        await document.fonts.ready;
+      } catch {
+        // Fallback gracefully
+      }
+    }
+
+    // 1.5 Prepare dynamic text variable context
+    const varContext = TextVariableResolver.createContext({
+      book: bookContext,
+      page,
+    });
+
+    // 2. Preload all media assets referenced in this page
+    const imageCache = new Map<string, HTMLImageElement>();
+    const urlsToLoad = new Set<string>();
+
+    if (page.background?.imageUrl) {
+      urlsToLoad.add(page.background.imageUrl);
+    }
+
+    for (const el of page.elements || []) {
+      if (!el.visible && el.visible !== undefined) continue;
+      if (el.type === 'IMAGE') {
+        const data = el.data as { src: string };
+        if (data.src) urlsToLoad.add(data.src);
+      } else if (el.type === 'VIDEO') {
+        const data = el.data as { thumbnailUrl?: string; src?: string };
+        if (data.thumbnailUrl) urlsToLoad.add(data.thumbnailUrl);
+        else if (data.src) urlsToLoad.add(data.src);
+      } else if (el.type === 'DECORATION') {
+        const data = el.data as { assetUrl?: string };
+        if (data.assetUrl) urlsToLoad.add(data.assetUrl);
+      }
+    }
+
+    await Promise.all(
+      Array.from(urlsToLoad).map(async (url) => {
+        try {
+          const img = await loadImageAsync(url);
+          imageCache.set(url, img);
+        } catch {
+          // Handled by fallback in loadImageAsync
+        }
+      })
+    );
+
+    // 3. Render Background Layer
+    this.renderBackground(ctx, page.background, page.side, imageCache);
+
+    // 4. Sort Elements by zIndex ascending
+    const sortedElements = [...(page.elements || [])].filter((el) => el.visible !== false);
+    sortedElements.sort((a, b) => {
+      const za = a.transform?.zIndex ?? 1;
+      const zb = b.transform?.zIndex ?? 1;
+      return za - zb;
+    });
+
+    // 5. Render Elements in zIndex order
+    for (const el of sortedElements) {
+      this.renderElement(ctx, el, imageCache, varContext);
+    }
+
+    // 6. Draw Page Number Footer if specified
+    if (page.pageNumber !== undefined && page.pageNumber > 0) {
+      this.renderPageNumberFooter(ctx, page.pageNumber);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }
+
+  // =========================================================================
+  // 2. BACKGROUND RENDERING LOGIC
+  // =========================================================================
+
+  private static renderBackground(
+    ctx: CanvasRenderingContext2D,
+    bg: PageBackground,
+    side: 'left' | 'right',
+    imageCache: Map<string, HTMLImageElement>
+  ) {
+    const bgImage = bg?.imageUrl ? imageCache.get(bg.imageUrl) : null;
+
+    if (bgImage && bgImage.width > 1) {
+      // Render Full Photo Background
+      const srcW = bgImage.naturalWidth || bgImage.width;
+      const srcH = bgImage.naturalHeight || bgImage.height;
+      const srcRatio = srcW / srcH;
+      const destRatio = CANVAS_WIDTH / CANVAS_HEIGHT;
+
+      let sx = 0, sy = 0, sw = srcW, sh = srcH;
+      if (srcRatio > destRatio) {
+        sw = srcH * destRatio;
+        sx = (srcW - sw) / 2;
+      } else {
+        sh = srcW / destRatio;
+        sy = (srcH - sh) / 2;
+      }
+
+      ctx.save();
+      ctx.globalAlpha = bg.opacity ?? 1.0;
+      ctx.drawImage(bgImage, sx, sy, sw, sh, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      ctx.restore();
+
+      // Draw Header Reading Zone Fade
+      if (bg.headerFade?.enabled !== false) {
+        const fadeHeight = (bg.headerFade?.height ?? 0.345) * CANVAS_HEIGHT;
+        const fadeColor = bg.headerFade?.color ?? '#F9F5EC';
+        const startOp = bg.headerFade?.startOpacity ?? 0.92;
+
+        const headerFade = ctx.createLinearGradient(0, 0, 0, fadeHeight);
+        headerFade.addColorStop(0, this.hexToRgba(fadeColor, startOp));
+        headerFade.addColorStop(0.28, this.hexToRgba(fadeColor, startOp * 0.85));
+        headerFade.addColorStop(0.66, this.hexToRgba(fadeColor, startOp * 0.41));
+        headerFade.addColorStop(1, this.hexToRgba(fadeColor, 0));
+
+        ctx.save();
+        ctx.fillStyle = headerFade;
+        ctx.fillRect(0, 0, CANVAS_WIDTH, fadeHeight);
+        ctx.restore();
+      }
+
+      // Draw Spine Gutter Fade
+      if (bg.gutterFade?.enabled !== false) {
+        const gutterWidth = (bg.gutterFade?.width ?? 0.14) * CANVAS_WIDTH;
+        const gutterColor = bg.gutterFade?.color ?? '#F9F5EC';
+        const gutterOp = bg.gutterFade?.opacity ?? 0.28;
+
+        const gutterFade = ctx.createLinearGradient(
+          side === 'left' ? CANVAS_WIDTH : 0,
+          0,
+          side === 'left' ? CANVAS_WIDTH - gutterWidth : gutterWidth,
+          0
+        );
+        gutterFade.addColorStop(0, this.hexToRgba(gutterColor, gutterOp));
+        gutterFade.addColorStop(1, this.hexToRgba(gutterColor, 0));
+
+        ctx.save();
+        ctx.fillStyle = gutterFade;
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        ctx.restore();
+      }
+    } else {
+      // Render Plain Ivory Paper Background
+      ctx.save();
+      ctx.fillStyle = bg?.color || '#F9F5EC';
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      const vGrad = ctx.createRadialGradient(
+        CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, 200,
+        CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, 800
+      );
+      vGrad.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
+      vGrad.addColorStop(1, 'rgba(180, 154, 106, 0.12)');
+      ctx.fillStyle = vGrad;
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      // Spine shadow gradient on inner edge
+      const spineGrad = ctx.createLinearGradient(
+        side === 'left' ? CANVAS_WIDTH : 0,
+        0,
+        side === 'left' ? CANVAS_WIDTH - 144 : 144,
+        0
+      );
+      spineGrad.addColorStop(0, 'rgba(0, 0, 0, 0.16)');
+      spineGrad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+      ctx.fillStyle = spineGrad;
+      ctx.fillRect(side === 'left' ? CANVAS_WIDTH - 144 : 0, 0, 144, CANVAS_HEIGHT);
+      ctx.restore();
+    }
+  }
+
+  // =========================================================================
+  // 3. ELEMENT RENDERING DISPATCHER
+  // =========================================================================
+
+  private static renderElement(
+    ctx: CanvasRenderingContext2D,
+    el: PageElement,
+    imageCache: Map<string, HTMLImageElement>,
+    varContext?: VariableContext
+  ) {
+    const t = el.transform;
+
+    // Convert normalized coordinates (0..1) to canvas coordinates
+    const boxX = t.x * CANVAS_WIDTH;
+    const boxY = t.y * CANVAS_HEIGHT;
+    const boxW = t.width * CANVAS_WIDTH;
+    const boxH = t.height * CANVAS_HEIGHT;
+
+    ctx.save();
+
+    // Opacity
+    ctx.globalAlpha = (el.opacity ?? 1.0);
+
+    // Translation & Rotation around element center
+    const centerX = boxX + boxW / 2;
+    const centerY = boxY + boxH / 2;
+    ctx.translate(centerX, centerY);
+
+    if (t.rotation) {
+      ctx.rotate((t.rotation * Math.PI) / 180);
+    }
+    if (t.scale && t.scale !== 1) {
+      ctx.scale(t.scale, t.scale);
+    }
+
+    // Apply shadow if configured
+    if (el.style?.shadow) {
+      ctx.shadowColor = el.style.shadow.color;
+      ctx.shadowBlur = el.style.shadow.blur;
+      ctx.shadowOffsetX = el.style.shadow.offsetX;
+      ctx.shadowOffsetY = el.style.shadow.offsetY;
+    }
+
+    // Dispatch by element type
+    switch (el.type) {
+      case 'TEXT':
+        this.renderTextElement(ctx, el as TextElement, boxW, boxH, varContext);
+        break;
+      case 'IMAGE':
+        this.renderImageElement(ctx, el as ImageElement, boxW, boxH, imageCache, varContext);
+        break;
+      case 'VIDEO':
+        this.renderVideoElement(ctx, el as VideoElement, boxW, boxH, imageCache, varContext);
+        break;
+      case 'SHAPE':
+        this.renderShapeElement(ctx, el as ShapeElement, boxW, boxH);
+        break;
+      case 'DECORATION':
+        this.renderDecorationElement(ctx, el as DecorationElement, boxW, boxH);
+        break;
+    }
+
+    ctx.restore();
+  }
+
+  // =========================================================================
+  // 4. SPECIFIC ELEMENT RENDERERS
+  // =========================================================================
+
+  /**
+   * Renders a TEXT element supporting:
+   * - font family, font size, font weight, font style (italic)
+   * - color, text align, line height, letter spacing
+   * - multiline text array or wrapped text
+   */
+  private static renderTextElement(
+    ctx: CanvasRenderingContext2D,
+    el: TextElement,
+    boxW: number,
+    boxH: number,
+    varContext?: VariableContext
+  ) {
+    const s = el.style || {};
+    const d = el.data;
+
+    const fontFamily = s.fontFamily || (
+      d.variant === 'handwriting'
+        ? '"Dancing Script", cursive'
+        : d.variant === 'quote'
+        ? '"Dancing Script", "Playfair Display", Georgia, cursive'
+        : d.variant === 'chapter-label'
+        ? 'Montserrat, sans-serif'
+        : '"Cormorant Garamond", Georgia, serif'
+    );
+
+    const fontSize = s.fontSize || (
+      d.variant === 'title' ? 38 :
+      d.variant === 'chapter-label' ? 20 :
+      d.variant === 'quote' ? 26 :
+      d.variant === 'handwriting' ? 32 :
+      d.variant === 'caption' ? 19 : 22
+    );
+
+    const fontWeight = s.fontWeight || (
+      d.variant === 'title' ? 'bold' :
+      d.variant === 'chapter-label' ? 'bold' : 'normal'
+    );
+
+    const fontStyle = s.fontStyle || (
+      d.variant === 'quote' || d.variant === 'handwriting' || d.variant === 'caption' ? 'italic' : 'normal'
+    );
+
+    const color = s.color || (
+      d.variant === 'chapter-label' ? '#C99A9A' :
+      d.variant === 'title' ? '#292522' :
+      d.variant === 'quote' ? '#94384F' :
+      d.variant === 'handwriting' ? '#38161E' :
+      d.variant === 'caption' ? '#4A1523' : '#474039'
+    );
+
+    ctx.fillStyle = color;
+    ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+    ctx.textAlign = (s.textAlign === 'justify' ? 'left' : s.textAlign) || 'left';
+    ctx.textBaseline = 'middle';
+
+    if (s.letterSpacing) {
+      ctx.letterSpacing = `${s.letterSpacing}px`;
+    }
+
+    // Determine lines and resolve dynamic variables (e.g. {{couple.he}}, {{daysTogether}} NGÀY)
+    const rawLines = d.textLines && d.textLines.length > 0
+      ? d.textLines
+      : d.text ? [d.text] : [];
+
+    const lines = rawLines.map((line) =>
+      varContext ? TextVariableResolver.resolve(line, varContext) : line
+    );
+
+    const lineHeight = s.lineHeight || fontSize * 1.35;
+    const totalTextHeight = lines.length * lineHeight;
+
+    let startY = -totalTextHeight / 2 + lineHeight / 2;
+    let startX = s.textAlign === 'center' ? 0 : s.textAlign === 'right' ? boxW / 2 : -boxW / 2;
+
+    for (const line of lines) {
+      ctx.fillText(line, startX, startY);
+      startY += lineHeight;
+    }
+  }
+
+  /**
+   * Renders an IMAGE element with:
+   * - Strict aspect ratio preservation (object-fit: contain/cover/fill)
+   * - Optional polaroid white paper card mount & washi tape
+   * - Border & border radius
+   */
+  private static renderImageElement(
+    ctx: CanvasRenderingContext2D,
+    el: ImageElement,
+    boxW: number,
+    boxH: number,
+    imageCache: Map<string, HTMLImageElement>,
+    varContext?: VariableContext
+  ) {
+    const img = imageCache.get(el.data.src);
+    if (!img || img.width <= 1) return;
+
+    const s = el.style || {};
+    const usePolaroid = s.polaroidFrame !== false; // Default true for scrapbook aesthetic
+    const padding = usePolaroid ? (s.padding ?? 14) : 0;
+    const rawCaption = el.data.caption;
+    const captionText = rawCaption
+      ? (varContext ? TextVariableResolver.resolve(rawCaption, varContext) : rawCaption)
+      : undefined;
+    const captionSpace = (usePolaroid && captionText) ? 38 : (usePolaroid ? 22 : 0);
+
+    const srcW = img.naturalWidth || img.width;
+    const srcH = img.naturalHeight || img.height;
+    const srcRatio = el.data.aspectRatio || (srcW / srcH);
+
+    const maxImgW = boxW - padding * 2;
+    const maxImgH = boxH - padding * 2 - captionSpace;
+
+    let finalImgW = maxImgW;
+    let finalImgH = finalImgW / srcRatio;
+
+    if (finalImgH > maxImgH) {
+      finalImgH = maxImgH;
+      finalImgW = finalImgH * srcRatio;
+    }
+
+    const cardW = Math.round(finalImgW + padding * 2);
+    const cardH = Math.round(finalImgH + padding * 2 + captionSpace);
+
+    if (usePolaroid) {
+      // White Card Mount
+      ctx.fillStyle = s.backgroundColor || '#FFFFFF';
+      const r = s.borderRadius ?? 0;
+      if (r > 0) {
+        ctx.beginPath();
+        ctx.roundRect(-cardW / 2, -cardH / 2, cardW, cardH, [r]);
+        ctx.fill();
+      } else {
+        ctx.fillRect(-cardW / 2, -cardH / 2, cardW, cardH);
+      }
+
+      // Border
+      ctx.strokeStyle = s.borderColor || 'rgba(180, 160, 140, 0.25)';
+      ctx.lineWidth = s.borderWidth ?? 1;
+      if (r > 0) {
+        ctx.beginPath();
+        ctx.roundRect(-cardW / 2, -cardH / 2, cardW, cardH, [r]);
+        ctx.stroke();
+      } else {
+        ctx.strokeRect(-cardW / 2, -cardH / 2, cardW, cardH);
+      }
+    }
+
+    // Draw Image
+    const imgX = -cardW / 2 + padding;
+    const imgY = -cardH / 2 + padding;
+    ctx.drawImage(img, 0, 0, srcW, srcH, imgX, imgY, finalImgW, finalImgH);
+
+    // Optional Washi Tape on top
+    if (usePolaroid && s.washiTape !== false) {
+      ctx.fillStyle = 'rgba(235, 225, 205, 0.85)';
+      ctx.fillRect(-38, -cardH / 2 - 7, 76, 16);
+    }
+
+    // Caption
+    if (captionText) {
+      ctx.fillStyle = s.color || '#4A1523';
+      ctx.font = 'italic 19px "Dancing Script", cursive';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(captionText, 0, cardH / 2 - 13);
+    }
+  }
+
+  /**
+   * Renders a VIDEO poster element with play badge overlay.
+   */
+  private static renderVideoElement(
+    ctx: CanvasRenderingContext2D,
+    el: VideoElement,
+    boxW: number,
+    boxH: number,
+    imageCache: Map<string, HTMLImageElement>,
+    varContext?: VariableContext
+  ) {
+    const posterUrl = el.data.thumbnailUrl || el.data.src;
+    const img = imageCache.get(posterUrl);
+    if (!img || img.width <= 1) return;
+
+    // Render as Image first
+    this.renderImageElement(
+      ctx,
+      {
+        ...el,
+        type: 'IMAGE',
+        data: {
+          src: posterUrl,
+          caption: el.data.caption,
+          aspectRatio: el.data.aspectRatio,
+        },
+      } as ImageElement,
+      boxW,
+      boxH,
+      imageCache,
+      varContext
+    );
+
+    // Overlay Circular Play Button Badge
+    const padding = el.style?.polaroidFrame !== false ? (el.style?.padding ?? 14) : 0;
+    const captionSpace = el.data.caption ? 38 : 22;
+    const finalH = boxH - padding * 2 - captionSpace;
+    const playCenterY = -boxH / 2 + padding + finalH / 2;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.beginPath();
+    ctx.arc(0, playCenterY, 22, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.moveTo(-5, playCenterY - 9);
+    ctx.lineTo(10, playCenterY);
+    ctx.lineTo(-5, playCenterY + 9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /**
+   * Renders a SHAPE element (rectangle, circle, line, wreath, badge, heart).
+   */
+  private static renderShapeElement(
+    ctx: CanvasRenderingContext2D,
+    el: ShapeElement,
+    boxW: number,
+    boxH: number
+  ) {
+    const d = el.data;
+    const s = el.style || {};
+
+    ctx.save();
+    if (d.strokeDashArray) {
+      ctx.setLineDash(d.strokeDashArray);
+    }
+    if (d.fillColor) {
+      ctx.fillStyle = d.fillColor;
+    }
+    if (d.strokeColor) {
+      ctx.strokeStyle = d.strokeColor;
+      ctx.lineWidth = d.strokeWidth ?? 1;
+    }
+
+    switch (d.shapeType) {
+      case 'rectangle': {
+        const r = s.borderRadius ?? 0;
+        if (r > 0) {
+          ctx.beginPath();
+          ctx.roundRect(-boxW / 2, -boxH / 2, boxW, boxH, [r]);
+          if (d.fillColor) ctx.fill();
+          if (d.strokeColor) ctx.stroke();
+        } else {
+          if (d.fillColor) ctx.fillRect(-boxW / 2, -boxH / 2, boxW, boxH);
+          if (d.strokeColor) ctx.strokeRect(-boxW / 2, -boxH / 2, boxW, boxH);
+        }
+        break;
+      }
+      case 'circle': {
+        const radius = Math.min(boxW, boxH) / 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        if (d.fillColor) ctx.fill();
+        if (d.strokeColor) ctx.stroke();
+        break;
+      }
+      case 'line': {
+        ctx.beginPath();
+        ctx.moveTo(-boxW / 2, 0);
+        ctx.lineTo(boxW / 2, 0);
+        ctx.stroke();
+        break;
+      }
+      case 'heart': {
+        const scale = Math.min(boxW, boxH) / 30;
+        ctx.save();
+        ctx.scale(scale, scale);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(0, -6, -12, -6, -12, 6);
+        ctx.bezierCurveTo(-12, 16, 0, 24, 0, 30);
+        ctx.bezierCurveTo(0, 24, 12, 16, 12, 6);
+        ctx.bezierCurveTo(12, -6, 0, -6, 0, 0);
+        if (d.fillColor) ctx.fill();
+        if (d.strokeColor) ctx.stroke();
+        ctx.restore();
+        break;
+      }
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Renders a DECORATION element (washi tape, stamps, ribbons, floral ornaments).
+   */
+  private static renderDecorationElement(
+    ctx: CanvasRenderingContext2D,
+    el: DecorationElement,
+    boxW: number,
+    boxH: number
+  ) {
+    const d = el.data;
+    ctx.save();
+    switch (d.decorationType) {
+      case 'washi-tape':
+        ctx.fillStyle = el.style?.backgroundColor || 'rgba(235, 225, 205, 0.85)';
+        ctx.fillRect(-boxW / 2, -boxH / 2, boxW, boxH);
+        break;
+      case 'corner-ornament':
+      case 'flourish':
+      case 'flower':
+        if (d.icon) {
+          ctx.fillStyle = el.style?.color || '#D4AF37';
+          ctx.font = `${el.style?.fontSize ?? 28}px serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(d.icon, 0, 0);
+        }
+        break;
+    }
+    ctx.restore();
+  }
+
+  private static renderPageNumberFooter(ctx: CanvasRenderingContext2D, pageNumber: number) {
+    ctx.save();
+    ctx.fillStyle = '#8A7E71';
+    ctx.font = '22px "Cormorant Garamond", Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`— ${pageNumber} —`, CANVAS_WIDTH / 2, CANVAS_HEIGHT - 45);
+    ctx.restore();
+  }
+
+  private static hexToRgba(hexOrRgba: string, alpha: number): string {
+    if (hexOrRgba.startsWith('rgba') || hexOrRgba.startsWith('rgb')) {
+      return hexOrRgba;
+    }
+    const cleanHex = hexOrRgba.replace('#', '');
+    const r = parseInt(cleanHex.substring(0, 2), 16) || 249;
+    const g = parseInt(cleanHex.substring(2, 4), 16) || 245;
+    const b = parseInt(cleanHex.substring(4, 6), 16) || 236;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  // =========================================================================
+  // 5. BACKWARD-COMPATIBILITY ADAPTERS (Keep 100% functional with Flipbook)
+  // =========================================================================
+
+  /**
+   * Backward-compatible adapter for inside pages.
+   * Delegates layout instantiation to applyLayoutTemplate() and renders via renderPageTexture(page).
+   * Page renderer itself does NOT know or hardcode any layout templates.
+   */
+  static async createInsidePageTexture(params: {
+    pageNumber: number;
+    chapter?: string;
+    title?: string;
+    quote?: string;
+    textLines?: string[];
+    handwriting?: string;
+    media?: PageMediaItem[];
+    layout?: PageLayoutType;
+    backgroundSrc?: string;
+    side: 'left' | 'right';
+  }): Promise<THREE.CanvasTexture> {
+    const layout = (params.layout as LayoutTemplate) || 'auto';
+    const page = applyLayoutTemplate(
+      {
+        pageNumber: params.pageNumber,
+        side: params.side,
+        chapter: params.chapter,
+        title: params.title,
+        quote: params.quote,
+        textLines: params.textLines,
+        handwriting: params.handwriting,
+        background: {
+          type: params.backgroundSrc ? 'image' : 'color',
+          imageUrl: params.backgroundSrc,
+          color: '#F9F5EC',
+          headerFade: { enabled: true, color: '#F9F5EC', height: 0.345, startOpacity: 0.92, endOpacity: 0 },
+          gutterFade: { enabled: true, color: '#F9F5EC', width: 0.14, opacity: 0.28 },
+        },
+      },
+      layout,
+      {
+        title: params.title,
+        subtitle: params.chapter,
+        chapter: params.chapter,
+        quote: params.quote,
+        textLines: params.textLines,
+        handwriting: params.handwriting,
+        media: params.media,
+      }
+    );
+    return this.renderPageTexture(page);
+  }
+
+  // =========================================================================
+  // 6. COVERS CONVENIENCE METHODS
+  // =========================================================================
+
+  static createCoverTexture(
+    photoSrc: string,
+    bookContext?: Partial<Book>
+  ): Promise<THREE.CanvasTexture> {
     return new Promise(async (resolve) => {
       const canvas = document.createElement('canvas');
-      canvas.width = 1024;
-      canvas.height = 1360;
+      canvas.width = CANVAS_WIDTH;
+      canvas.height = CANVAS_HEIGHT;
       const ctx = canvas.getContext('2d')!;
 
-      // Ensure custom font 2.otf (SVN-Housttely Signature) is fully loaded in browser
       if (typeof document !== 'undefined' && document.fonts) {
         try {
           await document.fonts.load('60px "SVN-Housttely Signature"');
           await document.fonts.load('60px "Coldwell Bridges"');
           await document.fonts.ready;
-        } catch (err) {
-          console.log('Font load check:', err);
+        } catch {
+          // Pass
         }
       }
 
-      // Calculate days together from 2022-10-20 to today
-      const startDate = new Date('2022-10-20T00:00:00').getTime();
-      const now = new Date().getTime();
-      const daysTogether = Math.max(0, Math.floor((now - startDate) / (1000 * 60 * 60 * 24)));
+      const varContext = TextVariableResolver.createContext({ book: bookContext });
+      const title = TextVariableResolver.resolve(
+        bookContext?.cover?.front?.title || 'Chúng Mình',
+        varContext
+      );
+      const daysText = TextVariableResolver.resolve('{{daysTogether | number}} NGÀY', varContext);
+      const subtitle = TextVariableResolver.resolve(
+        bookContext?.cover?.front?.counterBadge?.subtitle || 'Bên nhau từ ngày {{anniversaryDate}}',
+        varContext
+      );
 
       const renderCover = (img?: HTMLImageElement) => {
-        if (img) {
-          // Draw full photo cover with object-fit: cover
+        if (img && img.width > 1) {
           const srcW = img.naturalWidth || img.width;
           const srcH = img.naturalHeight || img.height;
           const srcRatio = srcW / srcH;
-          const destRatio = 1024 / 1360;
+          const destRatio = CANVAS_WIDTH / CANVAS_HEIGHT;
 
           let sX = 0, sY = 0, sW = srcW, sH = srcH;
           if (srcRatio > destRatio) {
@@ -56,29 +771,16 @@ export class PageTextureGenerator {
             sH = srcW / destRatio;
             sY = (srcH - sH) / 2;
           }
-          ctx.drawImage(img, sX, sY, sW, sH, 0, 0, 1024, 1360);
+          ctx.drawImage(img, sX, sY, sW, sH, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         } else {
-          // Fallback background
-          const grad = ctx.createLinearGradient(0, 0, 1024, 1360);
+          const grad = ctx.createLinearGradient(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
           grad.addColorStop(0, '#FFE8EE');
           grad.addColorStop(1, '#F7D6DE');
           ctx.fillStyle = grad;
-          ctx.fillRect(0, 0, 1024, 1360);
+          ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         }
 
-        // Ultra-smooth seamless feathering vignette directly under text cluster (zero visible borders)
-        ctx.save();
-        const textVignette = ctx.createRadialGradient(200, 840, 0, 200, 840, 480);
-        textVignette.addColorStop(0, 'rgba(10, 5, 8, 0.65)');
-        textVignette.addColorStop(0.25, 'rgba(10, 5, 8, 0.45)');
-        textVignette.addColorStop(0.55, 'rgba(10, 5, 8, 0.20)');
-        textVignette.addColorStop(0.8, 'rgba(10, 5, 8, 0.06)');
-        textVignette.addColorStop(1, 'rgba(10, 5, 8, 0.0)');
-        ctx.fillStyle = textVignette;
-        ctx.fillRect(0, 380, 680, 880);
-        ctx.restore();
-
-        // 1. "CHÚNG MÌNH" Title with exact font public/font/2.otf ("SVN-Housttely Signature")
+        // Title and live days counter at middle-left
         ctx.save();
         ctx.textAlign = 'left';
         ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
@@ -88,9 +790,8 @@ export class PageTextureGenerator {
         ctx.fillStyle = '#FFFFFF';
         ctx.font = 'normal 60px "SVN-Housttely Signature", "Coldwell Bridges", cursive, serif';
         ctx.letterSpacing = '1px';
-        ctx.fillText('Chúng Mình', 70, 780);
+        ctx.fillText(title, 70, 780);
 
-        // Subtle rose-gold accent line
         ctx.strokeStyle = '#F0B6C3';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -98,16 +799,14 @@ export class PageTextureGenerator {
         ctx.lineTo(340, 850);
         ctx.stroke();
 
-        // 2. Love Counter: Days together from 20.10.2022
-        ctx.fillStyle = '#FFE5B4'; // Warm champagne gold
+        ctx.fillStyle = '#FFE5B4';
         ctx.font = 'bold 32px "Montserrat", sans-serif';
         ctx.letterSpacing = '1px';
-        ctx.fillText(`${daysTogether.toLocaleString()} NGÀY`, 70, 900);
+        ctx.fillText(daysText, 70, 900);
 
         ctx.fillStyle = 'rgba(255, 245, 247, 0.85)';
         ctx.font = 'italic 24px "Dancing Script", cursive';
-        ctx.fillText('Bên nhau từ ngày 20.10.2022', 70, 930);
-
+        ctx.fillText(subtitle, 70, 930);
         ctx.restore();
 
         const texture = new THREE.CanvasTexture(canvas);
@@ -126,16 +825,16 @@ export class PageTextureGenerator {
   static createBackCoverTexture(photoSrc: string, isInside: boolean = false): Promise<THREE.CanvasTexture> {
     return new Promise((resolve) => {
       const canvas = document.createElement('canvas');
-      canvas.width = 1024;
-      canvas.height = 1360;
+      canvas.width = CANVAS_WIDTH;
+      canvas.height = CANVAS_HEIGHT;
       const ctx = canvas.getContext('2d')!;
 
       const renderBack = (img?: HTMLImageElement) => {
-        if (img) {
+        if (img && img.width > 1) {
           const srcW = img.naturalWidth || img.width;
           const srcH = img.naturalHeight || img.height;
           const srcRatio = srcW / srcH;
-          const destRatio = 1024 / 1360;
+          const destRatio = CANVAS_WIDTH / CANVAS_HEIGHT;
 
           let sX = 0, sY = 0, sW = srcW, sH = srcH;
           if (srcRatio > destRatio) {
@@ -145,10 +844,10 @@ export class PageTextureGenerator {
             sH = srcW / destRatio;
             sY = (srcH - sH) / 2;
           }
-          ctx.drawImage(img, sX, sY, sW, sH, 0, 0, 1024, 1360);
+          ctx.drawImage(img, sX, sY, sW, sH, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         } else {
           ctx.fillStyle = '#1A1215';
-          ctx.fillRect(0, 0, 1024, 1360);
+          ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         }
 
         const texture = new THREE.CanvasTexture(canvas);
@@ -161,467 +860,6 @@ export class PageTextureGenerator {
       img.onload = () => renderBack(img);
       img.onerror = () => renderBack();
       img.src = photoSrc;
-    });
-  }
-
-  // Subtle, elegant paper grain & fine pulp texture (delicate, natural, not overwhelming)
-  static applyPaperGrainTexture(ctx: CanvasRenderingContext2D, width: number, height: number, intensity: number = 0.035) {
-    ctx.save();
-
-    // 1. Soft organic fiber speckles (chấm nhỏ li ti nhẹ nhàng)
-    ctx.fillStyle = `rgba(140, 115, 100, ${intensity * 1.0})`;
-    for (let i = 0; i < 1800; i++) {
-      const rx = Math.random() * width;
-      const ry = Math.random() * height;
-      const rw = Math.random() * 1.8 + 0.5;
-      const rh = Math.random() * 1.2 + 0.5;
-      ctx.fillRect(rx, ry, rw, rh);
-    }
-
-    // 2. Very fine pulp hairs (sợi tơ giấy mảnh bay nhẹ)
-    ctx.strokeStyle = `rgba(130, 105, 90, ${intensity * 0.8})`;
-    ctx.lineWidth = 0.6;
-    for (let i = 0; i < 180; i++) {
-      const fx = Math.random() * width;
-      const fy = Math.random() * height;
-      const length = Math.random() * 12 + 4;
-      const angle = Math.random() * Math.PI * 2;
-      ctx.beginPath();
-      ctx.moveTo(fx, fy);
-      ctx.lineTo(fx + Math.cos(angle) * length, fy + Math.sin(angle) * length);
-      ctx.stroke();
-    }
-
-    // 3. Very subtle paper highlights
-    ctx.fillStyle = `rgba(255, 255, 255, ${intensity * 0.7})`;
-    for (let i = 0; i < 1500; i++) {
-      ctx.fillRect(Math.random() * width, Math.random() * height, 1.0, 1.0);
-    }
-
-    ctx.restore();
-  }
-
-  static createInsidePageTexture(params: {
-    pageNumber: number;
-    chapter?: string;
-    title?: string;
-    quote?: string;
-    textLines?: string[];
-    handwriting?: string;
-    media?: PageMediaItem[];
-    layout?: PageLayoutType;
-    backgroundSrc?: string;
-    side: 'left' | 'right';
-  }): Promise<THREE.CanvasTexture> {
-    return new Promise((resolve) => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 1024;
-      canvas.height = 1360;
-      const ctx = canvas.getContext('2d')!;
-      const usesBackground = Boolean(params.backgroundSrc);
-
-      // Pages with their own image use it as the full background. Plain pages retain
-      // the journal's ivory paper color and wash.
-      if (!params.backgroundSrc) {
-        ctx.fillStyle = '#F9F5EC';
-        ctx.fillRect(0, 0, 1024, 1360);
-
-        const vGrad = ctx.createRadialGradient(512, 680, 200, 512, 680, 800);
-        vGrad.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
-        vGrad.addColorStop(1, 'rgba(180, 154, 106, 0.12)');
-        ctx.fillStyle = vGrad;
-        ctx.fillRect(0, 0, 1024, 1360);
-      }
-
-      // Spine shadow gradient on inner edge
-      const spineGrad = ctx.createLinearGradient(
-        params.side === 'left' ? 1024 : 0,
-        0,
-        params.side === 'left' ? 900 : 124,
-        0
-      );
-      spineGrad.addColorStop(0, 'rgba(0, 0, 0, 0.16)');
-      spineGrad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
-      ctx.fillStyle = spineGrad;
-      ctx.fillRect(params.side === 'left' ? 880 : 0, 0, 144, 1360);
-
-      // 2. Header
-      ctx.fillStyle = '#C99A9A';
-      ctx.font = 'bold 20px Montserrat, sans-serif';
-      ctx.letterSpacing = '4px';
-      ctx.textAlign = params.side === 'left' ? 'left' : 'right';
-      const headerX = params.side === 'left' ? 80 : 944;
-      ctx.fillText(params.chapter ? params.chapter.toUpperCase() : 'LOVE JOURNEY', headerX, 85);
-
-      ctx.strokeStyle = 'rgba(201, 154, 154, 0.3)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(80, 105);
-      ctx.lineTo(944, 105);
-      ctx.stroke();
-
-      // 3. Title & Quote
-      let curY = 160;
-      if (params.title) {
-        ctx.textAlign = 'left';
-        ctx.fillStyle = '#292522';
-        ctx.font = 'bold 38px "Cormorant Garamond", Georgia, serif';
-        ctx.letterSpacing = '1px';
-        ctx.fillText(params.title, 80, curY);
-        curY += 42;
-      }
-
-      if (params.quote) {
-        ctx.fillStyle = '#94384F';
-        ctx.font = 'italic 26px "Dancing Script", "Playfair Display", Georgia, cursive';
-        ctx.fillText(`"${params.quote}"`, 80, curY);
-        curY += 38;
-      }
-
-      // 4. Text Lines
-      if (params.textLines && params.textLines.length > 0) {
-        ctx.fillStyle = '#474039';
-        ctx.font = '22px "Cormorant Garamond", Georgia, serif';
-        params.textLines.forEach((line) => {
-          ctx.fillText(line, 80, curY);
-          curY += 30;
-        });
-        curY += 10;
-      }
-
-      const completeRendering = () => {
-        if (params.handwriting) {
-          ctx.fillStyle = '#38161E';
-          ctx.font = 'italic 32px "Dancing Script", "Playfair Display", Georgia, cursive';
-          ctx.textAlign = params.side === 'left' ? 'right' : 'center';
-          const hX = params.side === 'left' ? 920 : 512;
-          ctx.fillText(params.handwriting, hX, 1250);
-        }
-
-        ctx.fillStyle = '#8A7E71';
-        ctx.font = '22px "Cormorant Garamond", Georgia, serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(`— ${params.pageNumber} —`, 512, 1315);
-
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.colorSpace = THREE.SRGBColorSpace;
-        resolve(texture);
-      };
-
-      const drawBackground = (background?: HTMLImageElement) => {
-        if (!background) return;
-        const srcW = background.naturalWidth || background.width;
-        const srcH = background.naturalHeight || background.height;
-        const srcRatio = srcW / srcH;
-        const destRatio = 1024 / 1360;
-        let sx = 0;
-        let sy = 0;
-        let sw = srcW;
-        let sh = srcH;
-        if (srcRatio > destRatio) {
-          sw = srcH * destRatio;
-          sx = (srcW - sw) / 2;
-        } else {
-          sh = srcW / destRatio;
-          sy = (srcH - sh) / 2;
-        }
-
-        // Build the background and header fade on an offscreen layer. The finished
-        // layer can then be placed behind text without darkening the typography.
-        const backgroundLayer = document.createElement('canvas');
-        backgroundLayer.width = 1024;
-        backgroundLayer.height = 1360;
-        const backgroundContext = backgroundLayer.getContext('2d')!;
-        backgroundContext.drawImage(background, sx, sy, sw, sh, 0, 0, 1024, 1360);
-
-        // Dedicated reading zone for chapter label, title, quote and opening copy.
-        // It fades out before the scrapbook composition begins.
-        const headerFade = backgroundContext.createLinearGradient(0, 0, 0, 470);
-        headerFade.addColorStop(0, 'rgba(249, 245, 236, 0.92)');
-        headerFade.addColorStop(0.28, 'rgba(249, 245, 236, 0.78)');
-        headerFade.addColorStop(0.66, 'rgba(249, 245, 236, 0.38)');
-        headerFade.addColorStop(1, 'rgba(249, 245, 236, 0)');
-        backgroundContext.fillStyle = headerFade;
-        backgroundContext.fillRect(0, 0, 1024, 470);
-
-        // A gentle inner-edge fade keeps the page gutter readable without a hard bar.
-        const gutterFade = backgroundContext.createLinearGradient(
-          params.side === 'left' ? 1024 : 0,
-          0,
-          params.side === 'left' ? 810 : 214,
-          0
-        );
-        gutterFade.addColorStop(0, 'rgba(249, 245, 236, 0.28)');
-        gutterFade.addColorStop(1, 'rgba(249, 245, 236, 0)');
-        backgroundContext.fillStyle = gutterFade;
-        backgroundContext.fillRect(0, 0, 1024, 1360);
-
-        // This runs after the page copy, so destination-over places the prepared
-        // layer beneath every typography and scrapbook item.
-        ctx.save();
-        ctx.globalCompositeOperation = 'destination-over';
-        ctx.drawImage(backgroundLayer, 0, 0);
-        ctx.restore();
-      };
-
-      /**
-       * Draws Polaroid Card with STRICT 100% Aspect Ratio Preservation (Contain Mode inside Matte Card)
-       * ZERO Stretching, ZERO Distortion!
-       */
-      const drawAdaptivePolaroid = (
-        source: HTMLImageElement | HTMLCanvasElement,
-        boxX: number,
-        boxY: number,
-        boxW: number,
-        boxH: number,
-        caption?: string,
-        rotationDeg: number = 0,
-        isVideo: boolean = false
-      ) => {
-        const srcW = (source as HTMLImageElement).naturalWidth || source.width || 400;
-        const srcH = (source as HTMLImageElement).naturalHeight || source.height || 300;
-        const srcRatio = srcW / srcH;
-
-        // Calculate card dimensions that natively hug the photo aspect ratio
-        const padding = 14;
-        const captionSpace = caption ? 38 : 22;
-        
-        // Available space inside bounding box for photo
-        const maxImgW = boxW - padding * 2;
-        const maxImgH = boxH - padding * 2 - captionSpace;
-
-        let finalImgW = maxImgW;
-        let finalImgH = finalImgW / srcRatio;
-
-        if (finalImgH > maxImgH) {
-          finalImgH = maxImgH;
-          finalImgW = finalImgH * srcRatio;
-        }
-
-        // Exact outer Polaroid Card size
-        const cardW = Math.round(finalImgW + padding * 2);
-        const cardH = Math.round(finalImgH + padding * 2 + captionSpace);
-        
-        // Center the card within the assigned bounding box
-        const cardX = boxX + (boxW - cardW) / 2;
-        const cardY = boxY + (boxH - cardH) / 2;
-
-        ctx.save();
-        ctx.translate(cardX + cardW / 2, cardY + cardH / 2);
-        ctx.rotate((rotationDeg * Math.PI) / 180);
-
-        // Natural Card Border (No fake heavy drop shadow, blends flat and organically onto parchment)
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(-cardW / 2, -cardH / 2, cardW, cardH);
-
-        // Thin delicate frame line to ground the photo naturally on the page
-        ctx.strokeStyle = 'rgba(180, 160, 140, 0.25)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(-cardW / 2, -cardH / 2, cardW, cardH);
-
-        // Draw Image directly with exact dimensions
-        const imgX = -cardW / 2 + padding;
-        const imgY = -cardH / 2 + padding;
-        ctx.drawImage(source, 0, 0, srcW, srcH, imgX, imgY, finalImgW, finalImgH);
-
-        // If Video: badge overlay
-        if (isVideo) {
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-          ctx.beginPath();
-          ctx.arc(0, imgY + finalImgH / 2, 22, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.fillStyle = '#FFFFFF';
-          ctx.beginPath();
-          ctx.moveTo(-5, imgY + finalImgH / 2 - 9);
-          ctx.lineTo(10, imgY + finalImgH / 2);
-          ctx.lineTo(-5, imgY + finalImgH / 2 + 9);
-          ctx.closePath();
-          ctx.fill();
-        }
-
-        // Washi tape on top
-        ctx.fillStyle = 'rgba(235, 225, 205, 0.85)';
-        ctx.fillRect(-38, -cardH / 2 - 7, 76, 16);
-
-        // Caption text
-        if (caption) {
-          ctx.fillStyle = '#4A1523';
-          ctx.font = 'italic 20px "Dancing Script", "Playfair Display", Georgia, cursive';
-          ctx.textAlign = 'center';
-          ctx.fillText(caption, 0, cardH / 2 - 13);
-        }
-
-        ctx.restore();
-      };
-
-      const beginRendering = () => {
-      const mediaItems = params.media || [];
-      if (mediaItems.length === 0) {
-        completeRendering();
-        return;
-      }
-
-      let loadedCount = 0;
-      const loadedElements: Array<{ elem: HTMLImageElement | HTMLCanvasElement; item: PageMediaItem }> = [];
-
-      mediaItems.forEach((item, idx) => {
-        if (item.isVideo) {
-          const vImg = new Image();
-          vImg.crossOrigin = 'anonymous';
-          vImg.onload = () => {
-            loadedElements[idx] = { elem: vImg, item };
-            loadedCount++;
-            if (loadedCount === mediaItems.length) renderDynamicLayout();
-          };
-          vImg.onerror = () => {
-            const vCanvas = document.createElement('canvas');
-            vCanvas.width = 400;
-            vCanvas.height = 300;
-            const vCtx = vCanvas.getContext('2d')!;
-            vCtx.fillStyle = '#2A181E';
-            vCtx.fillRect(0, 0, 400, 300);
-            vCtx.fillStyle = '#E8BCC6';
-            vCtx.font = '22px Montserrat, sans-serif';
-            vCtx.textAlign = 'center';
-            vCtx.fillText('Video Kỷ Niệm', 200, 155);
-
-            loadedElements[idx] = { elem: vCanvas, item };
-            loadedCount++;
-            if (loadedCount === mediaItems.length) renderDynamicLayout();
-          };
-          vImg.src = item.src;
-        } else {
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => {
-            loadedElements[idx] = { elem: img, item };
-            loadedCount++;
-            if (loadedCount === mediaItems.length) renderDynamicLayout();
-          };
-          img.onerror = () => {
-            const errCanvas = document.createElement('canvas');
-            errCanvas.width = 300;
-            errCanvas.height = 300;
-            const eCtx = errCanvas.getContext('2d')!;
-            eCtx.fillStyle = '#EFE9DE';
-            eCtx.fillRect(0, 0, 300, 300);
-            eCtx.fillStyle = '#8A7E71';
-            eCtx.font = '16px serif';
-            eCtx.textAlign = 'center';
-            eCtx.fillText('Khoảnh khắc đôi mình', 150, 150);
-
-            loadedElements[idx] = { elem: errCanvas, item };
-            loadedCount++;
-            if (loadedCount === mediaItems.length) renderDynamicLayout();
-          };
-          img.src = item.src;
-        }
-      });
-
-      // RENDER SPECIFIC AND DIVERSE LAYOUTS PER PAGE
-      const renderDynamicLayout = () => {
-        const count = loadedElements.length;
-        const availableTop = curY + 12;
-        const availableHeight = 1205 - availableTop;
-        const layout = params.layout || 'auto';
-
-        // 1. Single Hero Layout (Trang chân dung hoặc ảnh ngang tráng lệ)
-        if (count === 1 || layout === 'single-hero') {
-          const el = loadedElements[0];
-          drawAdaptivePolaroid(el.elem, 70, availableTop, 884, availableHeight, el.item.caption, 0, el.item.isVideo);
-        }
-        
-        // 2. Dual Stacked Layout (2 ảnh ngang/vuông xếp trên dưới)
-        else if (layout === 'dual-stacked') {
-          const halfH = (availableHeight - 20) / 2;
-          drawAdaptivePolaroid(loadedElements[0].elem, 80, availableTop, 864, halfH, loadedElements[0].item.caption, -1.2, loadedElements[0].item.isVideo);
-          drawAdaptivePolaroid(loadedElements[1].elem, 80, availableTop + halfH + 20, 864, halfH, loadedElements[1].item.caption, 1.4, loadedElements[1].item.isVideo);
-        }
-
-        // 3. Dual Columns Layout (2 ảnh dọc đứng cạnh nhau)
-        else if (layout === 'dual-columns') {
-          const halfW = (884 - 24) / 2;
-          drawAdaptivePolaroid(loadedElements[0].elem, 70, availableTop, halfW, availableHeight, loadedElements[0].item.caption, -1.5, loadedElements[0].item.isVideo);
-          drawAdaptivePolaroid(loadedElements[1].elem, 70 + halfW + 24, availableTop, halfW, availableHeight, loadedElements[1].item.caption, 1.8, loadedElements[1].item.isVideo);
-        }
-
-        // 4. Diagonal Duo Layout (2 ảnh góc chéo xếp so le nghệ thuật)
-        else if (layout === 'diagonal-duo') {
-          const w = 580;
-          const h = availableHeight * 0.58;
-          drawAdaptivePolaroid(loadedElements[0].elem, 70, availableTop, w, h, loadedElements[0].item.caption, -2.5, loadedElements[0].item.isVideo);
-          drawAdaptivePolaroid(loadedElements[1].elem, 1024 - w - 70, availableTop + availableHeight - h, w, h, loadedElements[1].item.caption, 2.2, loadedElements[1].item.isVideo);
-        }
-
-        // 5. Asymmetric Featured (1 ảnh lớn + 2 ảnh nhỏ)
-        else if (layout === 'asymmetric-featured' && count >= 3) {
-          const topH = availableHeight * 0.52;
-          drawAdaptivePolaroid(loadedElements[0].elem, 80, availableTop, 864, topH, loadedElements[0].item.caption, 0.6, loadedElements[0].item.isVideo);
-          
-          const btmW = (864 - 20) / 2;
-          const btmH = availableHeight * 0.44;
-          const btmY = availableTop + topH + 18;
-          drawAdaptivePolaroid(loadedElements[1].elem, 80, btmY, btmW, btmH, loadedElements[1].item.caption, -1.8, loadedElements[1].item.isVideo);
-          drawAdaptivePolaroid(loadedElements[2].elem, 80 + btmW + 20, btmY, btmW, btmH, loadedElements[2].item.caption, 1.9, loadedElements[2].item.isVideo);
-        }
-
-        // 6. Scrapbook Trio (3 ảnh đan xen)
-        else if (layout === 'scrapbook-trio' && count >= 3) {
-          const cardW = 540;
-          const cardH = availableHeight * 0.46;
-          drawAdaptivePolaroid(loadedElements[0].elem, 70, availableTop, cardW, cardH, loadedElements[0].item.caption, -2.0, loadedElements[0].item.isVideo);
-          drawAdaptivePolaroid(loadedElements[1].elem, 1024 - cardW - 70, availableTop + 140, cardW, cardH, loadedElements[1].item.caption, 2.5, loadedElements[1].item.isVideo);
-          drawAdaptivePolaroid(loadedElements[2].elem, 160, availableTop + availableHeight - cardH, cardW + 80, cardH, loadedElements[2].item.caption, -1.0, loadedElements[2].item.isVideo);
-        }
-
-        // 7. Quad Gallery Grid (4 ảnh polaroid thanh lịch)
-        else if (count >= 4) {
-          const colW = (884 - 20) / 2;
-          const rowH = (availableHeight - 20) / 2;
-          drawAdaptivePolaroid(loadedElements[0].elem, 70, availableTop, colW, rowH, loadedElements[0].item.caption, -1.5, loadedElements[0].item.isVideo);
-          drawAdaptivePolaroid(loadedElements[1].elem, 70 + colW + 20, availableTop, colW, rowH, loadedElements[1].item.caption, 1.8, loadedElements[1].item.isVideo);
-          drawAdaptivePolaroid(loadedElements[2].elem, 70, availableTop + rowH + 20, colW, rowH, loadedElements[2].item.caption, 1.6, loadedElements[2].item.isVideo);
-          drawAdaptivePolaroid(loadedElements[3].elem, 70 + colW + 20, availableTop + rowH + 20, colW, rowH, loadedElements[3].item.caption, -1.7, loadedElements[3].item.isVideo);
-        }
-
-        // Fallback auto logic
-        else if (count === 2) {
-          const isLandscape = ((loadedElements[0].elem as HTMLImageElement).naturalWidth || 400) > ((loadedElements[0].elem as HTMLImageElement).naturalHeight || 300);
-          if (isLandscape) {
-            const halfH = (availableHeight - 20) / 2;
-            drawAdaptivePolaroid(loadedElements[0].elem, 80, availableTop, 864, halfH, loadedElements[0].item.caption, -1.0, loadedElements[0].item.isVideo);
-            drawAdaptivePolaroid(loadedElements[1].elem, 80, availableTop + halfH + 20, 864, halfH, loadedElements[1].item.caption, 1.2, loadedElements[1].item.isVideo);
-          } else {
-            const halfW = (884 - 20) / 2;
-            drawAdaptivePolaroid(loadedElements[0].elem, 70, availableTop, halfW, availableHeight, loadedElements[0].item.caption, -1.5, loadedElements[0].item.isVideo);
-            drawAdaptivePolaroid(loadedElements[1].elem, 70 + halfW + 20, availableTop, halfW, availableHeight, loadedElements[1].item.caption, 1.8, loadedElements[1].item.isVideo);
-          }
-        } else if (count === 3) {
-          const topH = availableHeight * 0.5;
-          drawAdaptivePolaroid(loadedElements[0].elem, 80, availableTop, 864, topH, loadedElements[0].item.caption, 0.8, loadedElements[0].item.isVideo);
-          const btmW = (864 - 20) / 2;
-          const btmH = availableHeight * 0.46;
-          drawAdaptivePolaroid(loadedElements[1].elem, 80, availableTop + topH + 18, btmW, btmH, loadedElements[1].item.caption, -1.8, loadedElements[1].item.isVideo);
-          drawAdaptivePolaroid(loadedElements[2].elem, 80 + btmW + 20, availableTop + topH + 18, btmW, btmH, loadedElements[2].item.caption, 2.0, loadedElements[2].item.isVideo);
-        }
-
-        completeRendering();
-      };
-      };
-
-      if (params.backgroundSrc) {
-        const background = new Image();
-        background.crossOrigin = 'anonymous';
-        background.onload = () => {
-          drawBackground(background);
-          beginRendering();
-        };
-        background.onerror = () => beginRendering();
-        background.src = params.backgroundSrc;
-      } else {
-        beginRendering();
-      }
     });
   }
 }
