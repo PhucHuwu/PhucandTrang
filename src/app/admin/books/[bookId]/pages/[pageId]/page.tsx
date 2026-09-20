@@ -10,6 +10,7 @@ import {
   createAdminElement,
   deleteAdminElement,
 } from '@/services/adminApi';
+import { useAdminAuth } from '@/context/AdminAuthContext';
 import { Page, PageElement, PageElementType, Book } from '@/types/book';
 import LivePagePreview from '@/components/admin/LivePagePreview';
 import {
@@ -30,6 +31,7 @@ import {
 } from 'lucide-react';
 
 export default function PageDetailAndElementEditor() {
+  const { isViewer } = useAdminAuth();
   const params = useParams();
   const router = useRouter();
   const bookId = params.bookId as string;
@@ -172,6 +174,10 @@ export default function PageDetailAndElementEditor() {
 
   // Save all elements
   const handleSave = async () => {
+    if (isViewer) {
+      alert('Tài khoản quyền VIEWER chỉ có quyền xem, không thể lưu thay đổi.');
+      return;
+    }
     setSaving(true);
     setToast(null);
     try {
@@ -220,15 +226,17 @@ export default function PageDetailAndElementEditor() {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-semibold shadow-lg shadow-rosewood-950/50 transition-all active:scale-95 disabled:opacity-50"
-        >
-          <Save className="w-4 h-4" />
-          <span>{saving ? 'Đang lưu...' : 'Lưu toàn bộ thay đổi'}</span>
-        </button>
+        {!isViewer && (
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-semibold shadow-lg shadow-rosewood-950/50 transition-all active:scale-95 disabled:opacity-50"
+          >
+            <Save className="w-4 h-4" />
+            <span>{saving ? 'Đang lưu...' : 'Lưu toàn bộ thay đổi'}</span>
+          </button>
+        )}
       </div>
 
       {toast && (
@@ -250,35 +258,37 @@ export default function PageDetailAndElementEditor() {
               </span>
 
               {/* Add Element Quick Actions */}
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => handleAddElement('TEXT')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rosewood-900/40 hover:bg-rosewood-800/60 text-parchment-200 text-xs border border-rosewood-700/40 transition-colors"
-                  title="Thêm khối chữ"
-                >
-                  <Type className="w-3 h-3 text-champagne-400" />
-                  <span>Text</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleAddElement('IMAGE')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rosewood-900/40 hover:bg-rosewood-800/60 text-parchment-200 text-xs border border-rosewood-700/40 transition-colors"
-                  title="Thêm ảnh"
-                >
-                  <ImageIcon className="w-3 h-3 text-pink-400" />
-                  <span>Ảnh</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleAddElement('VIDEO')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rosewood-900/40 hover:bg-rosewood-800/60 text-parchment-200 text-xs border border-rosewood-700/40 transition-colors"
-                  title="Thêm video"
-                >
-                  <Video className="w-3 h-3 text-amber-400" />
-                  <span>Video</span>
-                </button>
-              </div>
+              {!isViewer && (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleAddElement('TEXT')}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rosewood-900/40 hover:bg-rosewood-800/60 text-parchment-200 text-xs border border-rosewood-700/40 transition-colors"
+                    title="Thêm khối chữ"
+                  >
+                    <Type className="w-3 h-3 text-champagne-400" />
+                    <span>Text</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddElement('IMAGE')}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rosewood-900/40 hover:bg-rosewood-800/60 text-parchment-200 text-xs border border-rosewood-700/40 transition-colors"
+                    title="Thêm ảnh"
+                  >
+                    <ImageIcon className="w-3 h-3 text-pink-400" />
+                    <span>Ảnh</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddElement('VIDEO')}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rosewood-900/40 hover:bg-rosewood-800/60 text-parchment-200 text-xs border border-rosewood-700/40 transition-colors"
+                    title="Thêm video"
+                  >
+                    <Video className="w-3 h-3 text-amber-400" />
+                    <span>Video</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Elements Chips List */}
@@ -318,14 +328,16 @@ export default function PageDetailAndElementEditor() {
                   <span className="text-xs font-mono text-stone-400">{selectedElement.id}</span>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleDeleteElement(selectedElement.id)}
-                  className="flex items-center gap-1 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/40 rounded-lg transition-colors border border-red-900/30"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Xóa phần tử</span>
-                </button>
+                {!isViewer && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteElement(selectedElement.id)}
+                    className="flex items-center gap-1 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/40 rounded-lg transition-colors border border-red-900/30"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Xóa phần tử</span>
+                  </button>
+                )}
               </div>
 
               {/* 1. Transform Section: x, y, width, height, rotation, opacity, zIndex */}

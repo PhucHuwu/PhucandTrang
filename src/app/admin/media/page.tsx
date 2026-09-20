@@ -9,6 +9,7 @@ import {
   requestSignedUpload,
   saveUploadedMediaMetadata,
 } from '@/services/adminApi';
+import { useAdminAuth } from '@/context/AdminAuthContext';
 import { uploadDirectToCloudinary } from '@/services/mediaApi';
 import { Media, MediaType } from '@/types/book';
 import {
@@ -26,6 +27,7 @@ import {
 } from 'lucide-react';
 
 export default function AdminMediaPage() {
+  const { isAdmin, isViewer } = useAdminAuth();
   const [mediaItems, setMediaItems] = useState<Media[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -177,23 +179,27 @@ export default function AdminMediaPage() {
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
 
-          {/* Hidden File Input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            onChange={handleFileUpload}
-            className="hidden"
-            accept="image/*,video/mp4,audio/*"
-          />
+          {!isViewer && (
+            <>
+              {/* Hidden File Input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                onChange={handleFileUpload}
+                className="hidden"
+                accept="image/*,video/mp4,audio/*"
+              />
 
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-medium shadow-lg shadow-rosewood-950/50 transition-all active:scale-95 disabled:opacity-50"
-          >
-            <Upload className="w-4 h-4" />
-            <span>{uploading ? `Đang tải lên (${uploadProgress}%)...` : 'Tải lên Media'}</span>
-          </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-medium shadow-lg shadow-rosewood-950/50 transition-all active:scale-95 disabled:opacity-50"
+              >
+                <Upload className="w-4 h-4" />
+                <span>{uploading ? `Đang tải lên (${uploadProgress}%)...` : 'Tải lên Media'}</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -317,14 +323,16 @@ export default function AdminMediaPage() {
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
 
-                    <button
-                      onClick={() => handleDeleteMedia(item.id)}
-                      disabled={deletingId === item.id}
-                      className="p-1 rounded text-red-400/80 hover:text-red-400 transition-colors"
-                      title="Xóa media"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleDeleteMedia(item.id)}
+                        disabled={deletingId === item.id}
+                        className="p-1 rounded text-red-400/80 hover:text-red-400 transition-colors"
+                        title="Xóa media (Chỉ quyền ADMIN)"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

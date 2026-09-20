@@ -8,6 +8,7 @@ import {
   updateAdminBook,
   getAdminAudioTracks,
 } from '@/services/adminApi';
+import { useAdminAuth } from '@/context/AdminAuthContext';
 import {
   Settings,
   ArrowLeft,
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 
 export default function BookSettingsPage() {
+  const { isViewer } = useAdminAuth();
   const params = useParams();
   const router = useRouter();
   const bookId = params.bookId as string;
@@ -133,6 +135,10 @@ export default function BookSettingsPage() {
   }, [bookId]);
 
   const handleSave = async () => {
+    if (isViewer) {
+      alert('Tài khoản quyền VIEWER chỉ có quyền xem, không thể sửa đổi cấu hình sách.');
+      return;
+    }
     setSaving(true);
     setToast(null);
     try {
@@ -193,14 +199,16 @@ export default function BookSettingsPage() {
           </div>
         </div>
 
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-semibold shadow-lg shadow-rosewood-950/50 transition-all active:scale-95 disabled:opacity-50"
-        >
-          <Save className="w-4 h-4" />
-          <span>{saving ? 'Đang lưu...' : 'Lưu thay đổi'}</span>
-        </button>
+        {!isViewer && (
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-semibold shadow-lg shadow-rosewood-950/50 transition-all active:scale-95 disabled:opacity-50"
+          >
+            <Save className="w-4 h-4" />
+            <span>{saving ? 'Đang lưu...' : 'Lưu thay đổi'}</span>
+          </button>
+        )}
       </div>
 
       {toast && (

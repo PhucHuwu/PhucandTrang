@@ -8,6 +8,7 @@ import {
   updateAdminAudioTrack,
   deleteAdminAudioTrack,
 } from '@/services/adminApi';
+import { useAdminAuth } from '@/context/AdminAuthContext';
 import {
   Music,
   Plus,
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 
 export default function AdminAudioPage() {
+  const { isAdmin, isViewer } = useAdminAuth();
   const [tracks, setTracks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -151,13 +153,15 @@ export default function AdminAudioPage() {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
-          <button
-            onClick={openCreateModal}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-medium shadow-lg shadow-rosewood-950/50 transition-all active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Thêm bài hát mới</span>
-          </button>
+          {!isViewer && (
+            <button
+              onClick={openCreateModal}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-medium shadow-lg shadow-rosewood-950/50 transition-all active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Thêm bài hát mới</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -191,20 +195,24 @@ export default function AdminAudioPage() {
                 </div>
 
                 <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => openEditModal(track)}
-                    className="p-2 rounded-lg bg-[#25151F] hover:bg-[#331C2A] text-stone-300 transition-colors"
-                    title="Chỉnh sửa"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(track.id, track.title)}
-                    className="p-2 rounded-lg bg-red-950/30 hover:bg-red-900/50 text-red-400 transition-colors"
-                    title="Xóa"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {!isViewer && (
+                    <button
+                      onClick={() => openEditModal(track)}
+                      className="p-2 rounded-lg bg-[#25151F] hover:bg-[#331C2A] text-stone-300 transition-colors"
+                      title="Chỉnh sửa"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleDelete(track.id, track.title)}
+                      className="p-2 rounded-lg bg-red-950/30 hover:bg-red-900/50 text-red-400 transition-colors"
+                      title="Xóa bài hát (Chỉ quyền ADMIN)"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
 

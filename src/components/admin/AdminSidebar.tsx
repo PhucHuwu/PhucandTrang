@@ -2,70 +2,63 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
-  BookOpen,
+  LayoutDashboard,
   FileText,
-  Settings,
-  LayoutGrid,
   Image as ImageIcon,
   Music,
-  LogOut,
-  ExternalLink,
+  LayoutGrid,
+  Settings,
+  BookOpen,
   Sparkles,
 } from 'lucide-react';
-import { clearAdminToken, getAdminUser } from '@/services/adminApi';
 
-interface AdminSidebarProps {
-  activeBookId?: string;
-}
-
-export default function AdminSidebar({ activeBookId = 'phuc-and-trang-love-journey' }: AdminSidebarProps) {
+export default function AdminSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const user = getAdminUser();
-
-  const handleLogout = () => {
-    clearAdminToken();
-    router.push('/admin/login');
-  };
 
   const navItems = [
     {
-      label: 'Sách kỷ niệm',
-      href: '/admin/books',
-      icon: BookOpen,
-      match: pathname === '/admin/books' || pathname === '/admin',
+      label: 'Dashboard',
+      href: '/admin',
+      icon: LayoutDashboard,
+      match: pathname === '/admin',
     },
     {
-      label: 'Quản lý trang',
-      href: `/admin/books/${activeBookId}/pages`,
+      label: 'Pages (Các trang)',
+      href: '/admin/pages',
       icon: FileText,
-      match: pathname.includes('/pages'),
+      match: pathname.startsWith('/admin/pages') || (pathname.includes('/books/') && pathname.includes('/pages')),
     },
     {
-      label: 'Cài đặt sách',
-      href: `/admin/books/${activeBookId}/settings`,
-      icon: Settings,
-      match: pathname.includes('/settings'),
-    },
-    {
-      label: 'Kho giao diện (Layout)',
-      href: '/admin/layout-templates',
-      icon: LayoutGrid,
-      match: pathname.startsWith('/admin/layout-templates'),
-    },
-    {
-      label: 'Thư viện ảnh / Media',
+      label: 'Media (Thư viện ảnh)',
       href: '/admin/media',
       icon: ImageIcon,
       match: pathname.startsWith('/admin/media'),
     },
     {
-      label: 'Nhạc nền & Audio',
+      label: 'Audio (Kho nhạc)',
       href: '/admin/audio',
       icon: Music,
       match: pathname.startsWith('/admin/audio'),
+    },
+    {
+      label: 'Layouts (Bố cục)',
+      href: '/admin/layouts',
+      icon: LayoutGrid,
+      match: pathname.startsWith('/admin/layouts') || pathname.startsWith('/admin/layout-templates'),
+    },
+    {
+      label: 'Book Settings (Cài đặt)',
+      href: '/admin/settings',
+      icon: Settings,
+      match: pathname.startsWith('/admin/settings') || (pathname.includes('/books/') && pathname.includes('/settings')),
+    },
+    {
+      label: 'Books (Tất cả sách)',
+      href: '/admin/books',
+      icon: BookOpen,
+      match: pathname === '/admin/books',
     },
   ];
 
@@ -86,7 +79,7 @@ export default function AdminSidebar({ activeBookId = 'phuc-and-trang-love-journ
         </div>
 
         {/* Navigation Items */}
-        <nav className="p-3 space-y-1">
+        <nav className="p-3 space-y-1.5">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.match;
@@ -94,7 +87,7 @@ export default function AdminSidebar({ activeBookId = 'phuc-and-trang-love-journ
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
                   isActive
                     ? 'bg-rosewood-600/30 text-champagne-300 font-semibold border border-rosewood-500/40 shadow-sm'
                     : 'text-stone-400 hover:text-parchment-100 hover:bg-[#25151F]'
@@ -108,38 +101,9 @@ export default function AdminSidebar({ activeBookId = 'phuc-and-trang-love-journ
         </nav>
       </div>
 
-      {/* Footer / User Profile & Logout */}
-      <div className="p-4 border-t border-rosewood-900/40 bg-[#140A0F] space-y-3">
-        {/* User Card */}
-        {user && (
-          <div className="flex items-center justify-between text-xs">
-            <div className="truncate">
-              <p className="font-medium text-parchment-200 truncate">{user.name}</p>
-              <p className="text-[10px] text-stone-500 truncate">{user.email}</p>
-            </div>
-            <span className="px-2 py-0.5 rounded text-[10px] bg-rosewood-900/60 text-rosewood-300 border border-rosewood-700/40 font-mono">
-              {user.role}
-            </span>
-          </div>
-        )}
-
-        <div className="flex items-center gap-2 pt-1">
-          <Link
-            href="/"
-            target="_blank"
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#25151F] hover:bg-[#331C2A] text-parchment-300 text-xs transition-colors border border-rosewood-900/40"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span>Mở trang web</span>
-          </Link>
-          <button
-            onClick={handleLogout}
-            className="p-2 rounded-lg bg-red-900/20 hover:bg-red-900/40 text-red-300 transition-colors border border-red-800/30"
-            title="Đăng xuất"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
-        </div>
+      {/* Footer Branding Info */}
+      <div className="p-4 border-t border-rosewood-900/40 bg-[#140A0F] text-[11px] font-mono text-stone-500 text-center">
+        <span>Admin CMS v2.0 • Phúc & Trang</span>
       </div>
     </aside>
   );
