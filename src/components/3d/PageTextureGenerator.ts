@@ -99,6 +99,19 @@ export class PageTextureGenerator {
     page: Page,
     bookContext?: Partial<Book>
   ): Promise<THREE.CanvasTexture> {
+    const canvas = await this.renderPageCanvas(page, bookContext);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }
+
+  /**
+   * Renders a page directly into a new HTMLCanvasElement.
+   */
+  static async renderPageCanvas(
+    page: Page,
+    bookContext?: Partial<Book>
+  ): Promise<HTMLCanvasElement> {
     const canvasW =
       bookContext?.settings?.dimensions?.canvasResolution?.width ||
       DEFAULT_CANVAS_WIDTH;
@@ -109,6 +122,29 @@ export class PageTextureGenerator {
     const canvas = document.createElement('canvas');
     canvas.width = canvasW;
     canvas.height = canvasH;
+    await this.renderPageToCanvas(page, canvas, bookContext);
+    return canvas;
+  }
+
+  /**
+   * Renders a page directly into a provided HTMLCanvasElement.
+   * Reusable by Admin CMS Live Preview without duplicating any renderer logic.
+   */
+  static async renderPageToCanvas(
+    page: Page,
+    canvas: HTMLCanvasElement,
+    bookContext?: Partial<Book>
+  ): Promise<void> {
+    const canvasW =
+      bookContext?.settings?.dimensions?.canvasResolution?.width ||
+      DEFAULT_CANVAS_WIDTH;
+    const canvasH =
+      bookContext?.settings?.dimensions?.canvasResolution?.height ||
+      DEFAULT_CANVAS_HEIGHT;
+
+    if (canvas.width !== canvasW) canvas.width = canvasW;
+    if (canvas.height !== canvasH) canvas.height = canvasH;
+
     const ctx = canvas.getContext('2d')!;
 
     // 1. Ensure custom fonts are ready
@@ -186,10 +222,6 @@ export class PageTextureGenerator {
     ) {
       this.renderPageNumberFooter(ctx, page.pageNumber, canvasW, canvasH);
     }
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    return texture;
   }
 
   // =========================================================================

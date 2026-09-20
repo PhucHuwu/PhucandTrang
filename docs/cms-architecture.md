@@ -301,7 +301,19 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
    - Centralized Cache Invalidation với `PublicCacheService.touchBook()` và ETag dựa trên `contentRevision`.
    - Bảo mật RBAC (`ADMIN`, `EDITOR`, `VIEWER`), bảo vệ toàn bộ mutation routes và endpoint lấy chữ ký Cloudinary.
    - Seed toàn diện đầy đủ 21 trang kèm elements vào PostgreSQL, decouple production fallback.
-8. **Giai đoạn 8 (Prompt 14+ Admin Dashboard & Visual CMS Foundation)**:
-   - Xây dựng giao diện Admin CMS trực quan để quản trị viên chỉnh sửa nội dung, kéo thả layout và tải ảnh mới.
+8. **Giai đoạn 8 (Đã hoàn thành - Prompt 14 Admin CMS Foundation)**:
+   - Xây dựng hệ thống Admin CMS hoàn chỉnh bằng Next.js:
+     - Màn hình Đăng nhập quản trị: `/admin/login`
+     - Màn hình Quản lý Sách: `/admin/books`
+     - Màn hình Cài đặt Sách: `/admin/books/[bookId]/settings` (General, Audio, Dimensions, Camera 3D, Theme Colors, Atmosphere, Covers)
+     - Màn hình Quản lý Trang: `/admin/books/[bookId]/pages` (Reorder thứ tự vật lý, Duplicate, Xóa trang, Thêm trang mới)
+     - Màn hình Chỉnh sửa Phần tử & Chi tiết Trang: `/admin/books/[bookId]/pages/[pageId]`
+       - Form chỉnh sửa đầy đủ thuộc tính: `x`, `y`, `width`, `height`, `rotation`, `opacity`, `zIndex`, `text`, `font`, `color`, `media`, `interaction`
+       - **Live Preview thời gian thực**: Sử dụng trực tiếp `PageTextureGenerator.renderPageToCanvas()` dùng chung với public frontend, cam kết **không duplicate renderer**
+     - Màn hình Kho Bố Cục (Layout Templates): `/admin/layout-templates`
+     - Màn hình Thư viện Media: `/admin/media` (Tải lên Cloudinary trực tiếp qua Signed Config, tra cứu liên kết, xóa an toàn)
+     - Màn hình Kho Âm Thanh: `/admin/audio` (Nghe thử, điều chỉnh volume, loop, fade in, fade out, start at)
+9. **Giai đoạn 9 (Prompt 15+ Visual Editor & Drag-and-Drop Canvas)**:
+   - Tích hợp Visual Canvas Editor kéo thả trực quan (React Konva / Canvas Interactive Layer).
    - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.
    - Di dời/xóa bỏ an toàn các file legacy trong `src/components/spreads` và `src/components/pages`.
