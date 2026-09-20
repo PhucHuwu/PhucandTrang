@@ -148,6 +148,7 @@ export default function QbjectAuthenticExperience() {
           'Kỷ niệm 1 năm bên nhau.',
         ],
         layout: 'quad-gallery',
+        backgroundSrc: getMediaUrl('backgrounds/page-6.jpg'),
         media: [
           { src: getMediaUrl('25-10-2023.jpg'), caption: '25.10.2023 • Tròn 1 năm yêu' },
           { src: getMediaUrl('25-10-2023_2.jpg'), caption: '25.10.2023 • Gắn kết bền lâu' },
@@ -166,6 +167,7 @@ export default function QbjectAuthenticExperience() {
         textLines: [
         ],
         layout: 'dual-columns',
+        backgroundSrc: getMediaUrl('backgrounds/page-7.jpg'),
         media: [
           { src: getMediaUrl('02-12-2023_3.jpg'), caption: '02.12.2023' },
           { src: getMediaUrl('26-06-2323_thumb.jpg'), caption: '26.06 • Video kỷ niệm', isVideo: true },
@@ -184,6 +186,7 @@ export default function QbjectAuthenticExperience() {
           'sinh nhật đặc biệt nhất khi luôn có bạn kề cạnh.',
         ],
         layout: 'quad-gallery',
+        backgroundSrc: getMediaUrl('backgrounds/page-8.jpg'),
         media: [
           { src: getMediaUrl('Brithdate-together-25-05-2024_2.jpg'), caption: '25.05.2024' },
           { src: getMediaUrl('Brithdate-together-25-05-2024_3.jpg'), caption: '25.05.2024' },
@@ -207,6 +210,7 @@ export default function QbjectAuthenticExperience() {
           'hai mình cùng nhau lưu giữ những khoảnh khắc rạng rỡ.',
         ],
         layout: 'quad-gallery',
+        backgroundSrc: getMediaUrl('backgrounds/page-9.jpg'),
         media: [
           { src: getMediaUrl('02-01-2025.jpg'), caption: '02.01.2025 • Du xuân năm mới' },
           { src: getMediaUrl('02-01-2025_2.jpg'), caption: '02.01.2025 • Đồng hành' },
@@ -226,6 +230,7 @@ export default function QbjectAuthenticExperience() {
           'Những góc chụp rạng rỡ và kỷ niệm ngày 17 tháng 01.',
         ],
         layout: 'quad-gallery',
+        backgroundSrc: getMediaUrl('backgrounds/page-10.jpg'),
         media: [
           { src: getMediaUrl('17-01-1025.jpg'), caption: '17.01.2025 • Từng bước chân qua' },
           { src: getMediaUrl('17-01-2025_2.jpg'), caption: '17.01.2025 • Chuyến đi ý nghĩa' },
@@ -246,6 +251,7 @@ export default function QbjectAuthenticExperience() {
           'Tháng 1 năm 2025 với những nụ cười hồn nhiên nhất.',
         ],
         layout: 'dual-columns',
+        backgroundSrc: getMediaUrl('backgrounds/page-11.jpg'),
         media: [
           { src: getMediaUrl('17-01-2025_5.jpg'), caption: '17.01.2025 • Hồn nhiên' },
           { src: getMediaUrl('17-01-2025_thumb.jpg'), caption: 'Video 17.01.2025', isVideo: true },
@@ -263,6 +269,7 @@ export default function QbjectAuthenticExperience() {
           'Tháng 8 mùa thu đưa hai mình đến những trải nghiệm mới.',
         ],
         layout: 'quad-gallery',
+        backgroundSrc: getMediaUrl('backgrounds/page-12.jpg'),
         media: [
           { src: getMediaUrl('20-08-2025.jpg'), caption: '20.08.2025 • Nắng thu' },
           { src: getMediaUrl('20-08-2025_2.jpg'), caption: '20.08.2025 • Dịu mát' },
@@ -282,6 +289,7 @@ export default function QbjectAuthenticExperience() {
           'Những ngày cuối năm 2025 luôn đong đầy tình cảm.',
         ],
         layout: 'scrapbook-trio',
+        backgroundSrc: getMediaUrl('backgrounds/page-13.jpg'),
         media: [
           { src: getMediaUrl('22-11-2025.jpg'), caption: '22.11.2025 • Chớm đông' },
           { src: getMediaUrl('22-11-2025_2.jpg'), caption: '22.11.2025 • Ấm áp' },
@@ -300,6 +308,7 @@ export default function QbjectAuthenticExperience() {
           'Những ngày tháng 4 đáng nhớ của tuổi trẻ.',
         ],
         layout: 'dual-columns',
+        backgroundSrc: getMediaUrl('backgrounds/page-14.jpg'),
         media: [
           { src: getMediaUrl('18-04-2016.jpg'), caption: '18.04.2016 • Kỷ niệm' },
           { src: getMediaUrl('First-trip-14-03-2026.jpg'), caption: '14.03.2026 • First Trip' },
@@ -316,6 +325,7 @@ export default function QbjectAuthenticExperience() {
           'Những chuyến đi dài phía trước luôn có hai mình bên nhau.',
         ],
         layout: 'dual-stacked',
+        backgroundSrc: getMediaUrl('backgrounds/page-15.jpg'),
         media: [
           { src: getMediaUrl('18-04-2026.jpg'), caption: '18.04.2026 • Ngày đẹp trời' },
           { src: getMediaUrl('18-04-2026_2.jpg'), caption: '18.04.2026 • Hẹn ước mai sau' },
@@ -370,6 +380,7 @@ export default function QbjectAuthenticExperience() {
           'luôn làm trái tim mình rung động như ngày đầu.',
         ],
         layout: 'asymmetric-featured',
+        backgroundSrc: getMediaUrl('backgrounds/page-18.jpg'),
         media: [
           { src: getMediaUrl('page18-her-pic-1.jpg'), caption: 'Nét dịu dàng của bạn' },
           { src: getMediaUrl('page18-her-pic-2.jpg'), caption: 'Một ngày thật đẹp' },
@@ -387,6 +398,7 @@ export default function QbjectAuthenticExperience() {
           'Lưu giữ từng nụ cười và ánh mắt biết nói.',
         ],
         layout: 'asymmetric-featured',
+        backgroundSrc: getMediaUrl('backgrounds/page-19.jpg'),
         media: [
           { src: getMediaUrl('page19-replacement.jpg'), caption: 'Xinh đẹp & Rạng rỡ' },
           { src: getMediaUrl('her-pic-3.jpg'), caption: 'Nét duyên dáng' },
@@ -409,6 +421,7 @@ export default function QbjectAuthenticExperience() {
         ],
         handwriting: 'Mình đây…',
         layout: 'dual-columns',
+        backgroundSrc: getMediaUrl('backgrounds/page-20.jpg'),
         media: [
           { src: getMediaUrl('me-1.jpg'), caption: 'Chàng trai của bạn' },
           { src: getMediaUrl('me-2.jpg'), caption: 'Phúc & Trang' },
