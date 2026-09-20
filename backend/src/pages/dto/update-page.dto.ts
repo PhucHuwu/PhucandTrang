@@ -6,6 +6,7 @@ import {
   IsBoolean,
   Min,
   ValidateNested,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { LayoutMode } from '@prisma/client';
@@ -54,7 +55,8 @@ export class UpdatePageDto {
   @IsOptional()
   background?: PageBackgroundDto;
 
+  @ValidateIf((_obj, value) => value !== null && value !== undefined)
   @IsString()
   @IsOptional()
-  audioTrackId?: string;
+  audioTrackId?: string | null;
 }

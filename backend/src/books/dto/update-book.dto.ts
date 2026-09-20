@@ -5,6 +5,7 @@ import {
   IsObject,
   IsDateString,
   Matches,
+  ValidateIf,
 } from 'class-validator';
 import { BookStatus } from '@prisma/client';
 
@@ -52,11 +53,14 @@ export class UpdateBookDto {
   @IsOptional()
   settings?: Record<string, any>;
 
+  @ValidateIf((_obj, value) => value !== null && value !== undefined)
   @IsString()
   @IsOptional()
-  backgroundMusicId?: string;
+  backgroundMusicId?: string | null;
 
+  /** @deprecated Use backgroundMusicId instead */
+  @ValidateIf((_obj, value) => value !== null && value !== undefined)
   @IsString()
   @IsOptional()
-  audioTrackId?: string;
+  audioTrackId?: string | null;
 }

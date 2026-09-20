@@ -49,9 +49,16 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   async onModuleDestroy() {
     try {
       await this.$disconnect();
-      await this.pool.end();
-    } catch (err) {
-      // Ignored during shutdown
+    } catch (err: any) {
+      console.warn('[PrismaService] Error disconnecting Prisma during shutdown:', err?.message || err);
+    }
+
+    try {
+      if (this.pool) {
+        await this.pool.end();
+      }
+    } catch (err: any) {
+      console.warn('[PrismaService] Error closing PostgreSQL pool during shutdown:', err?.message || err);
     }
   }
 }

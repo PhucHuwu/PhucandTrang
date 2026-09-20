@@ -120,20 +120,22 @@
 ---
 
 ## 3. Kết Quả Kiểm Thử Tự Động (Test Verification)
-- **Tổng số test suites**: 12 passed (100%).
-- **Tổng số unit/integration tests**: 59 passed (100%).
+- **Tổng số test suites**: 14 passed (100%).
+- **Tổng số unit/integration tests**: 67 passed (100%).
   1. `utils/image-fitting.spec.ts`: Test contain, cover, fill, focalPoint crop calculation.
   2. `utils/coordinate-conversion.spec.ts`: Test active area relative-to-element coordinate conversion.
   3. `utils/page-utils.spec.ts`: Test deterministic sequencing, side derivation, leaf/face calculation.
   4. `utils/safe-merge.spec.ts`: Test safe partial deep-merge and prototype pollution blocking.
   5. `utils/text-variable-resolver.spec.ts`: Test variable parsing, pipes, timezone consistency.
   6. `auth/roles.guard.spec.ts`: Test RBAC authorization rules and role gating.
-  7. `pages/pages.service.spec.ts`: Test Option B contract (pageNumber preserved, contiguous order 0..N-1, duplicate insertAfter with integer math, reorder foreign/incomplete/duplicate ID rejections, order/side PATCH rejection).
-  8. `versions/versions.service.spec.ts`: Test cross-book rollback rejection, backgroundMusicId null restoration, atomic execution.
-  9. `public/public.service.spec.ts`: Test public document compilation, mediaId resolution, hidden elements filtering, ETag.
-  10. `media/media.service.spec.ts`: Test signed upload config, media reference scanner (cover source, cover video poster, page, audio, video).
-  11. `common/dto/dto-validation.spec.ts`: Test strict DTO validation for interaction (action, target number/string), background (boolean enabled), and transform.
-  12. `app.controller.spec.ts`: Test basic server controller.
+  7. `pages/pages.service.spec.ts`: Test Option B contract (pageNumber preserved, contiguous order 0..N-1, duplicate insertAfter with integer math, reorder foreign/incomplete/duplicate ID rejections, order/side PATCH rejection, page audioTrackId null update).
+  8. `books/books.service.spec.ts`: Test Book nullable audio semantics (Case A: null disables music, Case B: string updates track, Case C: omitted keeps music intact).
+  9. `versions/versions.service.spec.ts`: Test cross-book rollback rejection, backgroundMusicId null restoration, atomic execution.
+  10. `public/public.service.spec.ts`: Test public document compilation, mediaId resolution, hidden elements filtering, null audio, ETag.
+  11. `media/media.service.spec.ts`: Test signed upload config, media reference scanner (cover source, cover video poster, page, audio, video).
+  12. `common/dto/dto-validation.spec.ts`: Test strict DTO validation for interaction (action, target number/string), background (boolean enabled), and transform.
+  13. `prisma/prisma.service.spec.ts`: Test production fail-fast without DATABASE_URL, hardened shutdown cleanup (pool.end called even if $disconnect fails).
+  14. `app.controller.spec.ts`: Test basic server controller.
 - **Biên dịch & Chạy thực tế**:
   - `backend`: `npm run build` thành công 100%.
   - `backend start:prod`: `node dist/backend/src/main` smoke test thành công 100% (cổng 4000).
@@ -161,7 +163,24 @@ Trước khi bước vào Prompt 14 (Admin CMS Foundation), toàn bộ kiến tr
      - Không cho phép trùng lặp page ID.
    - Cập nhật atomic trong một transaction duy nhất và touch book cache đúng 1 lần.
 
-3. **Prisma 7 Seed & Non-Destructive Policy**:
+3. **Final Nullable Audio Contract (Book & Page)**:
+   - `Book.backgroundMusicId`:
+     - `undefined`: Giữ nguyên bài hát nền hiện tại.
+     - `string`: Đổi sang track được chỉ định.
+     - `null`: Tắt hoàn toàn nhạc nền của cuốn sách.
+   - `Page.audioTrackId`:
+     - `undefined`: Giữ nguyên bài hát riêng của trang.
+     - `string`: Gắn bài hát riêng cho trang.
+     - `null`: Xóa bài hát riêng của trang.
+   - Public API: Trả về `{ "audio": null }` khi `backgroundMusicId = null`, không tự ý fallback nhạc local.
+
+4. **Shutdown Lifecycle & Production Fail-Fast**:
+   - `app.enableShutdownHooks()`:
+     `SIGTERM / SIGINT -> Nest shutdown -> onModuleDestroy() -> Prisma $disconnect() -> pg Pool close (pool.end())`.
+   - `$disconnect()` nếu thất bại thì `pool.end()` vẫn luôn được gọi trong khối try-catch độc lập.
+   - `PrismaService` và `seed.ts` bắt buộc `DATABASE_URL` khi chạy `NODE_ENV=production`, fail-fast ngay lập tức nếu thiếu hoặc mất kết nối cơ sở dữ liệu.
+
+5. **Prisma 7 Seed & Non-Destructive Policy**:
    - `backend/prisma7.config.ts` cấu hình:
      ```ts
      migrations: { path: "prisma/migrations", seed: "ts-node prisma/seed.ts" }
@@ -171,18 +190,14 @@ Trước khi bước vào Prompt 14 (Admin CMS Foundation), toàn bộ kiến tr
    - **Chế độ reset cưỡng chế**: Khi `SEED_FORCE_CANONICAL_BOOK=true`, xóa sạch và tái tạo chính xác 21 trang mẫu và tăng `contentRevision`.
    - Không đụng chạm các layout template tùy biến (`isSystem: false`).
 
-4. **Production Fail-Fast & Resource Cleanup**:
-   - `PrismaService` và `seed.ts` bắt buộc `DATABASE_URL` khi chạy `NODE_ENV=production`, fail-fast ngay lập tức nếu thiếu hoặc mất kết nối cơ sở dữ liệu.
-   - Quản lý đóng kết nối PostgreSQL Pool (`pool.end()`) triệt để trong `onModuleDestroy()` và khối `finally` của seed script.
-
-5. **Cover Video Poster Media References**:
+6. **Cover Video Poster Media References**:
    - `MediaService.checkReferences()` quét đầy đủ `posterMediaId`, `thumbnailUrl`, `posterUrl` trên cả bìa trước và bìa sau.
 
-6. **Renderer Baseline**:
+7. **Renderer Baseline**:
    - Chế độ `contain` của ảnh nền tự động lót màu nền giấy (`paperColor`) trước khi vẽ ảnh, tránh khoảng trống trong suốt.
    - Không còn số ảo `999` trên bìa.
 
 ---
 
 ## 5. Xác Nhận Sẵn Sàng Chuyển Giao Cho Prompt 14
-Hệ thống đã đạt toàn bộ 22 điều kiện trong Definition of Done. Cơ sở dữ liệu, API contract, Generic Renderer và cơ chế bảo mật đã hoàn thành mọi hotfix và chính thức đóng băng. Sẵn sàng 100% để triển khai Prompt 14 — Admin CMS Foundation!
+Hệ thống đã đạt toàn bộ 16 điều kiện trong Definition of Done. Cơ sở dữ liệu, API contract, Generic Renderer và cơ chế bảo mật đã hoàn thành mọi hotfix và chính thức đóng băng. Sẵn sàng 100% để triển khai Prompt 14 — Admin CMS Foundation!

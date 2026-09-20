@@ -193,6 +193,29 @@ describe('PagesService Option B Contract & Sequencing (Req 1, 2, 3, 4, 5, 6)', (
     expect(prisma.page.update).not.toHaveBeenCalled();
   });
 
+  it('Update Page: should set audioTrackId = null when client passes audioTrackId: null', async () => {
+    prisma.page.findUnique.mockResolvedValue({
+      id: 'p1',
+      bookId: 'book-1',
+      pageNumber: 1,
+      audioTrackId: 'track-1',
+    });
+    prisma.page.update.mockResolvedValue({ id: 'p1', bookId: 'book-1', audioTrackId: null });
+
+    const patchDto = { audioTrackId: null };
+    await service.update('p1', patchDto, true);
+
+    expect(prisma.page.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'p1' },
+        data: expect.objectContaining({
+          audioTrackId: null,
+        }),
+      }),
+    );
+    expect(cacheService.touchBook).toHaveBeenCalledWith('book-1');
+  });
+
   it('Delete (Option B): should compact order but preserve remaining pageNumbers', async () => {
     const pageToDelete = { id: 'p2', bookId: 'book-1', pageNumber: 20, order: 1 };
     prisma.page.findUnique.mockResolvedValue(pageToDelete);

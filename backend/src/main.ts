@@ -13,6 +13,9 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
+  // Enable shutdown hooks for graceful termination (SIGTERM / SIGINT)
+  app.enableShutdownHooks();
+
   // Secure CORS Configuration
   let corsOrigin: any = true;
   if (isProduction) {

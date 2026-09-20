@@ -73,7 +73,12 @@ export class BooksService {
       throw new ConflictException(`Cuốn sách với slug "${dto.slug}" đã tồn tại.`);
     }
 
-    const backgroundMusicId = dto.backgroundMusicId ?? dto.audioTrackId;
+    let backgroundMusicId: string | null = null;
+    if ('backgroundMusicId' in dto) {
+      backgroundMusicId = dto.backgroundMusicId ?? null;
+    } else if ('audioTrackId' in dto) {
+      backgroundMusicId = dto.audioTrackId ?? null;
+    }
 
     const book = await this.prisma.book.create({
       data: {
@@ -116,7 +121,12 @@ export class BooksService {
       }
     }
 
-    const backgroundMusicId = dto.backgroundMusicId ?? dto.audioTrackId;
+    const backgroundMusicUpdate: Record<string, any> = {};
+    if ('backgroundMusicId' in dto) {
+      backgroundMusicUpdate.backgroundMusicId = dto.backgroundMusicId;
+    } else if ('audioTrackId' in dto) {
+      backgroundMusicUpdate.backgroundMusicId = dto.audioTrackId;
+    }
 
     // Safe merge for partial JSON objects if PATCH
     const cover = isPatch && dto.cover
@@ -140,7 +150,7 @@ export class BooksService {
         ...(dto.proposalQuote !== undefined ? { proposalQuote: dto.proposalQuote } : {}),
         ...(cover !== undefined ? { cover } : {}),
         ...(settings !== undefined ? { settings } : {}),
-        ...(backgroundMusicId !== undefined ? { backgroundMusicId } : {}),
+        ...backgroundMusicUpdate,
       },
       include: {
         backgroundMusic: true,
