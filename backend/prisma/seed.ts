@@ -7,13 +7,21 @@ import {
   LayoutMode,
   MediaType,
 } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
 import * as fs from 'fs';
 import * as path from 'path';
+import 'dotenv/config';
 import { REAL_LAYOUT_PRESETS } from '../src/templates/layout-presets.data';
 import { derivePageSideEnum } from '../src/utils/page-utils';
 
-const prisma = new PrismaClient();
+const connectionString =
+  process.env.DATABASE_URL ||
+  'postgresql://postgres:postgres@localhost:5432/phuc_and_trang_db?schema=public';
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log('🌱 Starting comprehensive database seed for Phúc & Trang Love Journey...');
@@ -307,35 +315,69 @@ async function main() {
     },
   };
 
-  const book = await prisma.book.upsert({
-    where: { slug: 'phuc-and-trang' },
-    update: {
-      title: 'Chúng Mình',
-      contentRevision: 1,
-      cover: canonicalCover,
-      settings: canonicalSettings,
-      backgroundMusicId: audioTrack.id,
-    },
-    create: {
-      slug: 'phuc-and-trang',
-      title: 'Chúng Mình',
-      description: 'Cuốn nhật ký tình yêu của hai mình từ ngày 20 tháng 10 năm 2022.',
-      status: BookStatus.PUBLISHED,
-      heName: 'Phúc',
-      sheName: 'Trang',
-      anniversaryDate: new Date('2022-10-20T00:00:00Z'),
-      proposalQuote: 'Thế cậu đồng ý làm bạn gái tớ không?',
-      backgroundMusicId: audioTrack.id,
-      contentRevision: 1,
-      ownerId: admin.id,
-      cover: canonicalCover,
-      settings: canonicalSettings,
-    },
-  });
-  console.log(`✅ Book entity created: "${book.title}" (slug: ${book.slug})`);
+  const forceCanonicalReset = process.env.SEED_FORCE_CANONICAL_BOOK === 'true';
 
-  // 6. Definition of all 21 inside pages
-  const pagesData = [
+  const existingBook = await prisma.book.findUnique({
+    where: { slug: 'phuc-and-trang' },
+    include: { _count: { select: { pages: true } } },
+  });
+
+  let book: any;
+  let shouldSeedPages = false;
+
+  if (existingBook && !forceCanonicalReset) {
+    console.log(
+      `ℹ️ Master book "${existingBook.title}" already exists with ${existingBook._count.pages} pages.`,
+    );
+    console.log(
+      `ℹ️ Non-destructive mode: Existing CMS book, cover, settings, and pages are preserved.`,
+    );
+    console.log(
+      `ℹ️ (To overwrite and rebuild canonical book and all 21 pages, run with SEED_FORCE_CANONICAL_BOOK=true).`,
+    );
+    book = existingBook;
+  } else {
+    if (existingBook && forceCanonicalReset) {
+      console.warn(
+        '⚠️ FORCE CANONICAL SEED ENABLED: Existing CMS content is being overwritten with canonical source.',
+      );
+      book = await prisma.book.update({
+        where: { id: existingBook.id },
+        data: {
+          title: 'Chúng Mình',
+          cover: canonicalCover,
+          settings: canonicalSettings,
+          backgroundMusicId: audioTrack.id,
+          contentRevision: { increment: 1 },
+        },
+      });
+    } else {
+      book = await prisma.book.create({
+        data: {
+          slug: 'phuc-and-trang',
+          title: 'Chúng Mình',
+          description: 'Cuốn nhật ký tình yêu của hai mình từ ngày 20 tháng 10 năm 2022.',
+          status: BookStatus.PUBLISHED,
+          heName: 'Phúc',
+          sheName: 'Trang',
+          anniversaryDate: new Date('2022-10-20T00:00:00Z'),
+          proposalQuote: 'Thế cậu đồng ý làm bạn gái tớ không?',
+          backgroundMusicId: audioTrack.id,
+          contentRevision: 1,
+          ownerId: admin.id,
+          cover: canonicalCover,
+          settings: canonicalSettings,
+        },
+      });
+      console.log(`✅ Book entity created: "${book.title}" (slug: ${book.slug})`);
+    }
+
+    shouldSeedPages = true;
+  }
+
+  if (shouldSeedPages) {
+    // 6. Definition of all 21 inside pages
+    const pagesData = [
     {
       pageNumber: 0,
       title: 'OUR STORY',
@@ -932,7 +974,8 @@ async function main() {
       createdById: admin.id,
     },
   });
-  console.log('✅ Initial version snapshot 2.0.0 created with complete pages.');
+    console.log('✅ Initial version snapshot 2.0.0 created with complete pages.');
+  }
 
   console.log('🎉 Database seeding completed successfully! Ready for production.');
 }

@@ -35,7 +35,6 @@ export interface TemplateElementPrototypeData {
     height: number;
     rotation: number;
     scale: number;
-    zIndex?: number;
   };
   style?: Record<string, any>;
   defaultData?: Record<string, any>;

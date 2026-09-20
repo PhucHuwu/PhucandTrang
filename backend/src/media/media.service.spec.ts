@@ -153,6 +153,38 @@ describe('MediaService', () => {
       expect(result.references[0].description).toContain('bìa trước');
     });
 
+    it('should detect when media is referenced as a video poster on front or back cover', async () => {
+      prisma.media.findUnique.mockResolvedValue(mockMedia);
+      prisma.page.findMany.mockResolvedValue([]);
+      prisma.pageElement.findMany.mockResolvedValue([]);
+      prisma.audioTrack.findMany.mockResolvedValue([]);
+      prisma.book.findMany.mockResolvedValue([
+        {
+          id: 'book-1',
+          title: 'Chúng Mình',
+          slug: 'phuc-and-trang',
+          cover: {
+            front: {
+              backgroundUrl: 'other.jpg',
+              elements: [
+                {
+                  id: 'cover-video-1',
+                  type: 'VIDEO',
+                  data: { mediaId: 'video-source-id', posterMediaId: 'media-1' },
+                },
+              ],
+            },
+            back: {},
+          },
+        },
+      ]);
+
+      const result = await service.checkReferences('media-1');
+      expect(result.isInUse).toBe(true);
+      expect(result.references[0].targetType).toBe('BOOK_COVER');
+      expect(result.references[0].description).toContain('Poster video trên bìa trước');
+    });
+
     it('should detect when media is referenced by audio track', async () => {
       prisma.media.findUnique.mockResolvedValue(mockMedia);
       prisma.book.findMany.mockResolvedValue([]);

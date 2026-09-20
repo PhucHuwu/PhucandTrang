@@ -20,7 +20,9 @@ export class PagesService {
   ) {}
 
   /**
-   * Normalizes page order (0..N-1) and sides (LEFT/RIGHT) to guarantee contiguous sequence without gaps.
+   * Option B Normalization:
+   * Normalizes contiguous physical sequence: order = 0..N-1, side = derivePageSideEnum(order).
+   * Strictly preserves existing display metadata: pageNumber is NEVER overwritten.
    */
   async normalizeBookPageSequence(bookId: string, customTx?: any): Promise<void> {
     const execute = async (tx: any) => {
@@ -30,22 +32,13 @@ export class PagesService {
         select: { id: true, order: true, side: true, pageNumber: true },
       });
 
-      // Step 1: Temporarily set pageNumbers to negative to avoid unique constraint collisions
-      for (let i = 0; i < pages.length; i++) {
-        await tx.page.update({
-          where: { id: pages[i].id },
-          data: { pageNumber: -(i + 1) * 1000 },
-        });
-      }
-
-      // Step 2: Assign contiguous 0..N-1 order, pageNumber, and side
+      // Update physical order and side; strictly preserve display pageNumber
       for (let i = 0; i < pages.length; i++) {
         const side = derivePageSideEnum(i);
         await tx.page.update({
           where: { id: pages[i].id },
           data: {
             order: i,
-            pageNumber: i,
             side,
           },
         });
@@ -107,7 +100,17 @@ export class PagesService {
       );
     }
 
-    const order = dto.order !== undefined ? dto.order : dto.pageNumber;
+    // Option B: order is physical sequence (appended at end if not provided)
+    let order = dto.order;
+    if (order === undefined) {
+      const maxOrderPage = await this.prisma.page.findFirst({
+        where: { bookId: dto.bookId },
+        orderBy: { order: 'desc' },
+        select: { order: true },
+      });
+      order = (maxOrderPage?.order ?? -1) + 1;
+    }
+
     const derivedSide = derivePageSideEnum(order);
 
     const page = await this.prisma.page.create({
@@ -202,6 +205,31 @@ export class PagesService {
     const original = await this.findOne(id);
     const insertAfter = dto?.insertAfter ?? false;
 
+    // Option B: Validate or generate unique display pageNumber
+    let targetPageNum = dto?.targetPageNumber;
+    if (targetPageNum !== undefined) {
+      const existing = await this.prisma.page.findUnique({
+        where: {
+          bookId_pageNumber: {
+            bookId: original.bookId,
+            pageNumber: targetPageNum,
+          },
+        },
+      });
+      if (existing) {
+        throw new ConflictException(
+          `Trang số ${targetPageNum} đã tồn tại trong cuốn sách này.`,
+        );
+      }
+    } else {
+      const maxPage = await this.prisma.page.findFirst({
+        where: { bookId: original.bookId },
+        orderBy: { pageNumber: 'desc' },
+        select: { pageNumber: true },
+      });
+      targetPageNum = (maxPage?.pageNumber ?? original.pageNumber) + 1;
+    }
+
     const duplicated = await this.prisma.$transaction(async (tx) => {
       let targetOrder: number;
 
@@ -226,13 +254,13 @@ export class PagesService {
         targetOrder = (maxPage?.order ?? 0) + 1;
       }
 
-      // Create new page with temporary pageNumber to evade unique collision
-      const tempPageNumber = -(Math.floor(Math.random() * 900000) + 100000);
+      const derivedSide = derivePageSideEnum(targetOrder);
+
       const newPage = await tx.page.create({
         data: {
           bookId: original.bookId,
-          pageNumber: tempPageNumber,
-          side: original.side,
+          pageNumber: targetPageNum,
+          side: derivedSide,
           order: targetOrder,
           chapter: original.chapter ? `${original.chapter} (Bản sao)` : undefined,
           title: original.title ? `${original.title} (Copy)` : undefined,
@@ -262,7 +290,7 @@ export class PagesService {
         },
       });
 
-      // Normalize sequence in the same transaction
+      // Normalize sequence: orders are contiguous 0..N-1, display pageNumbers are untouched
       await this.normalizeBookPageSequence(original.bookId, tx);
 
       return tx.page.findUnique({
@@ -281,6 +309,7 @@ export class PagesService {
   async remove(id: string) {
     const page = await this.findOne(id);
     await this.prisma.page.delete({ where: { id } });
+    // Compact orders to 0..N-1 and re-derive sides; pageNumbers of remaining pages are strictly preserved
     await this.normalizeBookPageSequence(page.bookId);
     await this.cacheService.touchBook(page.bookId);
     return { success: true, message: `Đã xóa trang ${id} cùng tất cả element liên quan` };
@@ -291,29 +320,23 @@ export class PagesService {
     if (!book) throw new NotFoundException(`Book not found: ${bookId}`);
 
     const result = await this.prisma.$transaction(async (tx) => {
-      // Step 1: Temporarily set pageNumbers to negative values to evade unique constraint
-      for (let i = 0; i < dto.items.length; i++) {
-        await tx.page.update({
-          where: { id: dto.items[i].id },
-          data: { pageNumber: -(i + 1) * 1000 },
-        });
-      }
-
-      // Step 2: Assign final page numbers, orders, and derived sides
+      // Reorder physical positions according to dto.items sequence
       for (let i = 0; i < dto.items.length; i++) {
         const item = dto.items[i];
-        const newOrder = i;
+        const newOrder = item.order !== undefined ? item.order : i;
         const derivedSide = derivePageSideEnum(newOrder);
 
         await tx.page.update({
           where: { id: item.id },
           data: {
-            pageNumber: i,
             order: newOrder,
             side: derivedSide,
           },
         });
       }
+
+      // Compact orders to contiguous 0..N-1 without modifying pageNumber metadata
+      await this.normalizeBookPageSequence(bookId, tx);
 
       return tx.page.findMany({
         where: { bookId },

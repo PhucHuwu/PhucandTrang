@@ -331,10 +331,13 @@ export class MediaService {
         });
       }
 
-      // Scan cover elements (front & back)
+      // Scan cover elements (front & back) for both source media and video poster media
       for (const el of cover.front?.elements || []) {
         const d = el.data || {};
-        if (matchesMedia(d.src || d.url, d.mediaId)) {
+        const sourceMatched = matchesMedia(d.src || d.url, d.mediaId);
+        const posterMatched = matchesMedia(d.thumbnailUrl || d.posterUrl, d.posterMediaId);
+
+        if (sourceMatched) {
           references.push({
             targetType: 'BOOK_COVER',
             bookId: book.id,
@@ -342,15 +345,31 @@ export class MediaService {
             bookSlug: book.slug,
             elementId: el.id,
             elementType: el.type,
-            field: 'cover.front.elements',
+            field: 'cover.front.elements.src',
             description: `Phần tử ${el.type} trên bìa trước sách "${book.title}"`,
+          });
+        }
+
+        if (posterMatched && !sourceMatched) {
+          references.push({
+            targetType: 'BOOK_COVER',
+            bookId: book.id,
+            bookTitle: book.title,
+            bookSlug: book.slug,
+            elementId: el.id,
+            elementType: el.type,
+            field: 'cover.front.elements.poster',
+            description: `Poster video trên bìa trước sách "${book.title}"`,
           });
         }
       }
 
       for (const el of cover.back?.elements || []) {
         const d = el.data || {};
-        if (matchesMedia(d.src || d.url, d.mediaId)) {
+        const sourceMatched = matchesMedia(d.src || d.url, d.mediaId);
+        const posterMatched = matchesMedia(d.thumbnailUrl || d.posterUrl, d.posterMediaId);
+
+        if (sourceMatched) {
           references.push({
             targetType: 'BOOK_COVER',
             bookId: book.id,
@@ -358,8 +377,21 @@ export class MediaService {
             bookSlug: book.slug,
             elementId: el.id,
             elementType: el.type,
-            field: 'cover.back.elements',
+            field: 'cover.back.elements.src',
             description: `Phần tử ${el.type} trên bìa sau sách "${book.title}"`,
+          });
+        }
+
+        if (posterMatched && !sourceMatched) {
+          references.push({
+            targetType: 'BOOK_COVER',
+            bookId: book.id,
+            bookTitle: book.title,
+            bookSlug: book.slug,
+            elementId: el.id,
+            elementType: el.type,
+            field: 'cover.back.elements.poster',
+            description: `Poster video trên bìa sau sách "${book.title}"`,
           });
         }
       }

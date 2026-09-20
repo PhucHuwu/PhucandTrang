@@ -18,11 +18,13 @@ export class PageOrderItemDto {
 
   @IsInt()
   @Min(0)
-  order: number;
+  @IsOptional()
+  order?: number;
 
   @IsInt()
   @Min(0)
-  pageNumber: number;
+  @IsOptional()
+  pageNumber?: number;
 
   @IsEnum(PageSide)
   @IsOptional()
