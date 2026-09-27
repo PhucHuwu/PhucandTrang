@@ -139,11 +139,22 @@ export default function LayoutPresetPicker({
                         <span className="font-serif font-bold text-xs text-parchment-100 group-hover:text-champagne-300 transition-colors">
                           {tpl.name}
                         </span>
-                        {isCurrent && (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950/80 text-emerald-300 border border-emerald-500/40">
-                            Đang dùng
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {(tpl as any).isSystem ? (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-emerald-950/70 text-emerald-300 border border-emerald-500/40">
+                              Hệ thống
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-pink-950/70 text-pink-300 border border-pink-500/40">
+                              Custom
+                            </span>
+                          )}
+                          {isCurrent && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-champagne-950/80 text-champagne-300 border border-champagne-500/40">
+                              Đang dùng
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {/* Schematic Diagram Thumbnail */}

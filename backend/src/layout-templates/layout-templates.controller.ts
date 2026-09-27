@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { LayoutTemplatesService } from './layout-templates.service';
 import { AuthGuard } from '@nestjs/passport';
@@ -33,21 +34,34 @@ export class LayoutTemplatesController {
     return this.templatesService.findOne(id);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.EDITOR)
   @Post()
-  async create(@Body() dto: CreateLayoutTemplateDto) {
-    return this.templatesService.create(dto);
+  async create(@Body() dto: CreateLayoutTemplateDto, @Request() req: any) {
+    return this.templatesService.create(dto, req.user?.role);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.EDITOR)
   @Put(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateLayoutTemplateDto) {
-    return this.templatesService.update(id, dto);
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateLayoutTemplateDto,
+    @Request() req: any,
+  ) {
+    return this.templatesService.update(id, dto, req.user?.role);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.EDITOR)
+  @Post(':id/duplicate')
+  async duplicate(
+    @Param('id') id: string,
+    @Body() body: { newId: string; newName?: string },
+  ) {
+    return this.templatesService.duplicate(id, body.newId, body.newName);
+  }
+
+  @Roles(Role.ADMIN, Role.EDITOR)
   @Delete(':id')
-  async remove(@Param('id') id: string) {
-    return this.templatesService.remove(id);
+  async remove(@Param('id') id: string, @Request() req: any) {
+    return this.templatesService.remove(id, req.user?.role);
   }
 }

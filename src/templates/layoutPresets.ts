@@ -12,6 +12,7 @@ import {
   LAYOUT_PRESETS,
   LayoutPresetDefinition,
   TemplateElementPrototypeData as TemplateElementPrototype,
+  LayoutSlotData,
 } from '../../shared/layoutPresets';
 
 export * from '../../shared/layoutPresets';
@@ -108,6 +109,71 @@ export function extractContentFromPage(page: Page): SlotData {
     handwriting,
     textLines,
     media: mediaList,
+  };
+}
+
+/**
+ * Prompt 17: Extracts normalized slots and element prototypes from the current page's arrangement
+ * to save as a custom Layout Template (isSystem = false).
+ */
+export function extractLayoutDefinitionFromPage(
+  page: Page,
+  id: string,
+  name: string,
+  description?: string
+): LayoutPresetDefinition {
+  const sortedElements = [...(page.elements || [])].sort((a, b) => a.zIndex - b.zIndex);
+
+  const elementPrototypes: TemplateElementPrototype[] = [];
+  const slots: LayoutSlotData[] = [];
+
+  let imageIndex = 0;
+
+  for (const el of sortedElements) {
+    let slot: string = el.slot || '';
+    if (!slot) {
+      if (el.type === 'IMAGE' || el.type === 'VIDEO') {
+        imageIndex++;
+        slot = imageIndex === 1 ? 'primaryImage' : imageIndex === 2 ? 'secondaryImage' : imageIndex === 3 ? 'tertiaryImage' : `image-${imageIndex}`;
+      } else if (el.type === 'TEXT') {
+        const variant = (el.data as any)?.variant;
+        slot = variant || `text-${el.zIndex}`;
+      } else {
+        slot = `${el.type.toLowerCase()}-${el.zIndex}`;
+      }
+    }
+
+    const defaultTransform = {
+      x: el.transform.x,
+      y: el.transform.y,
+      width: el.transform.width,
+      height: el.transform.height,
+      rotation: el.transform.rotation || 0,
+      scale: el.transform.scale || 1,
+    };
+
+    elementPrototypes.push({
+      slot,
+      defaultType: el.type,
+      zIndex: el.zIndex,
+      transform: defaultTransform,
+      style: el.style,
+      defaultData: el.data ? { variant: (el.data as any).variant, shapeType: (el.data as any).shapeType } : undefined,
+    });
+
+    slots.push({
+      name: slot,
+      defaultTransform,
+      allowedTypes: [el.type],
+    });
+  }
+
+  return {
+    id,
+    name,
+    description: description || `Bố cục tùy biến lưu từ Trang số ${page.pageNumber}`,
+    slots,
+    elementPrototypes,
   };
 }
 

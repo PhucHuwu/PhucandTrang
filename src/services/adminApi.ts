@@ -277,6 +277,13 @@ export async function updateAdminLayoutTemplate(id: string, data: any): Promise<
   });
 }
 
+export async function duplicateAdminLayoutTemplate(id: string, newId: string, newName?: string): Promise<any> {
+  return adminFetch<any>(`layout-templates/${id}/duplicate`, {
+    method: 'POST',
+    body: JSON.stringify({ newId, newName }),
+  });
+}
+
 export async function deleteAdminLayoutTemplate(id: string): Promise<any> {
   return adminFetch<any>(`layout-templates/${id}`, {
     method: 'DELETE',

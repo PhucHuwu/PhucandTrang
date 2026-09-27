@@ -334,7 +334,18 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
    - Khi người dùng kéo thả hoặc chỉnh sửa thuộc tính phần tử:
      - Tự động đánh dấu `isCustomized` = `true`
    - Hiển thị hộp thoại cảnh báo xác nhận (confirmation dialog) nếu việc áp dụng layout mới sẽ sắp xếp lại các phần tử đã được tùy biến.
-11. **Giai đoạn 11 (Prompt 17+ Nâng cao Editor & Undo/Redo/Snapping)**:
+11. **Giai đoạn 11 (Đã hoàn thành - Prompt 17 Save Custom Layout Template)**:
+   - Cho phép lưu arrangement hiện tại của bất kỳ trang nào thành một Layout Template tùy biến mới (`Save As Layout`).
+   - Luồng hoạt động:
+     `Current Page -> Save as Layout -> Name -> Template ID (arbitrary string) -> Description -> POST /layout-templates`.
+   - Cơ chế bảo vệ hệ thống:
+     - Custom Layouts: `isSystem = false`. Người dùng quyền EDITOR / ADMIN có thể tạo, đổi tên, nhân bản, xóa và áp dụng.
+     - Built-in System Layouts: `isSystem = true`. Nghiêm cấm ghi đè hoặc xóa các bố cục hệ thống mặc định.
+   - Thư viện layout (`/admin/layout-templates`):
+     - Hiển thị danh sách template phân loại rõ ràng "Hệ thống" vs "Tùy biến".
+     - Hỗ trợ đổi tên, sửa mô tả, nhân bản (`duplicate`) và xóa custom template.
+     - Tích hợp liền mạch với Layout Preset Picker trong Visual Editor.
+12. **Giai đoạn 12 (Prompt 18+ Nâng cao Editor & Undo/Redo/Snapping)**:
    - Tích hợp lịch sử Undo / Redo cho canvas editor.
    - Thêm đường gióng từ tính (Smart Snapping / Alignment Guides).
    - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.

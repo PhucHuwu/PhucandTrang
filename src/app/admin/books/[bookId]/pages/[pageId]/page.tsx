@@ -17,6 +17,7 @@ import {
 import { useAdminAuth } from '@/context/AdminAuthContext';
 import { Page, PageElement, PageElementType, Book } from '@/types/book';
 import LayoutPresetPicker from '@/components/admin/LayoutPresetPicker';
+import SaveAsLayoutModal from '@/components/admin/SaveAsLayoutModal';
 import {
   applyLayoutTemplate,
   extractContentFromPage,
@@ -47,6 +48,7 @@ import {
   FileText,
   Palette,
   LayoutGrid,
+  BookmarkPlus,
 } from 'lucide-react';
 
 // Dynamic import KonvaPageCanvas with ssr: false because Konva requires DOM window & canvas
@@ -77,6 +79,8 @@ export default function VisualPageEditorPage() {
 
   // Layout Picker Modal state (Prompt 16)
   const [showLayoutPicker, setShowLayoutPicker] = useState(false);
+  // Save As Layout Modal state (Prompt 17)
+  const [showSaveAsLayout, setShowSaveAsLayout] = useState(false);
 
   // Load initial page, all book pages, and book settings
   useEffect(() => {
@@ -412,7 +416,18 @@ export default function VisualPageEditorPage() {
               title="Mở kho Layout Templates để đổi bố cục trang"
             >
               <LayoutGrid className="w-3.5 h-3.5 text-champagne-400" />
-              <span>Đổi Bố Cục (Layout)</span>
+              <span>Đổi Bố Cục</span>
+            </button>
+
+            {/* Prompt 17: Save Current Arrangement as Custom Layout Template */}
+            <button
+              type="button"
+              onClick={() => setShowSaveAsLayout(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#22101A] hover:bg-[#2D1623] hover:border-rosewood-600 text-parchment-200 text-xs font-medium border border-rosewood-800/60 shadow-md transition-all active:scale-95"
+              title="Lưu bố cục hiện tại thành template tùy biến để tái sử dụng"
+            >
+              <BookmarkPlus className="w-3.5 h-3.5 text-pink-400" />
+              <span className="hidden sm:inline">Lưu Template</span>
             </button>
 
             {/* Add Elements Group */}
@@ -941,6 +956,17 @@ export default function VisualPageEditorPage() {
         isOpen={showLayoutPicker}
         onClose={() => setShowLayoutPicker(false)}
         onSelectLayout={handleApplyLayoutTemplate}
+      />
+
+      {/* Prompt 17: Save Current Arrangement as Custom Layout Template Modal */}
+      <SaveAsLayoutModal
+        page={page}
+        isOpen={showSaveAsLayout}
+        onClose={() => setShowSaveAsLayout(false)}
+        onSaved={(newTpl) => {
+          setToast(`Đã lưu bố cục "${newTpl.name}" thành công!`);
+          setTimeout(() => setToast(null), 3000);
+        }}
       />
     </div>
   );
