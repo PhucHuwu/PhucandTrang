@@ -15,6 +15,7 @@ import { Type } from 'class-transformer';
 import {
   ELEMENT_INTERACTION_ACTIONS,
   ElementInteractionAction,
+  validateInteractionTarget,
 } from '../../../../shared/interactionContract';
 
 export function IsStringOrNumber(validationOptions?: ValidationOptions) {
@@ -31,6 +32,27 @@ export function IsStringOrNumber(validationOptions?: ValidationOptions) {
         },
         defaultMessage(args: ValidationArguments) {
           return `${args.property} phải là chuỗi (string) hoặc số (number)`;
+        },
+      },
+    });
+  };
+}
+
+export function IsValidInteractionTarget(validationOptions?: ValidationOptions) {
+  return function (object: Object, propertyName: string) {
+    registerDecorator({
+      name: 'isValidInteractionTarget',
+      target: object.constructor,
+      propertyName,
+      options: validationOptions,
+      validator: {
+        validate(value: unknown, args: ValidationArguments) {
+          const action = (args.object as ElementInteractionDto).action;
+          return validateInteractionTarget(action, value) === null;
+        },
+        defaultMessage(args: ValidationArguments) {
+          const action = (args.object as ElementInteractionDto).action;
+          return validateInteractionTarget(action, args.value) || 'Interaction target không hợp lệ.';
         },
       },
     });
@@ -70,8 +92,8 @@ export class ElementInteractionDto {
   })
   action: ElementInteractionAction;
 
-  @IsOptional()
   @IsStringOrNumber()
+  @IsValidInteractionTarget()
   target?: string | number;
 
   @IsString()

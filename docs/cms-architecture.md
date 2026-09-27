@@ -379,7 +379,25 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
      - Hỗ trợ thay video, thay poster, caption, muted và interaction `open-video`.
      - Có modal phát thử video theo yêu cầu; Konva Canvas chỉ render poster tĩnh kèm play badge, không tạo `<video>` liên tục trên từng node.
    - Media Picker được tổng quát hóa để tải/chọn cả `IMAGE` và `VIDEO` qua Cloudinary Signed Direct Upload.
-16. **Giai đoạn 16 (Prompt 22+ Nâng cao Editor & Undo/Redo/Snapping)**:
+16. **Giai đoạn 16 (Đã hoàn thành - Prompt 22 Element Interactions)**:
+   - Hoàn thiện Interaction Editor dùng duy nhất shared contract `ELEMENT_INTERACTION_ACTIONS`:
+     - `none`
+     - `open-video`
+     - `zoom`
+     - `open-link`
+     - `navigate-page`
+     - `play-audio`
+   - Thuộc tính hỗ trợ: `enabled`, `action`, `target`, `title`, `activeArea` (`left`, `top`, `width`, `height`).
+   - Validation phụ thuộc action:
+     - `open-link`: target phải là URL HTTP/HTTPS hợp lệ.
+     - `navigate-page`: chọn page ID/page metadata từ danh sách trang hiện tại.
+     - `play-audio`: chọn AudioTrack ID từ Audio Library.
+     - `open-video`: chọn video từ Media Library hoặc video canonical của phần tử.
+   - ActiveArea Visual Editor:
+     - Hiển thị overlay vàng trên Konva Canvas.
+     - Hỗ trợ kéo và resize vùng click.
+     - Dùng shared helpers `computeActiveAreaPageRect()` và `computeRelativeActiveArea()` để chuyển đổi page-space và element-relative normalized coordinates.
+17. **Giai đoạn 17 (Prompt 23+ Nâng cao Editor & Undo/Redo/Snapping)**:
    - Tích hợp lịch sử Undo / Redo cho canvas editor.
    - Thêm đường gióng từ tính (Smart Snapping / Alignment Guides).
    - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.

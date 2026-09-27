@@ -2,6 +2,7 @@ import {
   computeActiveAreaPageRect,
   normalizedToCanvasTransform,
   canvasToNormalizedTransform,
+  computeRelativeActiveArea,
 } from './coordinate-conversion';
 
 describe('Video ActiveArea Coordinate Conversion (Req 5)', () => {
@@ -59,5 +60,17 @@ describe('Video ActiveArea Coordinate Conversion (Req 5)', () => {
     expect(convertedBack.width).toBeCloseTo(0.45, 4);
     expect(convertedBack.height).toBeCloseTo(0.3, 4);
     expect(convertedBack.rotation).toBe(-12.5);
+  });
+
+  it('Prompt 22: should convert page-space active area back to element-relative coordinates', () => {
+    const element = { x: 0.1, y: 0.2, width: 0.5, height: 0.4 };
+    const pageRect = { left: 0.125, top: 0.24, width: 0.45, height: 0.34 };
+
+    expect(computeRelativeActiveArea(element, pageRect)).toEqual({
+      left: 0.05,
+      top: 0.1,
+      width: 0.9,
+      height: 0.85,
+    });
   });
 });

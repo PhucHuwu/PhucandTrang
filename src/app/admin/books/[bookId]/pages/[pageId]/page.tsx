@@ -13,6 +13,8 @@ import {
   deleteAdminElement,
   duplicateAdminElement,
   updateAdminPage,
+  getAdminAudioTracks,
+  getAdminMedia,
 } from '@/services/adminApi';
 import { useAdminAuth } from '@/context/AdminAuthContext';
 import { Page, PageElement, PageElementType, Book } from '@/types/book';
@@ -22,6 +24,7 @@ import BackgroundEditor from '@/components/admin/BackgroundEditor';
 import AdvancedTextEditor from '@/components/admin/AdvancedTextEditor';
 import AdvancedImageEditor from '@/components/admin/AdvancedImageEditor';
 import AdvancedVideoEditor from '@/components/admin/AdvancedVideoEditor';
+import InteractionEditor from '@/components/admin/InteractionEditor';
 import {
   applyLayoutTemplate,
   extractContentFromPage,
@@ -74,6 +77,8 @@ export default function VisualPageEditorPage() {
 
   const [book, setBook] = useState<Partial<Book> | null>(null);
   const [allPages, setAllPages] = useState<any[]>([]);
+  const [audioTracks, setAudioTracks] = useState<any[]>([]);
+  const [videoMedia, setVideoMedia] = useState<any[]>([]);
   const [page, setPage] = useState<Page | null>(null);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,21 +92,26 @@ export default function VisualPageEditorPage() {
   const [showSaveAsLayout, setShowSaveAsLayout] = useState(false);
 
   // Active Inspector Tab: 'element' | 'background' (Prompt 18)
-  const [inspectorTab, setInspectorTab] = useState<'element' | 'background'>('element');
+  const [inspectorTab, setInspectorTab] = useState<'element' | 'interaction' | 'background'>('element');
+  const [editingActiveArea, setEditingActiveArea] = useState(false);
 
   // Load initial page, all book pages, and book settings
   useEffect(() => {
     async function loadData() {
       setLoading(true);
       try {
-        const [bookData, pageData, pagesList] = await Promise.all([
+        const [bookData, pageData, pagesList, tracks, videos] = await Promise.all([
           getAdminBook(bookId),
           getAdminPage(pageId),
           getAdminPages(bookId),
+          getAdminAudioTracks(),
+          getAdminMedia({ type: 'VIDEO', limit: 100 }),
         ]);
         setBook(bookData);
         setPage(pageData);
         setAllPages(pagesList);
+        setAudioTracks(tracks);
+        setVideoMedia(videos.items || []);
         if (pageData.elements && pageData.elements.length > 0) {
           setSelectedElementId(pageData.elements[0].id);
         }
@@ -156,6 +166,30 @@ export default function VisualPageEditorPage() {
           ...prevPage,
           isCustomized: true, // Dragging/resizing sets isCustomized = true
           elements: updatedElements,
+        };
+      });
+    },
+    []
+  );
+
+  const handleUpdateActiveArea = useCallback(
+    (id: string, activeArea: { left: number; top: number; width: number; height: number }) => {
+      setPage((prevPage) => {
+        if (!prevPage) return prevPage;
+        return {
+          ...prevPage,
+          isCustomized: true,
+          elements: prevPage.elements.map((el) =>
+            el.id === id
+              ? {
+                  ...el,
+                  interaction: {
+                    ...(el.interaction || { enabled: true, action: 'none' }),
+                    activeArea,
+                  },
+                }
+              : el
+          ),
         };
       });
     },
@@ -655,6 +689,8 @@ export default function VisualPageEditorPage() {
               selectedElementId={selectedElementId}
               onSelectElement={setSelectedElementId}
               onUpdateElementTransform={handleUpdateElementTransform}
+              editingActiveArea={editingActiveArea && inspectorTab === 'interaction'}
+              onUpdateActiveArea={handleUpdateActiveArea}
               scale={canvasScale}
             />
           </div>
@@ -676,6 +712,20 @@ export default function VisualPageEditorPage() {
               >
                 <Sliders className="w-3.5 h-3.5" />
                 <span>Phần tử</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setInspectorTab('interaction')}
+                disabled={!selectedElement}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-40 ${
+                  inspectorTab === 'interaction'
+                    ? 'bg-rosewood-600 text-white font-semibold shadow'
+                    : 'text-stone-400 hover:text-white hover:bg-[#25151F]'
+                }`}
+              >
+                <MousePointer className="w-3.5 h-3.5" />
+                <span>Tương tác</span>
               </button>
 
               <button
@@ -911,6 +961,29 @@ export default function VisualPageEditorPage() {
                 ) : (
                   <div className="p-8 text-center text-xs text-stone-500">
                     Nhấp chọn một phần tử trên Canvas hoặc từ bảng Layers để chỉnh sửa thông số.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {inspectorTab === 'interaction' && (
+              <div className="flex-1 overflow-y-auto p-4">
+                {selectedElement ? (
+                  <InteractionEditor
+                    element={selectedElement}
+                    pages={allPages}
+                    audioTracks={audioTracks}
+                    videoMedia={videoMedia}
+                    disabled={isViewer}
+                    isEditingActiveArea={editingActiveArea}
+                    onEditActiveArea={() => setEditingActiveArea((value) => !value)}
+                    onChange={(interaction) => {
+                      updateSelectedElement((el) => ({ ...el, interaction }));
+                    }}
+                  />
+                ) : (
+                  <div className="p-8 text-center text-xs text-stone-500">
+                    Chọn một phần tử để cấu hình interaction.
                   </div>
                 )}
               </div>

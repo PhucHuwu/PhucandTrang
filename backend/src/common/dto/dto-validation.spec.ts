@@ -40,6 +40,27 @@ describe('Strict DTO Validations (Req 6, 7, 14, 17, 18, 19)', () => {
       expect(errors.length).toBeGreaterThan(0);
       expect(errors[0].property).toBe('target');
     });
+
+    it('should reject invalid open-link URL and accept a valid https URL', async () => {
+      const invalid = new ElementInteractionDto();
+      invalid.action = 'open-link';
+      invalid.target = 'not-a-url';
+      expect((await validate(invalid)).length).toBeGreaterThan(0);
+
+      const valid = new ElementInteractionDto();
+      valid.action = 'open-link';
+      valid.target = 'https://love.phuchuwu.io.vn';
+      expect((await validate(valid)).length).toBe(0);
+    });
+
+    it('should require target for open-video, navigate-page and play-audio', async () => {
+      for (const action of ['open-video', 'navigate-page', 'play-audio'] as const) {
+        const dto = new ElementInteractionDto();
+        dto.action = action;
+        dto.target = '';
+        expect((await validate(dto)).length).toBeGreaterThan(0);
+      }
+    });
   });
 
   describe('PageBackgroundDto', () => {

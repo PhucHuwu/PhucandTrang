@@ -110,3 +110,33 @@ export function computeActiveAreaPageRect(
     height: relativeActiveArea.height * elementTransform.height,
   };
 }
+
+/**
+ * Converts a normalized page-space rectangle back into activeArea coordinates
+ * relative to an element transform. Values are clamped to the element bounds.
+ */
+export function computeRelativeActiveArea(
+  elementTransform: { x: number; y: number; width: number; height: number },
+  pageRect: PageCoordinateRect
+): ActiveAreaRelative {
+  const elementWidth = Math.max(0.001, elementTransform.width);
+  const elementHeight = Math.max(0.001, elementTransform.height);
+
+  const left = (pageRect.left - elementTransform.x) / elementWidth;
+  const top = (pageRect.top - elementTransform.y) / elementHeight;
+  const width = pageRect.width / elementWidth;
+  const height = pageRect.height / elementHeight;
+
+  const clamp = (value: number, min: number, max: number) =>
+    Math.min(max, Math.max(min, value));
+
+  const clampedLeft = clamp(left, 0, 0.999);
+  const clampedTop = clamp(top, 0, 0.999);
+
+  return {
+    left: parseFloat(clampedLeft.toFixed(4)),
+    top: parseFloat(clampedTop.toFixed(4)),
+    width: parseFloat(clamp(width, 0.001, 1 - clampedLeft).toFixed(4)),
+    height: parseFloat(clamp(height, 0.001, 1 - clampedTop).toFixed(4)),
+  };
+}

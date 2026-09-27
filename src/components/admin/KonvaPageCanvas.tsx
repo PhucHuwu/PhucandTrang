@@ -19,6 +19,8 @@ import {
   DESIGN_CANVAS_HEIGHT,
   normalizedToCanvasTransform,
   canvasToNormalizedTransform,
+  computeActiveAreaPageRect,
+  computeRelativeActiveArea,
 } from '@/utils/coordinateConversion';
 import { computeImageFit } from '@/utils/imageFitting';
 import { TextVariableResolver } from '@/utils/textVariableResolver';
@@ -31,6 +33,11 @@ interface KonvaPageCanvasProps {
   onUpdateElementTransform: (
     id: string,
     transform: { x: number; y: number; width: number; height: number; rotation: number }
+  ) => void;
+  editingActiveArea?: boolean;
+  onUpdateActiveArea?: (
+    id: string,
+    activeArea: { left: number; top: number; width: number; height: number }
   ) => void;
   scale: number;
 }
@@ -358,10 +365,14 @@ export default function KonvaPageCanvas({
   selectedElementId,
   onSelectElement,
   onUpdateElementTransform,
+  editingActiveArea = false,
+  onUpdateActiveArea,
   scale,
 }: KonvaPageCanvasProps) {
   const stageRef = useRef<Konva.Stage | null>(null);
   const transformerRef = useRef<Konva.Transformer | null>(null);
+  const activeAreaRef = useRef<Konva.Rect | null>(null);
+  const activeAreaTransformerRef = useRef<Konva.Transformer | null>(null);
 
   const canvasW = book?.settings?.dimensions?.canvasResolution?.width || DESIGN_CANVAS_WIDTH;
   const canvasH = book?.settings?.dimensions?.canvasResolution?.height || DESIGN_CANVAS_HEIGHT;
@@ -398,7 +409,7 @@ export default function KonvaPageCanvas({
       const selectedNode = stageRef.current.findOne(`#${selectedElementId}`);
       const selectedElement = page.elements?.find((el) => el.id === selectedElementId);
 
-      if (selectedNode && !selectedElement?.locked) {
+      if (selectedNode && !selectedElement?.locked && !editingActiveArea) {
         transformerRef.current.nodes([selectedNode]);
         transformerRef.current.getLayer()?.batchDraw();
         return;
@@ -406,7 +417,17 @@ export default function KonvaPageCanvas({
     }
     transformerRef.current.nodes([]);
     transformerRef.current.getLayer()?.batchDraw();
-  }, [selectedElementId, page.elements, scale]);
+  }, [selectedElementId, page.elements, scale, editingActiveArea]);
+
+  useEffect(() => {
+    if (!activeAreaTransformerRef.current) return;
+    if (editingActiveArea && activeAreaRef.current) {
+      activeAreaTransformerRef.current.nodes([activeAreaRef.current]);
+    } else {
+      activeAreaTransformerRef.current.nodes([]);
+    }
+    activeAreaTransformerRef.current.getLayer()?.batchDraw();
+  }, [editingActiveArea, selectedElementId, page.elements, scale]);
 
   // Click on stage blank area deselects
   const checkDeselect = (e: any) => {
@@ -435,6 +456,14 @@ export default function KonvaPageCanvas({
   const headerFadeColor = page.background?.headerFade?.color || '#F9F5EC';
   const gutterFadeWidth = (page.background?.gutterFade?.width ?? 0.14) * canvasW;
   const gutterFadeColor = page.background?.gutterFade?.color || '#F9F5EC';
+
+  const selectedElement = page.elements?.find((el) => el.id === selectedElementId);
+  const activeAreaPageRect = selectedElement
+    ? computeActiveAreaPageRect(
+        selectedElement.transform,
+        selectedElement.interaction?.activeArea
+      )
+    : null;
 
   return (
     <div
@@ -607,6 +636,74 @@ export default function KonvaPageCanvas({
             borderStroke="#8C2437"
             borderDash={[4, 4]}
           />
+
+          {editingActiveArea && selectedElement && activeAreaPageRect && !selectedElement.locked && (
+            <>
+              <Rect
+                ref={activeAreaRef}
+                x={activeAreaPageRect.left * canvasW}
+                y={activeAreaPageRect.top * canvasH}
+                width={activeAreaPageRect.width * canvasW}
+                height={activeAreaPageRect.height * canvasH}
+                fill="rgba(245, 158, 11, 0.12)"
+                stroke="#F59E0B"
+                strokeWidth={2}
+                dash={[8, 5]}
+                draggable={true}
+                onDragEnd={(e) => {
+                  const node = e.target;
+                  const relative = computeRelativeActiveArea(selectedElement.transform, {
+                    left: node.x() / canvasW,
+                    top: node.y() / canvasH,
+                    width: node.width() / canvasW,
+                    height: node.height() / canvasH,
+                  });
+                  onUpdateActiveArea?.(selectedElement.id, relative);
+                }}
+                onTransformEnd={() => {
+                  const node = activeAreaRef.current;
+                  if (!node) return;
+                  const width = Math.max(2, node.width() * Math.abs(node.scaleX()));
+                  const height = Math.max(2, node.height() * Math.abs(node.scaleY()));
+                  node.scaleX(1);
+                  node.scaleY(1);
+                  node.width(width);
+                  node.height(height);
+
+                  const relative = computeRelativeActiveArea(selectedElement.transform, {
+                    left: node.x() / canvasW,
+                    top: node.y() / canvasH,
+                    width: width / canvasW,
+                    height: height / canvasH,
+                  });
+                  onUpdateActiveArea?.(selectedElement.id, relative);
+                }}
+              />
+              <Transformer
+                ref={activeAreaTransformerRef}
+                rotateEnabled={false}
+                keepRatio={false}
+                enabledAnchors={[
+                  'top-left',
+                  'top-right',
+                  'bottom-left',
+                  'bottom-right',
+                  'middle-left',
+                  'middle-right',
+                  'top-center',
+                  'bottom-center',
+                ]}
+                anchorSize={7}
+                anchorStroke="#F59E0B"
+                anchorFill="#FEF3C7"
+                borderStroke="#F59E0B"
+                borderDash={[5, 4]}
+                boundBoxFunc={(oldBox, newBox) =>
+                  newBox.width < 5 || newBox.height < 5 ? oldBox : newBox
+                }
+              />
+            </>
+          )}
         </Layer>
       </Stage>
     </div>
