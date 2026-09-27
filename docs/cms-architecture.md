@@ -313,7 +313,16 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
      - Màn hình Kho Bố Cục (Layout Templates): `/admin/layout-templates`
      - Màn hình Thư viện Media: `/admin/media` (Tải lên Cloudinary trực tiếp qua Signed Config, tra cứu liên kết, xóa an toàn)
      - Màn hình Kho Âm Thanh: `/admin/audio` (Nghe thử, điều chỉnh volume, loop, fade in, fade out, start at)
-9. **Giai đoạn 9 (Prompt 15+ Visual Editor & Drag-and-Drop Canvas)**:
-   - Tích hợp Visual Canvas Editor kéo thả trực quan (React Konva / Canvas Interactive Layer).
+9. **Giai đoạn 9 (Đã hoàn thành - Prompt 15 Visual Page Editor với React Konva)**:
+   - Triển khai visual page editor trực tiếp tại `/admin/books/[bookId]/pages/[pageId]`.
+   - Layout 3 cột trực quan:
+     - **Cột trái (Pages / Layers)**: Danh sách layers xếp chồng theo `zIndex`, nút chuyển trang nhanh, toggle khóa (lock), ẩn/hiện (visibility).
+     - **Cột giữa (Canvas)**: React Konva Stage 1024 × 1360px (thu phóng linh hoạt 20% - 100%), hỗ trợ Transformer chọn, kéo (drag), co giãn (resize), xoay (rotate).
+     - **Cột phải (Properties Panel)**: Chỉnh sửa trực tiếp tọa độ chuẩn hóa (`x`, `y`, `width`, `height`, `rotation`, `opacity`, `zIndex`), nội dung text/image/video và interaction.
+   - Cơ chế lưu trữ: Mọi thao tác trên canvas 1024 × 1360 được chuyển đổi về tọa độ chuẩn hóa (0.0 đến 1.0) qua `canvasToNormalizedTransform()` và lưu qua PageElement API.
+   - Renderer đồng nhất: Canvas editor và Generic Renderer đều dùng chung định dạng dữ liệu và bộ quy tắc render.
+10. **Giai đoạn 10 (Prompt 16+ Nâng cao Editor & Undo/Redo/Snapping)**:
+   - Tích hợp lịch sử Undo / Redo cho canvas editor.
+   - Thêm đường gióng từ tính (Smart Snapping / Alignment Guides).
    - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.
    - Di dời/xóa bỏ an toàn các file legacy trong `src/components/spreads` và `src/components/pages`.

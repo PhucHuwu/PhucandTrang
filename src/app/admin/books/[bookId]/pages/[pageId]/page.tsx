@@ -1,18 +1,20 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import {
   getAdminPage,
   getAdminBook,
+  getAdminPages,
   batchUpdateElements,
   createAdminElement,
   deleteAdminElement,
+  duplicateAdminElement,
 } from '@/services/adminApi';
 import { useAdminAuth } from '@/context/AdminAuthContext';
 import { Page, PageElement, PageElementType, Book } from '@/types/book';
-import LivePagePreview from '@/components/admin/LivePagePreview';
 import {
   ArrowLeft,
   Save,
@@ -27,33 +29,57 @@ import {
   Sparkles,
   Sliders,
   MousePointer,
-  Check,
+  Lock,
+  Unlock,
+  Eye,
+  EyeOff,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  CheckCircle2,
+  FileText,
+  Palette,
 } from 'lucide-react';
 
-export default function PageDetailAndElementEditor() {
+// Dynamic import KonvaPageCanvas with ssr: false because Konva requires DOM window & canvas
+const KonvaPageCanvas = dynamic(() => import('@/components/admin/KonvaPageCanvas'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-[430px] h-[570px] rounded-2xl bg-[#140B10] border border-rosewood-900/40 flex flex-col items-center justify-center text-stone-500 text-xs">
+      <div className="w-8 h-8 rounded-full border-2 border-rosewood-500 border-t-transparent animate-spin mb-3" />
+      <span>Khởi tạo Visual Canvas...</span>
+    </div>
+  ),
+});
+
+export default function VisualPageEditorPage() {
   const { isViewer } = useAdminAuth();
   const params = useParams();
-  const router = useRouter();
   const bookId = params.bookId as string;
   const pageId = params.pageId as string;
 
   const [book, setBook] = useState<Partial<Book> | null>(null);
+  const [allPages, setAllPages] = useState<any[]>([]);
   const [page, setPage] = useState<Page | null>(null);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [canvasScale, setCanvasScale] = useState(0.42);
 
+  // Load initial page, all book pages, and book settings
   useEffect(() => {
     async function loadData() {
       setLoading(true);
       try {
-        const [bookData, pageData] = await Promise.all([
+        const [bookData, pageData, pagesList] = await Promise.all([
           getAdminBook(bookId),
           getAdminPage(pageId),
+          getAdminPages(bookId),
         ]);
         setBook(bookData);
         setPage(pageData);
+        setAllPages(pagesList);
         if (pageData.elements && pageData.elements.length > 0) {
           setSelectedElementId(pageData.elements[0].id);
         }
@@ -66,19 +92,10 @@ export default function PageDetailAndElementEditor() {
     loadData();
   }, [bookId, pageId]);
 
-  if (loading || !page) {
-    return (
-      <div className="py-32 flex flex-col items-center justify-center text-stone-500 text-xs">
-        <div className="w-8 h-8 rounded-full border-2 border-rosewood-500 border-t-transparent animate-spin mb-3" />
-        <span>Đang nạp dữ liệu trang và phần tử...</span>
-      </div>
-    );
-  }
+  const selectedElement = (page?.elements || []).find((el) => el.id === selectedElementId);
 
-  const selectedElement = (page.elements || []).find((el) => el.id === selectedElementId);
-
-  // Update a field of the currently selected element
-  const updateSelectedElement = (updater: (el: any) => any) => {
+  // Update selected element property locally
+  const updateSelectedElement = useCallback((updater: (el: any) => any) => {
     if (!selectedElementId) return;
     setPage((prevPage) => {
       if (!prevPage) return prevPage;
@@ -93,10 +110,37 @@ export default function PageDetailAndElementEditor() {
         elements: updatedElements,
       };
     });
-  };
+  }, [selectedElementId]);
+
+  // Update normalized transform when dragged or resized on Konva Canvas
+  const handleUpdateElementTransform = useCallback(
+    (id: string, normalizedTransform: { x: number; y: number; width: number; height: number; rotation: number }) => {
+      setPage((prevPage) => {
+        if (!prevPage) return prevPage;
+        const updatedElements = (prevPage.elements || []).map((el) => {
+          if (el.id === id) {
+            return {
+              ...el,
+              transform: {
+                ...el.transform,
+                ...normalizedTransform,
+              },
+            };
+          }
+          return el;
+        });
+        return {
+          ...prevPage,
+          elements: updatedElements,
+        };
+      });
+    },
+    []
+  );
 
   // Add new element to page
   const handleAddElement = async (type: PageElementType) => {
+    if (isViewer || !page) return;
     const maxZ = (page.elements || []).reduce((max, el) => Math.max(max, el.zIndex ?? 1), 0);
     const newZ = maxZ + 1;
 
@@ -107,7 +151,7 @@ export default function PageDetailAndElementEditor() {
       case 'TEXT':
         defaultData = { text: 'Nội dung kỷ niệm mới', variant: 'body' };
         defaultStyle = {
-          fontFamily: '"Cormorant Garamond", Georgia, serif',
+          fontFamily: 'Cormorant Garamond',
           fontSize: 24,
           color: '#292522',
           textAlign: 'left',
@@ -156,8 +200,23 @@ export default function PageDetailAndElementEditor() {
     }
   };
 
+  // Duplicate selected element
+  const handleDuplicateSelected = async () => {
+    if (isViewer || !selectedElementId) return;
+    try {
+      const dup = await duplicateAdminElement(selectedElementId, 0.03, 0.03);
+      setPage((prev) => (prev ? { ...prev, elements: [...prev.elements, dup] } : prev));
+      setSelectedElementId(dup.id);
+      setToast('Đã nhân bản phần tử!');
+      setTimeout(() => setToast(null), 2500);
+    } catch (err: any) {
+      alert(err?.message || 'Lỗi nhân bản phần tử');
+    }
+  };
+
   // Delete element
   const handleDeleteElement = async (elementId: string) => {
+    if (isViewer) return;
     if (!confirm('Bạn có chắc chắn muốn xóa phần tử này khỏi trang?')) return;
     try {
       await deleteAdminElement(elementId);
@@ -172,12 +231,9 @@ export default function PageDetailAndElementEditor() {
     }
   };
 
-  // Save all elements
+  // Save all modified elements to database via batchUpdateElements API
   const handleSave = async () => {
-    if (isViewer) {
-      alert('Tài khoản quyền VIEWER chỉ có quyền xem, không thể lưu thay đổi.');
-      return;
-    }
+    if (isViewer || !page) return;
     setSaving(true);
     setToast(null);
     try {
@@ -195,8 +251,8 @@ export default function PageDetailAndElementEditor() {
       }));
 
       await batchUpdateElements(pageId, elementsToSave);
-      setToast('Đã lưu tất cả phần tử và cập nhật trang thành công!');
-      setTimeout(() => setToast(null), 3500);
+      setToast('Đã lưu toàn bộ thay đổi lên cơ sở dữ liệu!');
+      setTimeout(() => setToast(null), 3000);
     } catch (err: any) {
       alert(err?.message || 'Lỗi lưu phần tử');
     } finally {
@@ -204,155 +260,312 @@ export default function PageDetailAndElementEditor() {
     }
   };
 
+  if (loading || !page) {
+    return (
+      <div className="py-32 flex flex-col items-center justify-center text-stone-500 text-xs">
+        <div className="w-8 h-8 rounded-full border-2 border-rosewood-500 border-t-transparent animate-spin mb-3" />
+        <span>Đang nạp Visual Editor...</span>
+      </div>
+    );
+  }
+
+  // Sort elements for Layers panel
+  const sortedLayers = [...(page.elements || [])].sort((a, b) => (b.zIndex ?? 1) - (a.zIndex ?? 1));
+
   return (
-    <div className="p-6 max-w-7xl mx-auto w-full space-y-5">
-      {/* Top Header */}
-      <div className="flex items-center justify-between border-b border-rosewood-900/40 pb-4">
+    <div className="flex flex-col h-screen overflow-hidden bg-[#0C0609] select-none text-parchment-100 font-sans">
+      {/* Top Application Bar */}
+      <div className="h-14 bg-[#160D12] border-b border-rosewood-900/50 px-5 flex items-center justify-between shrink-0 z-30">
         <div className="flex items-center gap-3">
           <Link
             href={`/admin/books/${bookId}/pages`}
-            className="p-2 rounded-xl bg-[#201319] hover:bg-[#2C1923] text-stone-300 border border-rosewood-900/40 transition-colors"
+            className="p-1.5 rounded-lg bg-[#25151F] hover:bg-[#331C2A] text-stone-300 border border-rosewood-900/40 transition-colors"
+            title="Quay lại danh sách trang"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
-          <div>
-            <h1 className="font-serif text-xl font-bold text-parchment-100 flex items-center gap-2">
-              <span>Chỉnh Sửa Trang {page.pageNumber}:</span>
-              <span className="text-champagne-300">{page.title || '(Không tiêu đề)'}</span>
+          <div className="flex items-center gap-2">
+            <h1 className="font-serif font-bold text-sm tracking-wide text-parchment-100">
+              Trang {page.pageNumber}: {page.title || '(Không tiêu đề)'}
             </h1>
-            <p className="text-xs text-stone-400">
-              {page.chapter || 'Không chương'} • Bố cục: {page.layout} • Mặt: {page.side?.toUpperCase()}
-            </p>
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-rosewood-950 text-champagne-300 border border-rosewood-800/40">
+              Order #{page.order} • {page.side?.toUpperCase()}
+            </span>
           </div>
         </div>
 
+        {/* Center Quick Action Bar (Add Elements) */}
         {!isViewer && (
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-semibold shadow-lg shadow-rosewood-950/50 transition-all active:scale-95 disabled:opacity-50"
-          >
-            <Save className="w-4 h-4" />
-            <span>{saving ? 'Đang lưu...' : 'Lưu toàn bộ thay đổi'}</span>
-          </button>
+          <div className="flex items-center gap-1.5 bg-[#20111A] p-1 rounded-xl border border-rosewood-900/40 text-xs">
+            <button
+              type="button"
+              onClick={() => handleAddElement('TEXT')}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors"
+              title="Thêm khối chữ Text"
+            >
+              <Type className="w-3.5 h-3.5 text-champagne-300" />
+              <span>Text</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleAddElement('IMAGE')}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors"
+              title="Thêm ảnh Polaroid"
+            >
+              <ImageIcon className="w-3.5 h-3.5 text-pink-400" />
+              <span>Ảnh</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleAddElement('VIDEO')}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors"
+              title="Thêm video clip"
+            >
+              <Video className="w-3.5 h-3.5 text-amber-400" />
+              <span>Video</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleAddElement('SHAPE')}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors"
+              title="Thêm đường kẻ Shape"
+            >
+              <Square className="w-3.5 h-3.5 text-rosewood-400" />
+              <span>Shape</span>
+            </button>
+          </div>
         )}
+
+        {/* Right Action: Save Button */}
+        <div className="flex items-center gap-3">
+          {toast && (
+            <span className="text-xs text-emerald-400 font-mono flex items-center gap-1 animate-fade-in">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>{toast}</span>
+            </span>
+          )}
+
+          {!isViewer && (
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-semibold shadow-lg shadow-rosewood-950/50 transition-all active:scale-95 disabled:opacity-50"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>{saving ? 'Đang lưu...' : 'Lưu trang'}</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {toast && (
-        <div className="p-3 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-emerald-200 text-xs text-center animate-fade-in">
-          {toast}
-        </div>
-      )}
-
-      {/* Editor Grid: 2 Columns (Left: Elements & Form, Right: Live Canvas Preview) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Elements Panel & Property Form (7 cols) */}
-        <div className="lg:col-span-7 space-y-5">
-          {/* Elements Selector Bar */}
-          <div className="bg-[#180E14] border border-rosewood-900/40 rounded-2xl p-4 shadow-xl space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-parchment-200 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                <Layers className="w-4 h-4 text-rosewood-400" />
-                <span>Danh sách phần tử ({page.elements?.length || 0})</span>
+      {/* 3-Column Visual Layout (Prompt 15 Specification) */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* LEFT COLUMN: Pages / Layers (width: 270px) */}
+        <aside className="w-64 bg-[#140B10] border-r border-rosewood-900/40 flex flex-col justify-between shrink-0 overflow-hidden">
+          {/* Section 1: Layers Stacking Order */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="p-3 bg-[#1C0F16] border-b border-rosewood-900/40 flex items-center justify-between text-xs font-semibold text-parchment-200">
+              <span className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-champagne-300">
+                <Layers className="w-3.5 h-3.5 text-rosewood-400" />
+                <span>Layers (Lớp phần tử)</span>
               </span>
-
-              {/* Add Element Quick Actions */}
-              {!isViewer && (
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handleAddElement('TEXT')}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rosewood-900/40 hover:bg-rosewood-800/60 text-parchment-200 text-xs border border-rosewood-700/40 transition-colors"
-                    title="Thêm khối chữ"
-                  >
-                    <Type className="w-3 h-3 text-champagne-400" />
-                    <span>Text</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleAddElement('IMAGE')}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rosewood-900/40 hover:bg-rosewood-800/60 text-parchment-200 text-xs border border-rosewood-700/40 transition-colors"
-                    title="Thêm ảnh"
-                  >
-                    <ImageIcon className="w-3 h-3 text-pink-400" />
-                    <span>Ảnh</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleAddElement('VIDEO')}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rosewood-900/40 hover:bg-rosewood-800/60 text-parchment-200 text-xs border border-rosewood-700/40 transition-colors"
-                    title="Thêm video"
-                  >
-                    <Video className="w-3 h-3 text-amber-400" />
-                    <span>Video</span>
-                  </button>
-                </div>
-              )}
+              <span className="text-[10px] font-mono text-stone-500">{page.elements?.length || 0}</span>
             </div>
 
-            {/* Elements Chips List */}
-            <div className="flex items-center gap-1.5 overflow-x-auto py-1">
-              {(page.elements || []).map((el, idx) => {
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {sortedLayers.map((el) => {
                 const isSelected = el.id === selectedElementId;
+                const isLocked = Boolean(el.locked);
+                const isVisible = el.visible !== false;
+
                 return (
-                  <button
+                  <div
                     key={el.id}
-                    type="button"
                     onClick={() => setSelectedElementId(el.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${
+                    className={`flex items-center justify-between px-2.5 py-2 rounded-xl text-xs cursor-pointer transition-all ${
                       isSelected
                         ? 'bg-rosewood-600 text-white font-semibold shadow-md'
-                        : 'bg-[#25151F] text-stone-400 hover:text-white hover:bg-[#331C2A]'
+                        : 'bg-[#1E1119] text-stone-400 hover:text-white hover:bg-[#2A1622]'
                     }`}
                   >
-                    <span className="font-mono text-[10px] opacity-75">z{el.zIndex ?? idx}</span>
-                    <span>
-                      {el.slot || el.type}: {(el.data as any).text || (el.data as any).caption || el.id.slice(0, 8)}
-                    </span>
-                  </button>
+                    <div className="flex items-center gap-2 truncate flex-1 pr-2">
+                      <span className="font-mono text-[10px] opacity-70 w-5">z{el.zIndex}</span>
+                      <span className="truncate">
+                        {(el.data as any).text || (el.data as any).caption || el.slot || el.type}
+                      </span>
+                    </div>
+
+                    {!isViewer && (
+                      <div className="flex items-center gap-1 text-stone-400">
+                        {/* Lock toggle button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateSelectedElement((target) => (target.id === el.id ? { ...target, locked: !isLocked } : target));
+                          }}
+                          className={`p-1 rounded hover:text-white ${isLocked ? 'text-amber-400' : 'opacity-60'}`}
+                          title={isLocked ? 'Mở khóa' : 'Khóa layer'}
+                        >
+                          {isLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                        </button>
+
+                        {/* Visibility toggle button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateSelectedElement((target) => (target.id === el.id ? { ...target, visible: !isVisible } : target));
+                          }}
+                          className={`p-1 rounded hover:text-white ${!isVisible ? 'text-stone-600' : 'opacity-60'}`}
+                          title={isVisible ? 'Ẩn layer' : 'Hiện layer'}
+                        >
+                          {isVisible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
+
+              {sortedLayers.length === 0 && (
+                <div className="p-6 text-center text-xs text-stone-500">Chưa có phần tử nào trên trang này.</div>
+              )}
             </div>
           </div>
 
-          {/* Element Property Form */}
+          {/* Section 2: Quick Pages Navigation Switcher */}
+          <div className="h-44 border-t border-rosewood-900/40 bg-[#12090F] flex flex-col shrink-0">
+            <div className="px-3 py-2 border-b border-rosewood-900/40 flex items-center justify-between text-[11px] font-mono text-stone-400">
+              <span className="flex items-center gap-1">
+                <FileText className="w-3 h-3 text-rosewood-400" />
+                <span>Chuyển trang nhanh</span>
+              </span>
+              <span>{allPages.length} trang</span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {allPages.map((p) => (
+                <Link
+                  key={p.id}
+                  href={`/admin/books/${bookId}/pages/${p.id}`}
+                  className={`block px-2.5 py-1.5 rounded-lg text-xs font-mono truncate transition-all ${
+                    p.id === pageId
+                      ? 'bg-rosewood-900/60 text-champagne-300 font-bold border border-rosewood-700/50'
+                      : 'text-stone-500 hover:text-stone-300 hover:bg-[#1E1119]'
+                  }`}
+                >
+                  #{p.order} • {p.pageNumber === 0 ? 'Lời ngỏ' : `Trang ${p.pageNumber}`} {p.title ? `— ${p.title}` : ''}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        {/* CENTER COLUMN: React Konva Visual Canvas (Flex-1) */}
+        <main className="flex-1 flex flex-col bg-[#0A0407] overflow-hidden relative">
+          {/* Canvas Viewport Toolbar */}
+          <div className="h-10 bg-[#140B10] border-b border-rosewood-900/40 px-4 flex items-center justify-between text-xs text-stone-400 z-10 shrink-0">
+            <div className="flex items-center gap-2 font-mono text-[11px]">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span>Canvas 1024 × 1360px</span>
+              <span className="text-stone-600">|</span>
+              <span>Tỉ lệ: {Math.round(canvasScale * 100)}%</span>
+            </div>
+
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setCanvasScale((s) => Math.max(0.2, parseFloat((s - 0.05).toFixed(2))))}
+                className="p-1 rounded bg-[#20111A] hover:bg-rosewood-800 text-stone-300 transition-colors"
+                title="Thu nhỏ canvas"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <span className="font-mono w-10 text-center text-[11px]">{Math.round(canvasScale * 100)}%</span>
+              <button
+                type="button"
+                onClick={() => setCanvasScale((s) => Math.min(1.0, parseFloat((s + 0.05).toFixed(2))))}
+                className="p-1 rounded bg-[#20111A] hover:bg-rosewood-800 text-stone-300 transition-colors"
+                title="Phóng to canvas"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCanvasScale(0.42)}
+                className="p-1 rounded bg-[#20111A] hover:bg-rosewood-800 text-stone-300 transition-colors"
+                title="Tỉ lệ chuẩn 42%"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Interactive Konva Canvas Viewport */}
+          <div className="flex-1 flex items-center justify-center p-6 overflow-auto">
+            <KonvaPageCanvas
+              page={page}
+              book={book}
+              selectedElementId={selectedElementId}
+              onSelectElement={setSelectedElementId}
+              onUpdateElementTransform={handleUpdateElementTransform}
+              scale={canvasScale}
+            />
+          </div>
+        </main>
+
+        {/* RIGHT COLUMN: Properties Panel (width: 320px) */}
+        <aside className="w-80 bg-[#140B10] border-l border-rosewood-900/40 flex flex-col justify-between shrink-0 overflow-y-auto">
           {selectedElement ? (
-            <div className="bg-[#180E14] border border-rosewood-900/40 rounded-2xl p-5 shadow-xl space-y-5">
-              {/* Form Header */}
+            <div className="p-4 space-y-5">
+              {/* Header */}
               <div className="flex items-center justify-between border-b border-rosewood-900/40 pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-rosewood-900/60 text-champagne-300 border border-rosewood-700/50">
+                  <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-rosewood-900/60 text-champagne-300 border border-rosewood-700/50">
                     {selectedElement.type}
                   </span>
-                  <span className="text-xs font-mono text-stone-400">{selectedElement.id}</span>
+                  <span className="text-[11px] font-mono text-stone-400">{selectedElement.id.slice(0, 10)}</span>
                 </div>
 
                 {!isViewer && (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteElement(selectedElement.id)}
-                    className="flex items-center gap-1 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/40 rounded-lg transition-colors border border-red-900/30"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Xóa phần tử</span>
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={handleDuplicateSelected}
+                      className="p-1.5 rounded-lg bg-[#25151F] hover:bg-[#331C2A] text-stone-300 transition-colors"
+                      title="Nhân bản phần tử"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteElement(selectedElement.id)}
+                      className="p-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/60 text-red-400 transition-colors"
+                      title="Xóa phần tử"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 )}
               </div>
 
-              {/* 1. Transform Section: x, y, width, height, rotation, opacity, zIndex */}
+              {/* Transform Property Section: x, y, width, height, rotation, opacity, zIndex */}
               <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-champagne-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5" />
-                  <span>Tọa độ & Kích thước (Transform)</span>
+                <h4 className="text-xs font-semibold text-champagne-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-rosewood-400" />
+                  <span>Transform (Tọa độ Normalized)</span>
                 </h4>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="grid grid-cols-2 gap-2.5 text-xs">
                   <div>
                     <label className="block text-[11px] text-stone-400 mb-1">X (0.0 - 1.0)</label>
                     <input
                       type="number"
                       step="0.01"
+                      disabled={isViewer || Boolean(selectedElement.locked)}
                       value={selectedElement.transform.x}
                       onChange={(e) =>
                         updateSelectedElement((el) => ({
@@ -360,7 +573,7 @@ export default function PageDetailAndElementEditor() {
                           transform: { ...el.transform, x: parseFloat(e.target.value) || 0 },
                         }))
                       }
-                      className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white font-mono"
+                      className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
                     />
                   </div>
 
@@ -369,6 +582,7 @@ export default function PageDetailAndElementEditor() {
                     <input
                       type="number"
                       step="0.01"
+                      disabled={isViewer || Boolean(selectedElement.locked)}
                       value={selectedElement.transform.y}
                       onChange={(e) =>
                         updateSelectedElement((el) => ({
@@ -376,15 +590,16 @@ export default function PageDetailAndElementEditor() {
                           transform: { ...el.transform, y: parseFloat(e.target.value) || 0 },
                         }))
                       }
-                      className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white font-mono"
+                      className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] text-stone-400 mb-1">Rộng width (0.0 - 1.0)</label>
+                    <label className="block text-[11px] text-stone-400 mb-1">Width (0.0 - 1.0)</label>
                     <input
                       type="number"
                       step="0.01"
+                      disabled={isViewer || Boolean(selectedElement.locked)}
                       value={selectedElement.transform.width}
                       onChange={(e) =>
                         updateSelectedElement((el) => ({
@@ -392,15 +607,16 @@ export default function PageDetailAndElementEditor() {
                           transform: { ...el.transform, width: parseFloat(e.target.value) || 0.1 },
                         }))
                       }
-                      className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white font-mono"
+                      className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] text-stone-400 mb-1">Cao height (0.0 - 1.0)</label>
+                    <label className="block text-[11px] text-stone-400 mb-1">Height (0.0 - 1.0)</label>
                     <input
                       type="number"
                       step="0.01"
+                      disabled={isViewer || Boolean(selectedElement.locked)}
                       value={selectedElement.transform.height}
                       onChange={(e) =>
                         updateSelectedElement((el) => ({
@@ -408,15 +624,16 @@ export default function PageDetailAndElementEditor() {
                           transform: { ...el.transform, height: parseFloat(e.target.value) || 0.1 },
                         }))
                       }
-                      className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white font-mono"
+                      className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] text-stone-400 mb-1">Góc xoay rotation (°)</label>
+                    <label className="block text-[11px] text-stone-400 mb-1">Rotation (°)</label>
                     <input
                       type="number"
-                      step="0.5"
+                      step="1"
+                      disabled={isViewer || Boolean(selectedElement.locked)}
                       value={selectedElement.transform.rotation || 0}
                       onChange={(e) =>
                         updateSelectedElement((el) => ({
@@ -424,17 +641,18 @@ export default function PageDetailAndElementEditor() {
                           transform: { ...el.transform, rotation: parseFloat(e.target.value) || 0 },
                         }))
                       }
-                      className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white font-mono"
+                      className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] text-stone-400 mb-1">Độ mờ opacity (0 - 1)</label>
+                    <label className="block text-[11px] text-stone-400 mb-1">Opacity (0 - 1)</label>
                     <input
                       type="number"
                       step="0.05"
                       min="0"
                       max="1"
+                      disabled={isViewer}
                       value={selectedElement.opacity ?? 1}
                       onChange={(e) =>
                         updateSelectedElement((el) => ({
@@ -442,14 +660,15 @@ export default function PageDetailAndElementEditor() {
                           opacity: parseFloat(e.target.value) || 1,
                         }))
                       }
-                      className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white font-mono"
+                      className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] text-stone-400 mb-1">Thứ tự layer zIndex</label>
+                    <label className="block text-[11px] text-stone-400 mb-1">zIndex</label>
                     <input
                       type="number"
+                      disabled={isViewer}
                       value={selectedElement.zIndex ?? 1}
                       onChange={(e) =>
                         updateSelectedElement((el) => ({
@@ -457,45 +676,45 @@ export default function PageDetailAndElementEditor() {
                           zIndex: parseInt(e.target.value, 10) || 1,
                         }))
                       }
-                      className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white font-mono"
+                      className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] text-stone-400 mb-1">Hiển thị (visible)</label>
+                    <label className="block text-[11px] text-stone-400 mb-1">Khóa (Locked)</label>
                     <div className="pt-2">
                       <input
                         type="checkbox"
-                        checked={selectedElement.visible !== false}
+                        disabled={isViewer}
+                        checked={Boolean(selectedElement.locked)}
                         onChange={(e) =>
                           updateSelectedElement((el) => ({
                             ...el,
-                            visible: e.target.checked,
+                            locked: e.target.checked,
                           }))
                         }
-                        className="w-4 h-4 rounded text-rosewood-600 bg-[#25151F] border-rosewood-800"
+                        className="w-4 h-4 rounded text-rosewood-600 bg-[#20111A] border-rosewood-800"
                       />
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* 2. Content Data Form */}
+              {/* Data Properties based on element type */}
               <div className="space-y-3 pt-3 border-t border-rosewood-900/40">
-                <h4 className="text-xs font-semibold text-champagne-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                  <Type className="w-3.5 h-3.5" />
-                  <span>Nội Dung & Dữ Liệu ({selectedElement.type})</span>
+                <h4 className="text-xs font-semibold text-champagne-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                  <Palette className="w-3.5 h-3.5 text-rosewood-400" />
+                  <span>Dữ Liệu Phần Tử ({selectedElement.type})</span>
                 </h4>
 
-                {/* TEXT Element inputs */}
+                {/* TEXT Element */}
                 {selectedElement.type === 'TEXT' && (
                   <div className="space-y-3 text-xs">
                     <div>
-                      <label className="block text-[11px] text-stone-400 mb-1">
-                        Đoạn văn bản (hỗ trợ biến {'{{...}}'})
-                      </label>
+                      <label className="block text-[11px] text-stone-400 mb-1">Văn bản (hỗ trợ biến {'{{...}}'})</label>
                       <textarea
                         rows={3}
+                        disabled={isViewer}
                         value={(selectedElement.data as any).text || ''}
                         onChange={(e) =>
                           updateSelectedElement((el) => ({
@@ -503,37 +722,16 @@ export default function PageDetailAndElementEditor() {
                             data: { ...el.data, text: e.target.value },
                           }))
                         }
-                        placeholder="Ví dụ: {{couple.he}} & {{couple.she}} đã bên nhau {{daysTogether}} ngày..."
-                        className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-white font-serif"
+                        className="w-full px-3 py-2 bg-[#20111A] border border-rosewood-900/60 rounded-xl text-white font-serif disabled:opacity-50"
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 gap-2.5">
                       <div>
-                        <label className="block text-[11px] text-stone-400 mb-1">Kiểu chữ variant</label>
-                        <select
-                          value={(selectedElement.data as any).variant || 'body'}
-                          onChange={(e) =>
-                            updateSelectedElement((el) => ({
-                              ...el,
-                              data: { ...el.data, variant: e.target.value as any },
-                            }))
-                          }
-                          className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white"
-                        >
-                          <option value="body">Body (Thân bài)</option>
-                          <option value="title">Title (Tiêu đề lớn)</option>
-                          <option value="chapter-label">Chapter (Nhãn chương)</option>
-                          <option value="quote">Quote (Trích dẫn nghiêng)</option>
-                          <option value="handwriting">Handwriting (Viết tay)</option>
-                          <option value="caption">Caption (Chú thích ảnh)</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] text-stone-400 mb-1">Cỡ chữ fontSize (px)</label>
+                        <label className="block text-[11px] text-stone-400 mb-1">Cỡ chữ fontSize</label>
                         <input
                           type="number"
+                          disabled={isViewer}
                           value={selectedElement.style?.fontSize || 24}
                           onChange={(e) =>
                             updateSelectedElement((el) => ({
@@ -541,14 +739,15 @@ export default function PageDetailAndElementEditor() {
                               style: { ...el.style, fontSize: parseInt(e.target.value, 10) || 24 },
                             }))
                           }
-                          className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white font-mono"
+                          className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[11px] text-stone-400 mb-1">Màu chữ (color)</label>
+                        <label className="block text-[11px] text-stone-400 mb-1">Màu chữ</label>
                         <input
                           type="text"
+                          disabled={isViewer}
                           value={selectedElement.style?.color || '#292522'}
                           onChange={(e) =>
                             updateSelectedElement((el) => ({
@@ -556,38 +755,21 @@ export default function PageDetailAndElementEditor() {
                               style: { ...el.style, color: e.target.value },
                             }))
                           }
-                          className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white font-mono"
+                          className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono"
                         />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] text-stone-400 mb-1">Căn lề textAlign</label>
-                        <select
-                          value={selectedElement.style?.textAlign || 'left'}
-                          onChange={(e) =>
-                            updateSelectedElement((el) => ({
-                              ...el,
-                              style: { ...el.style, textAlign: e.target.value as any },
-                            }))
-                          }
-                          className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white"
-                        >
-                          <option value="left">Left (Trái)</option>
-                          <option value="center">Center (Giữa)</option>
-                          <option value="right">Right (Phải)</option>
-                        </select>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* IMAGE Element inputs */}
+                {/* IMAGE Element */}
                 {selectedElement.type === 'IMAGE' && (
                   <div className="space-y-3 text-xs">
                     <div>
-                      <label className="block text-[11px] text-stone-400 mb-1">Đường dẫn ảnh (src URL)</label>
+                      <label className="block text-[11px] text-stone-400 mb-1">Ảnh URL</label>
                       <input
                         type="text"
+                        disabled={isViewer}
                         value={(selectedElement.data as any).src || ''}
                         onChange={(e) =>
                           updateSelectedElement((el) => ({
@@ -595,73 +777,20 @@ export default function PageDetailAndElementEditor() {
                             data: { ...el.data, src: e.target.value },
                           }))
                         }
-                        className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-white font-mono"
+                        className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono"
                       />
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-[11px] text-stone-400 mb-1">objectFit</label>
-                        <select
-                          value={(selectedElement.data as any).objectFit || 'cover'}
-                          onChange={(e) =>
-                            updateSelectedElement((el) => ({
-                              ...el,
-                              data: { ...el.data, objectFit: e.target.value as any },
-                            }))
-                          }
-                          className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white"
-                        >
-                          <option value="cover">cover (Cắt vừa khít)</option>
-                          <option value="contain">contain (Vừa vặn không crop)</option>
-                          <option value="fill">fill (Kéo dãn toàn bộ)</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] text-stone-400 mb-1">Khung ảnh Polaroid</label>
-                        <select
-                          value={selectedElement.style?.polaroidFrame !== false ? 'true' : 'false'}
-                          onChange={(e) =>
-                            updateSelectedElement((el) => ({
-                              ...el,
-                              style: { ...el.style, polaroidFrame: e.target.value === 'true' },
-                            }))
-                          }
-                          className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white"
-                        >
-                          <option value="true">Bật khung ảnh trắng</option>
-                          <option value="false">Tắt khung</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] text-stone-400 mb-1">Băng dính Washi Tape</label>
-                        <select
-                          value={selectedElement.style?.washiTape !== false ? 'true' : 'false'}
-                          onChange={(e) =>
-                            updateSelectedElement((el) => ({
-                              ...el,
-                              style: { ...el.style, washiTape: e.target.value === 'true' },
-                            }))
-                          }
-                          className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white"
-                        >
-                          <option value="true">Bật băng dính</option>
-                          <option value="false">Tắt băng dính</option>
-                        </select>
-                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* VIDEO Element inputs */}
+                {/* VIDEO Element */}
                 {selectedElement.type === 'VIDEO' && (
                   <div className="space-y-3 text-xs">
                     <div>
-                      <label className="block text-[11px] text-stone-400 mb-1">Đường dẫn file Video (.mp4)</label>
+                      <label className="block text-[11px] text-stone-400 mb-1">Video MP4 URL</label>
                       <input
                         type="text"
+                        disabled={isViewer}
                         value={(selectedElement.data as any).src || ''}
                         onChange={(e) =>
                           updateSelectedElement((el) => ({
@@ -669,92 +798,19 @@ export default function PageDetailAndElementEditor() {
                             data: { ...el.data, src: e.target.value },
                           }))
                         }
-                        className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-white font-mono"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] text-stone-400 mb-1">Ảnh bìa video (thumbnailUrl / poster)</label>
-                      <input
-                        type="text"
-                        value={(selectedElement.data as any).thumbnailUrl || ''}
-                        onChange={(e) =>
-                          updateSelectedElement((el) => ({
-                            ...el,
-                            data: { ...el.data, thumbnailUrl: e.target.value },
-                          }))
-                        }
-                        className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-white font-mono"
+                        className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono"
                       />
                     </div>
                   </div>
                 )}
               </div>
-
-              {/* 3. Interaction Section: action, target, activeArea */}
-              <div className="space-y-3 pt-3 border-t border-rosewood-900/40">
-                <h4 className="text-xs font-semibold text-champagne-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                  <MousePointer className="w-3.5 h-3.5" />
-                  <span>Tương Tác & Click Zone (Interaction)</span>
-                </h4>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <label className="block text-[11px] text-stone-400 mb-1">Hành động action</label>
-                    <select
-                      value={selectedElement.interaction?.action || 'none'}
-                      onChange={(e) =>
-                        updateSelectedElement((el) => ({
-                          ...el,
-                          interaction: {
-                            ...(el.interaction || { enabled: true }),
-                            action: e.target.value as any,
-                          },
-                        }))
-                      }
-                      className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white"
-                    >
-                      <option value="none">none (Không tương tác)</option>
-                      <option value="open-video">open-video (Mở Video Overlay)</option>
-                      <option value="zoom">zoom (Phóng to ảnh)</option>
-                      <option value="navigate-page">navigate-page (Chuyển trang)</option>
-                      <option value="open-link">open-link (Mở liên kết web)</option>
-                      <option value="play-audio">play-audio (Phát âm thanh)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-stone-400 mb-1">Mục tiêu target (URL / số trang)</label>
-                    <input
-                      type="text"
-                      value={selectedElement.interaction?.target?.toString() || ''}
-                      onChange={(e) =>
-                        updateSelectedElement((el) => ({
-                          ...el,
-                          interaction: {
-                            ...(el.interaction || { enabled: true, action: 'none' }),
-                            target: e.target.value,
-                          },
-                        }))
-                      }
-                      placeholder="URL video hoặc số trang cần lật"
-                      className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
             </div>
           ) : (
-            <div className="p-8 text-center bg-[#180E14] border border-rosewood-900/40 rounded-2xl text-stone-500 text-xs">
-              Chọn một phần tử từ danh sách phía trên để chỉnh sửa thông số.
+            <div className="p-8 text-center text-xs text-stone-500">
+              Nhấp chọn một phần tử trên Canvas hoặc từ bảng Layers để chỉnh sửa thông số.
             </div>
           )}
-        </div>
-
-        {/* Right Column: Live Page Preview using PageTextureGenerator (5 cols) */}
-        <div className="lg:col-span-5 sticky top-6">
-          <LivePagePreview page={page} book={book} />
-        </div>
+        </aside>
       </div>
     </div>
   );
