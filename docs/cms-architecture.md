@@ -361,7 +361,17 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
      - Phân giải biến động thông minh: Hỗ trợ các thẻ biến `{{daysTogether}}`, `{{daysTogether | number}}`, `{{anniversaryDate}}`, `{{couple.he}}`, `{{couple.she}}`, `{{currentDate}}`.
      - Bộ gõ hiển thị hộp thoại xem trước giá trị thực tế sau phân giải (Resolved Preview) theo thời gian thực nhưng trong cơ sở dữ liệu vẫn bảo toàn chuỗi template gốc.
      - Đồng bộ quy tắc xuống dòng (Text Wrapping): Cả Canvas Editor (`KonvaText wrap="word"`) và Public Canvas Generator (`PageTextureGenerator wrapText()`) cùng tính toán và bẻ dòng giống nhau.
-14. **Giai đoạn 14 (Prompt 20+ Nâng cao Editor & Undo/Redo/Snapping)**:
+14. **Giai đoạn 14 (Đã hoàn thành - Prompt 20 Advanced Image Editor)**:
+   - Hoàn thiện trình chỉnh sửa phần tử IMAGE chuyên sâu (`AdvancedImageEditor.tsx` & `MediaPickerModal.tsx`):
+     - **Chọn ảnh từ Thư viện Media (Select from Media Library)**: Tích hợp modal chọn ảnh trực quan, tìm kiếm theo tên, phân trang và xem trước.
+     - **Tải ảnh mới trực tiếp lên Cloudinary (Upload new image)**: Thực hiện Signed Direct Upload mà không gửi dữ liệu file nặng qua server NestJS.
+     - **Chuẩn hóa Canonical `mediaId`**: Khi người dùng chọn ảnh, hệ thống ưu tiên lưu trữ canonical `mediaId` vào database thay vì hardcode Cloudinary URL.
+     - **Văn bản thay thế (Alt text)**: Chỉnh sửa và đồng bộ chú thích thay thế cho người khiếm thị và SEO.
+     - **Kiểu khớp ảnh `objectFit`**: Hỗ trợ đầy đủ `cover`, `contain`, `fill`.
+     - **Điểm neo cắt `focalPoint` (X / Y)**: Tùy chỉnh trọng tâm ảnh (0..1) kết hợp với thuật toán dùng chung `computeImageFit`.
+     - **Phong cách Polaroid & Washi Tape**: Bật/tắt khung viền ảnh polaroid trắng cổ điển và dải băng dính washi tape trang trí.
+     - **Transform nâng cao**: Điều chỉnh độ mờ đục `opacity`, góc xoay `rotation` và hệ số thu phóng `scale`.
+15. **Giai đoạn 15 (Prompt 21+ Nâng cao Editor & Undo/Redo/Snapping)**:
    - Tích hợp lịch sử Undo / Redo cho canvas editor.
    - Thêm đường gióng từ tính (Smart Snapping / Alignment Guides).
    - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.

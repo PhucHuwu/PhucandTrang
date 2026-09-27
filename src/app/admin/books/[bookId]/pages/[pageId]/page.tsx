@@ -20,6 +20,7 @@ import LayoutPresetPicker from '@/components/admin/LayoutPresetPicker';
 import SaveAsLayoutModal from '@/components/admin/SaveAsLayoutModal';
 import BackgroundEditor from '@/components/admin/BackgroundEditor';
 import AdvancedTextEditor from '@/components/admin/AdvancedTextEditor';
+import AdvancedImageEditor from '@/components/admin/AdvancedImageEditor';
 import {
   applyLayoutTemplate,
   extractContentFromPage,
@@ -887,29 +888,13 @@ export default function VisualPageEditorPage() {
                         />
                       )}
 
-                      {/* IMAGE Element */}
+                      {/* IMAGE Element: Advanced Image Editor (Prompt 20) */}
                       {selectedElement.type === 'IMAGE' && (
-                        <div className="space-y-3 text-xs">
-                          <h4 className="text-xs font-semibold text-champagne-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                            <Palette className="w-3.5 h-3.5 text-rosewood-400" />
-                            <span>Dữ Liệu Hình Ảnh (IMAGE)</span>
-                          </h4>
-                          <div>
-                            <label className="block text-[11px] text-stone-400 mb-1">Ảnh URL</label>
-                            <input
-                              type="text"
-                              disabled={isViewer}
-                              value={(selectedElement.data as any).src || ''}
-                              onChange={(e) =>
-                                updateSelectedElement((el) => ({
-                                  ...el,
-                                  data: { ...el.data, src: e.target.value },
-                                }))
-                              }
-                              className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono"
-                            />
-                          </div>
-                        </div>
+                        <AdvancedImageEditor
+                          element={selectedElement as any}
+                          disabled={isViewer}
+                          onChange={(updater) => updateSelectedElement(updater)}
+                        />
                       )}
 
                       {/* VIDEO Element */}
