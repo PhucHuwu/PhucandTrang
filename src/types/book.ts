@@ -356,6 +356,7 @@ export interface Page {
   textLines?: string[];
   handwriting?: string;
   layout: LayoutTemplate;
+  layoutTemplateId?: LayoutTemplate | null;
   /** Layout mode: 'PRESET' (started from preset) or 'FREEFORM' (freeform canvas) */
   layoutMode?: PageLayoutMode;
   /** Template ID that initially generated this page */

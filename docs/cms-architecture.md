@@ -321,7 +321,20 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
      - **Cột phải (Properties Panel)**: Chỉnh sửa trực tiếp tọa độ chuẩn hóa (`x`, `y`, `width`, `height`, `rotation`, `opacity`, `zIndex`), nội dung text/image/video và interaction.
    - Cơ chế lưu trữ: Mọi thao tác trên canvas 1024 × 1360 được chuyển đổi về tọa độ chuẩn hóa (0.0 đến 1.0) qua `canvasToNormalizedTransform()` và lưu qua PageElement API.
    - Renderer đồng nhất: Canvas editor và Generic Renderer đều dùng chung định dạng dữ liệu và bộ quy tắc render.
-10. **Giai đoạn 10 (Prompt 16+ Nâng cao Editor & Undo/Redo/Snapping)**:
+10. **Giai đoạn 10 (Đã hoàn thành - Prompt 16 Layout Preset Picker)**:
+   - Tích hợp Layout Preset Picker modal tại Page Editor `/admin/books/[bookId]/pages/[pageId]`.
+   - Nạp động danh mục layout templates từ Backend API `GET /layout-templates`, hoàn toàn không hardcode ở Admin.
+   - Hiển thị preview sơ đồ vị trí (schematic blueprint thumbnails) cho từng mẫu bố cục.
+   - Thuật toán `extractContentFromPage()` trích xuất và bảo toàn 100% nội dung ảnh, video, tiêu đề, trích dẫn, chữ viết tay hiện có khi áp dụng layout mới.
+   - Khi Apply Layout:
+     - `layoutTemplateId` = `template.id`
+     - `layoutMode` = `'PRESET'`
+     - `sourceTemplateId` = `template.id`
+     - `isCustomized` = `false`
+   - Khi người dùng kéo thả hoặc chỉnh sửa thuộc tính phần tử:
+     - Tự động đánh dấu `isCustomized` = `true`
+   - Hiển thị hộp thoại cảnh báo xác nhận (confirmation dialog) nếu việc áp dụng layout mới sẽ sắp xếp lại các phần tử đã được tùy biến.
+11. **Giai đoạn 11 (Prompt 17+ Nâng cao Editor & Undo/Redo/Snapping)**:
    - Tích hợp lịch sử Undo / Redo cho canvas editor.
    - Thêm đường gióng từ tính (Smart Snapping / Alignment Guides).
    - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.

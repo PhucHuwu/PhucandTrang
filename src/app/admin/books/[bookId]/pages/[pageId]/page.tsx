@@ -12,9 +12,16 @@ import {
   createAdminElement,
   deleteAdminElement,
   duplicateAdminElement,
+  updateAdminPage,
 } from '@/services/adminApi';
 import { useAdminAuth } from '@/context/AdminAuthContext';
 import { Page, PageElement, PageElementType, Book } from '@/types/book';
+import LayoutPresetPicker from '@/components/admin/LayoutPresetPicker';
+import {
+  applyLayoutTemplate,
+  extractContentFromPage,
+  LayoutPresetDefinition,
+} from '@/templates/layoutPresets';
 import {
   ArrowLeft,
   Save,
@@ -39,6 +46,7 @@ import {
   CheckCircle2,
   FileText,
   Palette,
+  LayoutGrid,
 } from 'lucide-react';
 
 // Dynamic import KonvaPageCanvas with ssr: false because Konva requires DOM window & canvas
@@ -67,6 +75,9 @@ export default function VisualPageEditorPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [canvasScale, setCanvasScale] = useState(0.42);
 
+  // Layout Picker Modal state (Prompt 16)
+  const [showLayoutPicker, setShowLayoutPicker] = useState(false);
+
   // Load initial page, all book pages, and book settings
   useEffect(() => {
     async function loadData() {
@@ -94,7 +105,7 @@ export default function VisualPageEditorPage() {
 
   const selectedElement = (page?.elements || []).find((el) => el.id === selectedElementId);
 
-  // Update selected element property locally
+  // Update selected element property locally -> sets isCustomized = true (Prompt 16 Requirement)
   const updateSelectedElement = useCallback((updater: (el: any) => any) => {
     if (!selectedElementId) return;
     setPage((prevPage) => {
@@ -107,12 +118,13 @@ export default function VisualPageEditorPage() {
       });
       return {
         ...prevPage,
+        isCustomized: true, // Setting property sets isCustomized = true
         elements: updatedElements,
       };
     });
   }, [selectedElementId]);
 
-  // Update normalized transform when dragged or resized on Konva Canvas
+  // Update normalized transform when dragged or resized on Konva Canvas -> sets isCustomized = true (Prompt 16 Requirement)
   const handleUpdateElementTransform = useCallback(
     (id: string, normalizedTransform: { x: number; y: number; width: number; height: number; rotation: number }) => {
       setPage((prevPage) => {
@@ -131,12 +143,83 @@ export default function VisualPageEditorPage() {
         });
         return {
           ...prevPage,
+          isCustomized: true, // Dragging/resizing sets isCustomized = true
           elements: updatedElements,
         };
       });
     },
     []
   );
+
+  // Apply Layout Template (Prompt 16 Core Requirement)
+  const handleApplyLayoutTemplate = async (templateDef: LayoutPresetDefinition) => {
+    if (isViewer || !page) return;
+    setSaving(true);
+    setToast(null);
+
+    try {
+      // 1. Extract existing reusable content (media, text, quote, handwriting) from current page
+      const extractedContent = extractContentFromPage(page);
+
+      // 2. Apply template definition to arrange elements into new slots
+      const newlyArrangedPage = applyLayoutTemplate(
+        {
+          ...page,
+          pageNumber: page.pageNumber,
+          side: page.side,
+        },
+        templateDef,
+        extractedContent
+      );
+
+      // Explicit requirements for Apply Layout:
+      // - layoutTemplateId = template.id
+      // - layoutMode = PRESET
+      // - sourceTemplateId = template.id
+      // - isCustomized = false
+      const updatedMetadata = {
+        layoutTemplateId: templateDef.id,
+        layoutMode: 'PRESET',
+        sourceTemplateId: templateDef.id,
+        isCustomized: false,
+      };
+
+      // 3. Update page metadata in backend
+      await updateAdminPage(pageId, updatedMetadata, true);
+
+      // 4. Batch save the newly arranged elements
+      const elementsToSave = newlyArrangedPage.elements.map((el) => ({
+        id: el.id,
+        type: el.type,
+        slot: el.slot,
+        zIndex: el.zIndex,
+        order: el.order,
+        visible: el.visible,
+        locked: el.locked,
+        opacity: el.opacity,
+        transform: el.transform,
+        style: el.style,
+        data: el.data,
+        interaction: el.interaction,
+      }));
+
+      await batchUpdateElements(pageId, elementsToSave);
+
+      // Refresh page from backend to ensure consistent state
+      const refreshedPage = await getAdminPage(pageId);
+      setPage(refreshedPage);
+      if (refreshedPage.elements?.length > 0) {
+        setSelectedElementId(refreshedPage.elements[0].id);
+      }
+
+      setToast(`Đã áp dụng bố cục "${templateDef.name}" thành công!`);
+      setTimeout(() => setToast(null), 3000);
+    } catch (err: any) {
+      alert(err?.message || 'Lỗi áp dụng bố cục mới');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Add new element to page
   const handleAddElement = async (type: PageElementType) => {
@@ -193,7 +276,7 @@ export default function VisualPageEditorPage() {
 
     try {
       const created = await createAdminElement(newElementPayload);
-      setPage((prev) => (prev ? { ...prev, elements: [...prev.elements, created] } : prev));
+      setPage((prev) => (prev ? { ...prev, isCustomized: true, elements: [...prev.elements, created] } : prev));
       setSelectedElementId(created.id);
     } catch (err: any) {
       alert(err?.message || 'Lỗi thêm phần tử mới');
@@ -205,7 +288,7 @@ export default function VisualPageEditorPage() {
     if (isViewer || !selectedElementId) return;
     try {
       const dup = await duplicateAdminElement(selectedElementId, 0.03, 0.03);
-      setPage((prev) => (prev ? { ...prev, elements: [...prev.elements, dup] } : prev));
+      setPage((prev) => (prev ? { ...prev, isCustomized: true, elements: [...prev.elements, dup] } : prev));
       setSelectedElementId(dup.id);
       setToast('Đã nhân bản phần tử!');
       setTimeout(() => setToast(null), 2500);
@@ -223,7 +306,7 @@ export default function VisualPageEditorPage() {
       setPage((prev) => {
         if (!prev) return prev;
         const remaining = prev.elements.filter((el) => el.id !== elementId);
-        return { ...prev, elements: remaining };
+        return { ...prev, isCustomized: true, elements: remaining };
       });
       setSelectedElementId(null);
     } catch (err: any) {
@@ -237,6 +320,19 @@ export default function VisualPageEditorPage() {
     setSaving(true);
     setToast(null);
     try {
+      // 1. Save page level metadata if customized
+      await updateAdminPage(
+        pageId,
+        {
+          isCustomized: page.isCustomized ?? true,
+          layoutTemplateId: page.layoutTemplateId || undefined,
+          sourceTemplateId: page.sourceTemplateId || undefined,
+          layoutMode: page.layoutMode || undefined,
+        },
+        true
+      );
+
+      // 2. Batch update all elements
       const elementsToSave = (page.elements || []).map((el) => ({
         id: el.id,
         zIndex: el.zIndex,
@@ -291,48 +387,73 @@ export default function VisualPageEditorPage() {
             <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-rosewood-950 text-champagne-300 border border-rosewood-800/40">
               Order #{page.order} • {page.side?.toUpperCase()}
             </span>
+
+            {/* Layout Status Badge */}
+            <span
+              className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
+                page.isCustomized
+                  ? 'bg-amber-950/70 text-amber-300 border-amber-500/40'
+                  : 'bg-emerald-950/70 text-emerald-300 border-emerald-500/40'
+              }`}
+            >
+              {page.isCustomized ? 'Đã chỉnh tự do (Customized)' : `Template: ${page.layoutTemplateId || page.layout}`}
+            </span>
           </div>
         </div>
 
-        {/* Center Quick Action Bar (Add Elements) */}
+        {/* Center Quick Action Bar (Add Elements + Layout Preset Picker) */}
         {!isViewer && (
-          <div className="flex items-center gap-1.5 bg-[#20111A] p-1 rounded-xl border border-rosewood-900/40 text-xs">
+          <div className="flex items-center gap-2">
+            {/* Prompt 16: Layout Picker Button */}
             <button
               type="button"
-              onClick={() => handleAddElement('TEXT')}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors"
-              title="Thêm khối chữ Text"
+              onClick={() => setShowLayoutPicker(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-rosewood-900/80 to-[#2A1220] hover:border-champagne-400 text-champagne-300 text-xs font-medium border border-rosewood-700/60 shadow-md transition-all active:scale-95"
+              title="Mở kho Layout Templates để đổi bố cục trang"
             >
-              <Type className="w-3.5 h-3.5 text-champagne-300" />
-              <span>Text</span>
+              <LayoutGrid className="w-3.5 h-3.5 text-champagne-400" />
+              <span>Đổi Bố Cục (Layout)</span>
             </button>
-            <button
-              type="button"
-              onClick={() => handleAddElement('IMAGE')}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors"
-              title="Thêm ảnh Polaroid"
-            >
-              <ImageIcon className="w-3.5 h-3.5 text-pink-400" />
-              <span>Ảnh</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleAddElement('VIDEO')}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors"
-              title="Thêm video clip"
-            >
-              <Video className="w-3.5 h-3.5 text-amber-400" />
-              <span>Video</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleAddElement('SHAPE')}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors"
-              title="Thêm đường kẻ Shape"
-            >
-              <Square className="w-3.5 h-3.5 text-rosewood-400" />
-              <span>Shape</span>
-            </button>
+
+            {/* Add Elements Group */}
+            <div className="flex items-center gap-1 bg-[#20111A] p-1 rounded-xl border border-rosewood-900/40 text-xs">
+              <button
+                type="button"
+                onClick={() => handleAddElement('TEXT')}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors"
+                title="Thêm khối chữ Text"
+              >
+                <Type className="w-3.5 h-3.5 text-champagne-300" />
+                <span>Text</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAddElement('IMAGE')}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors"
+                title="Thêm ảnh Polaroid"
+              >
+                <ImageIcon className="w-3.5 h-3.5 text-pink-400" />
+                <span>Ảnh</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAddElement('VIDEO')}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors"
+                title="Thêm video clip"
+              >
+                <Video className="w-3.5 h-3.5 text-amber-400" />
+                <span>Video</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAddElement('SHAPE')}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors"
+                title="Thêm đường kẻ Shape"
+              >
+                <Square className="w-3.5 h-3.5 text-rosewood-400" />
+                <span>Shape</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -359,9 +480,9 @@ export default function VisualPageEditorPage() {
         </div>
       </div>
 
-      {/* 3-Column Visual Layout (Prompt 15 Specification) */}
+      {/* 3-Column Visual Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* LEFT COLUMN: Pages / Layers (width: 270px) */}
+        {/* LEFT COLUMN: Pages / Layers (width: 260px) */}
         <aside className="w-64 bg-[#140B10] border-r border-rosewood-900/40 flex flex-col justify-between shrink-0 overflow-hidden">
           {/* Section 1: Layers Stacking Order */}
           <div className="flex-1 flex flex-col overflow-hidden">
@@ -812,6 +933,15 @@ export default function VisualPageEditorPage() {
           )}
         </aside>
       </div>
+
+      {/* Prompt 16: Layout Preset Picker Modal */}
+      <LayoutPresetPicker
+        currentTemplateId={page.layoutTemplateId || page.layout}
+        hasCustomizations={Boolean(page.isCustomized)}
+        isOpen={showLayoutPicker}
+        onClose={() => setShowLayoutPicker(false)}
+        onSelectLayout={handleApplyLayoutTemplate}
+      />
     </div>
   );
 }

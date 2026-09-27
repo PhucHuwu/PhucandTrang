@@ -46,23 +46,102 @@ function normalizeMedia(input?: PageMediaItem | string): PageMediaItem | undefin
 }
 
 /**
+ * Extracts reusable content (media items, title, quote, textLines, handwriting)
+ * from existing Page and its elements so they are completely preserved when applying a new layout template.
+ */
+export function extractContentFromPage(page: Page): SlotData {
+  const mediaList: PageMediaItem[] = [];
+  let title = page.title || '';
+  let chapter = page.chapter || '';
+  let quote = page.quote || '';
+  let handwriting = page.handwriting || '';
+  const textLines: string[] = page.textLines ? [...page.textLines] : [];
+
+  // Inspect existing elements
+  const sortedElements = [...(page.elements || [])].sort((a, b) => a.zIndex - b.zIndex);
+
+  for (const el of sortedElements) {
+    const d = el.data as any;
+    if (!d) continue;
+
+    if (el.type === 'IMAGE' && d.src) {
+      mediaList.push({
+        src: d.src,
+        caption: d.caption,
+        aspectRatio: d.aspectRatio,
+        mediaId: d.mediaId,
+        isVideo: false,
+      });
+    } else if (el.type === 'VIDEO' && d.src) {
+      mediaList.push({
+        src: d.src,
+        thumbnailUrl: d.thumbnailUrl,
+        caption: d.caption,
+        aspectRatio: d.aspectRatio,
+        mediaId: d.mediaId,
+        posterMediaId: d.posterMediaId,
+        isVideo: true,
+      });
+    } else if (el.type === 'TEXT') {
+      if (el.slot === 'title' && !title) title = d.text || '';
+      else if (el.slot === 'subtitle' && !chapter) chapter = d.text || '';
+      else if (el.slot === 'quote' && !quote) quote = d.text || '';
+      else if (el.slot === 'handwriting' && !handwriting) handwriting = d.text || '';
+      else if (d.variant === 'caption') {
+        // If there is a standalone caption element, attach it to the preceding media item if uncaptioned
+        if (mediaList.length > 0 && !mediaList[mediaList.length - 1].caption) {
+          mediaList[mediaList.length - 1].caption = d.text;
+        }
+      } else if (d.variant === 'body' && d.textLines && d.textLines.length > 0) {
+        if (textLines.length === 0) {
+          textLines.push(...d.textLines);
+        }
+      }
+    }
+  }
+
+  return {
+    title,
+    chapter,
+    subtitle: chapter,
+    quote,
+    handwriting,
+    textLines,
+    media: mediaList,
+  };
+}
+
+/**
  * Core API Function: Applies a LayoutTemplate to a Page object.
- * Generic template processor: can accept either templateId or a LayoutPresetDefinition.
+ * Generic template processor: can accept either templateId or a LayoutPresetDefinition loaded dynamically from backend.
  *
  * Rules:
  * - Each PageElement has top-level `zIndex` as single source of truth.
  * - Captions become independent `TEXT` elements with `variant: 'caption'`.
  * - Video elements separate `src` (video) from `thumbnailUrl` (poster).
+ * - Preserves existing text & media content when applying new layout.
  */
 export function applyLayoutTemplate(
   page: Partial<Page> & { pageNumber: number; side: 'left' | 'right' },
   templateIdOrDef: LayoutTemplate | LayoutPresetDefinition,
   slotData?: SlotData
 ): Page {
-  const preset: LayoutPresetDefinition =
-    typeof templateIdOrDef === 'string'
-      ? LAYOUT_PRESETS[templateIdOrDef] || LAYOUT_PRESETS['auto']
-      : templateIdOrDef;
+  // If templateIdOrDef has slots / prototypes (from backend /layout-templates), normalize it
+  let preset: LayoutPresetDefinition;
+
+  if (typeof templateIdOrDef === 'string') {
+    preset = LAYOUT_PRESETS[templateIdOrDef] || LAYOUT_PRESETS['auto'];
+  } else {
+    // If passed from backend LayoutTemplate entity
+    const anyDef = templateIdOrDef as any;
+    preset = {
+      id: anyDef.id,
+      name: anyDef.name,
+      description: anyDef.description || '',
+      slots: anyDef.slots || [],
+      elementPrototypes: anyDef.elementPrototypes || anyDef.prototypes || [],
+    };
+  }
 
   const elements: PageElement[] = [];
   const pageNum = page.pageNumber;
@@ -365,8 +444,9 @@ export function applyLayoutTemplate(
     side,
     layout: preset.id,
     sourceTemplateId: preset.id,
-    layoutMode: page.layoutMode || 'PRESET',
-    isCustomized: page.isCustomized || false,
+    layoutTemplateId: preset.id,
+    layoutMode: 'PRESET',
+    isCustomized: false,
     background: page.background || { type: 'color', color: '#F9F5EC' },
     elements,
   };
