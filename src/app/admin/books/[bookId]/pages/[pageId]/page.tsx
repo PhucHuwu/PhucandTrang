@@ -19,6 +19,7 @@ import { Page, PageElement, PageElementType, Book } from '@/types/book';
 import LayoutPresetPicker from '@/components/admin/LayoutPresetPicker';
 import SaveAsLayoutModal from '@/components/admin/SaveAsLayoutModal';
 import BackgroundEditor from '@/components/admin/BackgroundEditor';
+import AdvancedTextEditor from '@/components/admin/AdvancedTextEditor';
 import {
   applyLayoutTemplate,
   extractContentFromPage,
@@ -875,69 +876,24 @@ export default function VisualPageEditorPage() {
 
                     {/* Data Properties based on element type */}
                     <div className="space-y-3 pt-3 border-t border-rosewood-900/40">
-                      <h4 className="text-xs font-semibold text-champagne-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                        <Palette className="w-3.5 h-3.5 text-rosewood-400" />
-                        <span>Dữ Liệu Phần Tử ({selectedElement.type})</span>
-                      </h4>
-
-                      {/* TEXT Element */}
+                      {/* TEXT Element: Advanced Text Editor (Prompt 19) */}
                       {selectedElement.type === 'TEXT' && (
-                        <div className="space-y-3 text-xs">
-                          <div>
-                            <label className="block text-[11px] text-stone-400 mb-1">Văn bản (hỗ trợ biến {'{{...}}'})</label>
-                            <textarea
-                              rows={3}
-                              disabled={isViewer}
-                              value={(selectedElement.data as any).text || ''}
-                              onChange={(e) =>
-                                updateSelectedElement((el) => ({
-                                  ...el,
-                                  data: { ...el.data, text: e.target.value },
-                                }))
-                              }
-                              className="w-full px-3 py-2 bg-[#20111A] border border-rosewood-900/60 rounded-xl text-white font-serif disabled:opacity-50"
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2.5">
-                            <div>
-                              <label className="block text-[11px] text-stone-400 mb-1">Cỡ chữ fontSize</label>
-                              <input
-                                type="number"
-                                disabled={isViewer}
-                                value={selectedElement.style?.fontSize || 24}
-                                onChange={(e) =>
-                                  updateSelectedElement((el) => ({
-                                    ...el,
-                                    style: { ...el.style, fontSize: parseInt(e.target.value, 10) || 24 },
-                                  }))
-                                }
-                                className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-[11px] text-stone-400 mb-1">Màu chữ</label>
-                              <input
-                                type="text"
-                                disabled={isViewer}
-                                value={selectedElement.style?.color || '#292522'}
-                                onChange={(e) =>
-                                  updateSelectedElement((el) => ({
-                                    ...el,
-                                    style: { ...el.style, color: e.target.value },
-                                  }))
-                                }
-                                className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono"
-                              />
-                            </div>
-                          </div>
-                        </div>
+                        <AdvancedTextEditor
+                          element={selectedElement as any}
+                          book={book}
+                          page={page}
+                          disabled={isViewer}
+                          onChange={(updater) => updateSelectedElement(updater)}
+                        />
                       )}
 
                       {/* IMAGE Element */}
                       {selectedElement.type === 'IMAGE' && (
                         <div className="space-y-3 text-xs">
+                          <h4 className="text-xs font-semibold text-champagne-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                            <Palette className="w-3.5 h-3.5 text-rosewood-400" />
+                            <span>Dữ Liệu Hình Ảnh (IMAGE)</span>
+                          </h4>
                           <div>
                             <label className="block text-[11px] text-stone-400 mb-1">Ảnh URL</label>
                             <input
@@ -959,6 +915,10 @@ export default function VisualPageEditorPage() {
                       {/* VIDEO Element */}
                       {selectedElement.type === 'VIDEO' && (
                         <div className="space-y-3 text-xs">
+                          <h4 className="text-xs font-semibold text-champagne-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                            <Palette className="w-3.5 h-3.5 text-rosewood-400" />
+                            <span>Dữ Liệu Video (VIDEO)</span>
+                          </h4>
                           <div>
                             <label className="block text-[11px] text-stone-400 mb-1">Video MP4 URL</label>
                             <input

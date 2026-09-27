@@ -355,7 +355,13 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
      - **`headerFade`**: Dải chuyển mờ đầu trang bảo đảm chữ dễ đọc, tùy chỉnh bật/tắt, độ cao `height` và độ đậm `startOpacity`.
      - **`gutterFade`**: Bóng đổ gáy trang vật lý, tùy chỉnh bật/tắt, bề rộng `width` và độ đậm `opacity`.
    - Độ trung thực hiển thị: Konva Canvas Preview và Public PageTextureGenerator dùng chung 100% logic toán học `computeImageFit` và render effects, cam kết **không duplicate code render**.
-13. **Giai đoạn 13 (Prompt 19+ Nâng cao Editor & Undo/Redo/Snapping)**:
+13. **Giai đoạn 13 (Đã hoàn thành - Prompt 19 Advanced Text Editor)**:
+   - Hoàn thiện trình chỉnh sửa phần tử TEXT chuyên sâu (`AdvancedTextEditor.tsx`):
+     - Thuộc tính hỗ trợ: `text`, `fontFamily` (Cormorant Garamond, Dancing Script, SVN-Housttely Signature, Montserrat, Playfair Display), `fontSize`, `fontWeight` (Normal / Bold), `fontStyle` (Normal / Italic), `color`, căn lề `textAlign` (Left / Center / Right), dãn dòng `lineHeight`, khoảng cách chữ `letterSpacing`, độ mờ `opacity`, hiệu ứng đổ bóng `shadow` (blur, offsetX, offsetY, color), góc xoay `rotation`.
+     - Phân giải biến động thông minh: Hỗ trợ các thẻ biến `{{daysTogether}}`, `{{daysTogether | number}}`, `{{anniversaryDate}}`, `{{couple.he}}`, `{{couple.she}}`, `{{currentDate}}`.
+     - Bộ gõ hiển thị hộp thoại xem trước giá trị thực tế sau phân giải (Resolved Preview) theo thời gian thực nhưng trong cơ sở dữ liệu vẫn bảo toàn chuỗi template gốc.
+     - Đồng bộ quy tắc xuống dòng (Text Wrapping): Cả Canvas Editor (`KonvaText wrap="word"`) và Public Canvas Generator (`PageTextureGenerator wrapText()`) cùng tính toán và bẻ dòng giống nhau.
+14. **Giai đoạn 14 (Prompt 20+ Nâng cao Editor & Undo/Redo/Snapping)**:
    - Tích hợp lịch sử Undo / Redo cho canvas editor.
    - Thêm đường gióng từ tính (Smart Snapping / Alignment Guides).
    - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.

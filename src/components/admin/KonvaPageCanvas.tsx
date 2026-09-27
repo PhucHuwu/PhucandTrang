@@ -309,8 +309,13 @@ function KonvaElementItem({
           fontStyle={fontStyle}
           fill={s.color || '#292522'}
           align={(s.textAlign as any) || 'left'}
-          lineHeight={1.3}
+          lineHeight={s.lineHeight ? s.lineHeight / fontSize : 1.35}
           letterSpacing={s.letterSpacing || 0}
+          wrap="word"
+          shadowColor={s.shadow?.color}
+          shadowBlur={s.shadow?.blur}
+          shadowOffset={s.shadow ? { x: s.shadow.offsetX, y: s.shadow.offsetY } : undefined}
+          shadowOpacity={s.shadow ? 1 : 0}
         />
       )}
 
