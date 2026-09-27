@@ -25,40 +25,34 @@ export default function AdminSidebar() {
       match: pathname === '/admin',
     },
     {
-      label: 'Pages (Các trang)',
+      label: 'Pages',
       href: '/admin/pages',
       icon: FileText,
       match: pathname.startsWith('/admin/pages') || (pathname.includes('/books/') && pathname.includes('/pages')),
     },
     {
-      label: 'Media (Thư viện ảnh)',
+      label: 'Media',
       href: '/admin/media',
       icon: ImageIcon,
       match: pathname.startsWith('/admin/media'),
     },
     {
-      label: 'Audio (Kho nhạc)',
+      label: 'Audio',
       href: '/admin/audio',
       icon: Music,
       match: pathname.startsWith('/admin/audio'),
     },
     {
-      label: 'Layouts (Bố cục)',
+      label: 'Layouts',
       href: '/admin/layouts',
       icon: LayoutGrid,
       match: pathname.startsWith('/admin/layouts') || pathname.startsWith('/admin/layout-templates'),
     },
     {
-      label: 'Book Settings (Cài đặt)',
+      label: 'Book Settings',
       href: '/admin/settings',
       icon: Settings,
       match: pathname.startsWith('/admin/settings') || (pathname.includes('/books/') && pathname.includes('/settings')),
-    },
-    {
-      label: 'Books (Tất cả sách)',
-      href: '/admin/books',
-      icon: BookOpen,
-      match: pathname === '/admin/books',
     },
   ];
 

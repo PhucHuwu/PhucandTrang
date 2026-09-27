@@ -37,10 +37,10 @@ export default function AdminHeader() {
           href="/"
           target="_blank"
           className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#23141E] hover:bg-[#301B29] text-parchment-200 hover:text-champagne-300 text-xs font-medium border border-rosewood-900/40 transition-colors shadow-sm"
-          title="Mở xem website thực tế trên tab mới"
+          title="Preview / Mở xem Public Site trên tab mới"
         >
           <ExternalLink className="w-3.5 h-3.5 text-rosewood-400" />
-          <span className="hidden sm:inline">Xem trang web</span>
+          <span className="hidden sm:inline">Preview / Public Site</span>
         </Link>
 
         {/* Current User Info */}
