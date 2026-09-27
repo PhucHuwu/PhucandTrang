@@ -18,6 +18,7 @@ import { useAdminAuth } from '@/context/AdminAuthContext';
 import { Page, PageElement, PageElementType, Book } from '@/types/book';
 import LayoutPresetPicker from '@/components/admin/LayoutPresetPicker';
 import SaveAsLayoutModal from '@/components/admin/SaveAsLayoutModal';
+import BackgroundEditor from '@/components/admin/BackgroundEditor';
 import {
   applyLayoutTemplate,
   extractContentFromPage,
@@ -81,6 +82,9 @@ export default function VisualPageEditorPage() {
   const [showLayoutPicker, setShowLayoutPicker] = useState(false);
   // Save As Layout Modal state (Prompt 17)
   const [showSaveAsLayout, setShowSaveAsLayout] = useState(false);
+
+  // Active Inspector Tab: 'element' | 'background' (Prompt 18)
+  const [inspectorTab, setInspectorTab] = useState<'element' | 'background'>('element');
 
   // Load initial page, all book pages, and book settings
   useEffect(() => {
@@ -655,297 +659,346 @@ export default function VisualPageEditorPage() {
 
         {/* RIGHT COLUMN: Properties Panel (width: 320px) */}
         <aside className="w-80 bg-[#140B10] border-l border-rosewood-900/40 flex flex-col justify-between shrink-0 overflow-y-auto">
-          {selectedElement ? (
-            <div className="p-4 space-y-5">
-              {/* Header */}
-              <div className="flex items-center justify-between border-b border-rosewood-900/40 pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-rosewood-900/60 text-champagne-300 border border-rosewood-700/50">
-                    {selectedElement.type}
-                  </span>
-                  <span className="text-[11px] font-mono text-stone-400">{selectedElement.id.slice(0, 10)}</span>
-                </div>
+          <div className="flex flex-col h-full">
+            {/* Inspector Top Switcher (Tabs: Element vs Background) */}
+            <div className="p-2.5 bg-[#1C0F16] border-b border-rosewood-900/40 flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setInspectorTab('element')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  inspectorTab === 'element'
+                    ? 'bg-rosewood-600 text-white font-semibold shadow'
+                    : 'text-stone-400 hover:text-white hover:bg-[#25151F]'
+                }`}
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>Phần tử</span>
+              </button>
 
-                {!isViewer && (
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={handleDuplicateSelected}
-                      className="p-1.5 rounded-lg bg-[#25151F] hover:bg-[#331C2A] text-stone-300 transition-colors"
-                      title="Nhân bản phần tử"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteElement(selectedElement.id)}
-                      className="p-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/60 text-red-400 transition-colors"
-                      title="Xóa phần tử"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-              </div>
+              <button
+                type="button"
+                onClick={() => setInspectorTab('background')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  inspectorTab === 'background'
+                    ? 'bg-rosewood-600 text-white font-semibold shadow'
+                    : 'text-stone-400 hover:text-white hover:bg-[#25151F]'
+                }`}
+              >
+                <Palette className="w-3.5 h-3.5" />
+                <span>Nền trang (BG)</span>
+              </button>
+            </div>
 
-              {/* Transform Property Section: x, y, width, height, rotation, opacity, zIndex */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-champagne-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5 text-rosewood-400" />
-                  <span>Transform (Tọa độ Normalized)</span>
-                </h4>
-
-                <div className="grid grid-cols-2 gap-2.5 text-xs">
-                  <div>
-                    <label className="block text-[11px] text-stone-400 mb-1">X (0.0 - 1.0)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      disabled={isViewer || Boolean(selectedElement.locked)}
-                      value={selectedElement.transform.x}
-                      onChange={(e) =>
-                        updateSelectedElement((el) => ({
-                          ...el,
-                          transform: { ...el.transform, x: parseFloat(e.target.value) || 0 },
-                        }))
-                      }
-                      className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-stone-400 mb-1">Y (0.0 - 1.0)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      disabled={isViewer || Boolean(selectedElement.locked)}
-                      value={selectedElement.transform.y}
-                      onChange={(e) =>
-                        updateSelectedElement((el) => ({
-                          ...el,
-                          transform: { ...el.transform, y: parseFloat(e.target.value) || 0 },
-                        }))
-                      }
-                      className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-stone-400 mb-1">Width (0.0 - 1.0)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      disabled={isViewer || Boolean(selectedElement.locked)}
-                      value={selectedElement.transform.width}
-                      onChange={(e) =>
-                        updateSelectedElement((el) => ({
-                          ...el,
-                          transform: { ...el.transform, width: parseFloat(e.target.value) || 0.1 },
-                        }))
-                      }
-                      className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-stone-400 mb-1">Height (0.0 - 1.0)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      disabled={isViewer || Boolean(selectedElement.locked)}
-                      value={selectedElement.transform.height}
-                      onChange={(e) =>
-                        updateSelectedElement((el) => ({
-                          ...el,
-                          transform: { ...el.transform, height: parseFloat(e.target.value) || 0.1 },
-                        }))
-                      }
-                      className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-stone-400 mb-1">Rotation (°)</label>
-                    <input
-                      type="number"
-                      step="1"
-                      disabled={isViewer || Boolean(selectedElement.locked)}
-                      value={selectedElement.transform.rotation || 0}
-                      onChange={(e) =>
-                        updateSelectedElement((el) => ({
-                          ...el,
-                          transform: { ...el.transform, rotation: parseFloat(e.target.value) || 0 },
-                        }))
-                      }
-                      className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-stone-400 mb-1">Opacity (0 - 1)</label>
-                    <input
-                      type="number"
-                      step="0.05"
-                      min="0"
-                      max="1"
-                      disabled={isViewer}
-                      value={selectedElement.opacity ?? 1}
-                      onChange={(e) =>
-                        updateSelectedElement((el) => ({
-                          ...el,
-                          opacity: parseFloat(e.target.value) || 1,
-                        }))
-                      }
-                      className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-stone-400 mb-1">zIndex</label>
-                    <input
-                      type="number"
-                      disabled={isViewer}
-                      value={selectedElement.zIndex ?? 1}
-                      onChange={(e) =>
-                        updateSelectedElement((el) => ({
-                          ...el,
-                          zIndex: parseInt(e.target.value, 10) || 1,
-                        }))
-                      }
-                      className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-stone-400 mb-1">Khóa (Locked)</label>
-                    <div className="pt-2">
-                      <input
-                        type="checkbox"
-                        disabled={isViewer}
-                        checked={Boolean(selectedElement.locked)}
-                        onChange={(e) =>
-                          updateSelectedElement((el) => ({
-                            ...el,
-                            locked: e.target.checked,
-                          }))
-                        }
-                        className="w-4 h-4 rounded text-rosewood-600 bg-[#20111A] border-rosewood-800"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Data Properties based on element type */}
-              <div className="space-y-3 pt-3 border-t border-rosewood-900/40">
-                <h4 className="text-xs font-semibold text-champagne-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                  <Palette className="w-3.5 h-3.5 text-rosewood-400" />
-                  <span>Dữ Liệu Phần Tử ({selectedElement.type})</span>
-                </h4>
-
-                {/* TEXT Element */}
-                {selectedElement.type === 'TEXT' && (
-                  <div className="space-y-3 text-xs">
-                    <div>
-                      <label className="block text-[11px] text-stone-400 mb-1">Văn bản (hỗ trợ biến {'{{...}}'})</label>
-                      <textarea
-                        rows={3}
-                        disabled={isViewer}
-                        value={(selectedElement.data as any).text || ''}
-                        onChange={(e) =>
-                          updateSelectedElement((el) => ({
-                            ...el,
-                            data: { ...el.data, text: e.target.value },
-                          }))
-                        }
-                        className="w-full px-3 py-2 bg-[#20111A] border border-rosewood-900/60 rounded-xl text-white font-serif disabled:opacity-50"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <div>
-                        <label className="block text-[11px] text-stone-400 mb-1">Cỡ chữ fontSize</label>
-                        <input
-                          type="number"
-                          disabled={isViewer}
-                          value={selectedElement.style?.fontSize || 24}
-                          onChange={(e) =>
-                            updateSelectedElement((el) => ({
-                              ...el,
-                              style: { ...el.style, fontSize: parseInt(e.target.value, 10) || 24 },
-                            }))
-                          }
-                          className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono"
-                        />
+            {/* Tab 1: Element Properties */}
+            {inspectorTab === 'element' && (
+              <div className="flex-1 overflow-y-auto">
+                {selectedElement ? (
+                  <div className="p-4 space-y-5">
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-rosewood-900/40 pb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-rosewood-900/60 text-champagne-300 border border-rosewood-700/50">
+                          {selectedElement.type}
+                        </span>
+                        <span className="text-[11px] font-mono text-stone-400">{selectedElement.id.slice(0, 10)}</span>
                       </div>
 
-                      <div>
-                        <label className="block text-[11px] text-stone-400 mb-1">Màu chữ</label>
-                        <input
-                          type="text"
-                          disabled={isViewer}
-                          value={selectedElement.style?.color || '#292522'}
-                          onChange={(e) =>
-                            updateSelectedElement((el) => ({
-                              ...el,
-                              style: { ...el.style, color: e.target.value },
-                            }))
-                          }
-                          className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono"
-                        />
+                      {!isViewer && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={handleDuplicateSelected}
+                            className="p-1.5 rounded-lg bg-[#25151F] hover:bg-[#331C2A] text-stone-300 transition-colors"
+                            title="Nhân bản phần tử"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteElement(selectedElement.id)}
+                            className="p-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/60 text-red-400 transition-colors"
+                            title="Xóa phần tử"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Transform Property Section: x, y, width, height, rotation, opacity, zIndex */}
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-semibold text-champagne-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                        <Sliders className="w-3.5 h-3.5 text-rosewood-400" />
+                        <span>Transform (Tọa độ Normalized)</span>
+                      </h4>
+
+                      <div className="grid grid-cols-2 gap-2.5 text-xs">
+                        <div>
+                          <label className="block text-[11px] text-stone-400 mb-1">X (0.0 - 1.0)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            disabled={isViewer || Boolean(selectedElement.locked)}
+                            value={selectedElement.transform.x}
+                            onChange={(e) =>
+                              updateSelectedElement((el) => ({
+                                ...el,
+                                transform: { ...el.transform, x: parseFloat(e.target.value) || 0 },
+                              }))
+                            }
+                            className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] text-stone-400 mb-1">Y (0.0 - 1.0)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            disabled={isViewer || Boolean(selectedElement.locked)}
+                            value={selectedElement.transform.y}
+                            onChange={(e) =>
+                              updateSelectedElement((el) => ({
+                                ...el,
+                                transform: { ...el.transform, y: parseFloat(e.target.value) || 0 },
+                              }))
+                            }
+                            className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] text-stone-400 mb-1">Width (0.0 - 1.0)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            disabled={isViewer || Boolean(selectedElement.locked)}
+                            value={selectedElement.transform.width}
+                            onChange={(e) =>
+                              updateSelectedElement((el) => ({
+                                ...el,
+                                transform: { ...el.transform, width: parseFloat(e.target.value) || 0.1 },
+                              }))
+                            }
+                            className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] text-stone-400 mb-1">Height (0.0 - 1.0)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            disabled={isViewer || Boolean(selectedElement.locked)}
+                            value={selectedElement.transform.height}
+                            onChange={(e) =>
+                              updateSelectedElement((el) => ({
+                                ...el,
+                                transform: { ...el.transform, height: parseFloat(e.target.value) || 0.1 },
+                              }))
+                            }
+                            className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] text-stone-400 mb-1">Rotation (°)</label>
+                          <input
+                            type="number"
+                            step="1"
+                            disabled={isViewer || Boolean(selectedElement.locked)}
+                            value={selectedElement.transform.rotation || 0}
+                            onChange={(e) =>
+                              updateSelectedElement((el) => ({
+                                ...el,
+                                transform: { ...el.transform, rotation: parseFloat(e.target.value) || 0 },
+                              }))
+                            }
+                            className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] text-stone-400 mb-1">Opacity (0 - 1)</label>
+                          <input
+                            type="number"
+                            step="0.05"
+                            min="0"
+                            max="1"
+                            disabled={isViewer}
+                            value={selectedElement.opacity ?? 1}
+                            onChange={(e) =>
+                              updateSelectedElement((el) => ({
+                                ...el,
+                                opacity: parseFloat(e.target.value) || 1,
+                              }))
+                            }
+                            className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] text-stone-400 mb-1">zIndex</label>
+                          <input
+                            type="number"
+                            disabled={isViewer}
+                            value={selectedElement.zIndex ?? 1}
+                            onChange={(e) =>
+                              updateSelectedElement((el) => ({
+                                ...el,
+                                zIndex: parseInt(e.target.value, 10) || 1,
+                              }))
+                            }
+                            className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono disabled:opacity-50"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] text-stone-400 mb-1">Khóa (Locked)</label>
+                          <div className="pt-2">
+                            <input
+                              type="checkbox"
+                              disabled={isViewer}
+                              checked={Boolean(selectedElement.locked)}
+                              onChange={(e) =>
+                                updateSelectedElement((el) => ({
+                                  ...el,
+                                  locked: e.target.checked,
+                                }))
+                              }
+                              className="w-4 h-4 rounded text-rosewood-600 bg-[#20111A] border-rosewood-800"
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
 
-                {/* IMAGE Element */}
-                {selectedElement.type === 'IMAGE' && (
-                  <div className="space-y-3 text-xs">
-                    <div>
-                      <label className="block text-[11px] text-stone-400 mb-1">Ảnh URL</label>
-                      <input
-                        type="text"
-                        disabled={isViewer}
-                        value={(selectedElement.data as any).src || ''}
-                        onChange={(e) =>
-                          updateSelectedElement((el) => ({
-                            ...el,
-                            data: { ...el.data, src: e.target.value },
-                          }))
-                        }
-                        className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono"
-                      />
+                    {/* Data Properties based on element type */}
+                    <div className="space-y-3 pt-3 border-t border-rosewood-900/40">
+                      <h4 className="text-xs font-semibold text-champagne-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                        <Palette className="w-3.5 h-3.5 text-rosewood-400" />
+                        <span>Dữ Liệu Phần Tử ({selectedElement.type})</span>
+                      </h4>
+
+                      {/* TEXT Element */}
+                      {selectedElement.type === 'TEXT' && (
+                        <div className="space-y-3 text-xs">
+                          <div>
+                            <label className="block text-[11px] text-stone-400 mb-1">Văn bản (hỗ trợ biến {'{{...}}'})</label>
+                            <textarea
+                              rows={3}
+                              disabled={isViewer}
+                              value={(selectedElement.data as any).text || ''}
+                              onChange={(e) =>
+                                updateSelectedElement((el) => ({
+                                  ...el,
+                                  data: { ...el.data, text: e.target.value },
+                                }))
+                              }
+                              className="w-full px-3 py-2 bg-[#20111A] border border-rosewood-900/60 rounded-xl text-white font-serif disabled:opacity-50"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <div>
+                              <label className="block text-[11px] text-stone-400 mb-1">Cỡ chữ fontSize</label>
+                              <input
+                                type="number"
+                                disabled={isViewer}
+                                value={selectedElement.style?.fontSize || 24}
+                                onChange={(e) =>
+                                  updateSelectedElement((el) => ({
+                                    ...el,
+                                    style: { ...el.style, fontSize: parseInt(e.target.value, 10) || 24 },
+                                  }))
+                                }
+                                className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] text-stone-400 mb-1">Màu chữ</label>
+                              <input
+                                type="text"
+                                disabled={isViewer}
+                                value={selectedElement.style?.color || '#292522'}
+                                onChange={(e) =>
+                                  updateSelectedElement((el) => ({
+                                    ...el,
+                                    style: { ...el.style, color: e.target.value },
+                                  }))
+                                }
+                                className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* IMAGE Element */}
+                      {selectedElement.type === 'IMAGE' && (
+                        <div className="space-y-3 text-xs">
+                          <div>
+                            <label className="block text-[11px] text-stone-400 mb-1">Ảnh URL</label>
+                            <input
+                              type="text"
+                              disabled={isViewer}
+                              value={(selectedElement.data as any).src || ''}
+                              onChange={(e) =>
+                                updateSelectedElement((el) => ({
+                                  ...el,
+                                  data: { ...el.data, src: e.target.value },
+                                }))
+                              }
+                              className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* VIDEO Element */}
+                      {selectedElement.type === 'VIDEO' && (
+                        <div className="space-y-3 text-xs">
+                          <div>
+                            <label className="block text-[11px] text-stone-400 mb-1">Video MP4 URL</label>
+                            <input
+                              type="text"
+                              disabled={isViewer}
+                              value={(selectedElement.data as any).src || ''}
+                              onChange={(e) =>
+                                updateSelectedElement((el) => ({
+                                  ...el,
+                                  data: { ...el.data, src: e.target.value },
+                                }))
+                              }
+                              className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
-
-                {/* VIDEO Element */}
-                {selectedElement.type === 'VIDEO' && (
-                  <div className="space-y-3 text-xs">
-                    <div>
-                      <label className="block text-[11px] text-stone-400 mb-1">Video MP4 URL</label>
-                      <input
-                        type="text"
-                        disabled={isViewer}
-                        value={(selectedElement.data as any).src || ''}
-                        onChange={(e) =>
-                          updateSelectedElement((el) => ({
-                            ...el,
-                            data: { ...el.data, src: e.target.value },
-                          }))
-                        }
-                        className="w-full px-2.5 py-1.5 bg-[#20111A] border border-rosewood-900/60 rounded-lg text-white font-mono"
-                      />
-                    </div>
+                ) : (
+                  <div className="p-8 text-center text-xs text-stone-500">
+                    Nhấp chọn một phần tử trên Canvas hoặc từ bảng Layers để chỉnh sửa thông số.
                   </div>
                 )}
               </div>
-            </div>
-          ) : (
-            <div className="p-8 text-center text-xs text-stone-500">
-              Nhấp chọn một phần tử trên Canvas hoặc từ bảng Layers để chỉnh sửa thông số.
-            </div>
-          )}
+            )}
+
+            {/* Tab 2: Background Editor (Prompt 18) */}
+            {inspectorTab === 'background' && (
+              <div className="flex-1 overflow-y-auto p-4">
+                <BackgroundEditor
+                  background={page.background}
+                  disabled={isViewer}
+                  onChange={(newBg) => {
+                    setPage((prev) => (prev ? { ...prev, isCustomized: true, background: newBg } : prev));
+                  }}
+                />
+              </div>
+            )}
+          </div>
         </aside>
       </div>
 

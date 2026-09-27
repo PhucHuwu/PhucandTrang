@@ -305,18 +305,18 @@ export type PageElement =
 // ==========================================
 
 export interface HeaderFadeConfig {
-  enabled: boolean;
-  color: string;       // e.g. '#F9F5EC'
-  height: number;      // normalized 0.0 to 1.0 (e.g. 0.35)
-  startOpacity: number;// e.g. 0.92
-  endOpacity: number;  // e.g. 0.0
+  enabled?: boolean;
+  color?: string;       // e.g. '#F9F5EC'
+  height?: number;      // normalized 0.0 to 1.0 (e.g. 0.35)
+  startOpacity?: number;// e.g. 0.92
+  endOpacity?: number;  // e.g. 0.0
 }
 
 export interface GutterFadeConfig {
-  enabled: boolean;
-  color: string;       // e.g. '#F9F5EC'
-  width: number;       // normalized 0.0 to 1.0 (e.g. 0.15)
-  opacity: number;     // e.g. 0.28
+  enabled?: boolean;
+  color?: string;       // e.g. '#F9F5EC'
+  width?: number;       // normalized 0.0 to 1.0 (e.g. 0.15)
+  opacity?: number;     // e.g. 0.28
 }
 
 export interface GradientStop {

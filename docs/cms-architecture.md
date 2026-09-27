@@ -345,7 +345,17 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
      - Hiển thị danh sách template phân loại rõ ràng "Hệ thống" vs "Tùy biến".
      - Hỗ trợ đổi tên, sửa mô tả, nhân bản (`duplicate`) và xóa custom template.
      - Tích hợp liền mạch với Layout Preset Picker trong Visual Editor.
-12. **Giai đoạn 12 (Prompt 18+ Nâng cao Editor & Undo/Redo/Snapping)**:
+12. **Giai đoạn 12 (Đã hoàn thành - Prompt 18 Background Editor)**:
+   - Tích hợp Background Editor chuyên sâu cho từng trang tại `/admin/books/[bookId]/pages/[pageId]`.
+   - Hỗ trợ đầy đủ 3 chế độ nền:
+     - **COLOR (Đơn sắc)**: Bảng chọn màu sắc trực quan kèm mã Hex.
+     - **IMAGE (Hình ảnh)**: Đường dẫn ảnh nền, `objectFit` (`cover` / `contain` / `fill`), thanh kéo điểm neo `focalPoint X/Y`, độ trong suốt `opacity` (0.0 đến 1.0).
+     - **GRADIENT**: Góc xoay gradient (`angle` 0° đến 360°), danh sách các điểm dừng chuyển màu (multiple color stops với `color` và `offset` 0%..100%), thêm/xóa stop linh hoạt.
+   - Quản lý hiệu ứng chuyển mờ (Effects):
+     - **`headerFade`**: Dải chuyển mờ đầu trang bảo đảm chữ dễ đọc, tùy chỉnh bật/tắt, độ cao `height` và độ đậm `startOpacity`.
+     - **`gutterFade`**: Bóng đổ gáy trang vật lý, tùy chỉnh bật/tắt, bề rộng `width` và độ đậm `opacity`.
+   - Độ trung thực hiển thị: Konva Canvas Preview và Public PageTextureGenerator dùng chung 100% logic toán học `computeImageFit` và render effects, cam kết **không duplicate code render**.
+13. **Giai đoạn 13 (Prompt 19+ Nâng cao Editor & Undo/Redo/Snapping)**:
    - Tích hợp lịch sử Undo / Redo cho canvas editor.
    - Thêm đường gióng từ tính (Smart Snapping / Alignment Guides).
    - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.

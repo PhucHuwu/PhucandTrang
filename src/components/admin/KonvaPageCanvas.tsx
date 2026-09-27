@@ -20,6 +20,7 @@ import {
   normalizedToCanvasTransform,
   canvasToNormalizedTransform,
 } from '@/utils/coordinateConversion';
+import { computeImageFit } from '@/utils/imageFitting';
 import { TextVariableResolver } from '@/utils/textVariableResolver';
 
 interface KonvaPageCanvasProps {
@@ -127,6 +128,21 @@ function KonvaElementItem({
   const captionText = d?.caption ? (varContext ? TextVariableResolver.resolve(d.caption, varContext) : d.caption) : '';
   const captionSpace = usePolaroid && captionText ? 36 : usePolaroid ? 20 : 0;
 
+  // Image fitting
+  const rawSrcW = imageObj?.naturalWidth || imageObj?.width || 400;
+  const rawSrcH = imageObj?.naturalHeight || imageObj?.height || 300;
+  const maxImgW = Math.max(10, t.width - padding * 2);
+  const maxImgH = Math.max(10, t.height - padding * 2 - captionSpace);
+
+  const imgFit = computeImageFit(
+    rawSrcW,
+    rawSrcH,
+    maxImgW,
+    maxImgH,
+    d?.objectFit || (usePolaroid ? 'contain' : 'cover'),
+    d?.focalPoint || { x: 0.5, y: 0.5 }
+  );
+
   return (
     <Group
       ref={groupRef}
@@ -220,21 +236,27 @@ function KonvaElementItem({
             />
           )}
 
-          {/* Actual photo content */}
+          {/* Actual photo content using shared computeImageFit */}
           {imageObj ? (
             <KonvaImage
               image={imageObj}
-              x={padding}
-              y={padding}
-              width={Math.max(10, t.width - padding * 2)}
-              height={Math.max(10, t.height - padding * 2 - captionSpace)}
+              x={padding + imgFit.dx}
+              y={padding + imgFit.dy}
+              width={imgFit.dw}
+              height={imgFit.dh}
+              crop={{
+                x: imgFit.sx,
+                y: imgFit.sy,
+                width: imgFit.sw,
+                height: imgFit.sh,
+              }}
             />
           ) : (
             <Rect
               x={padding}
               y={padding}
-              width={Math.max(10, t.width - padding * 2)}
-              height={Math.max(10, t.height - padding * 2 - captionSpace)}
+              width={maxImgW}
+              height={maxImgH}
               fill="#2A1622"
             />
           )}
@@ -342,6 +364,18 @@ export default function KonvaPageCanvas({
   // Background Image
   const bgImageObj = useKonvaImage(page.background?.imageUrl);
 
+  // Background math using shared computeImageFit
+  const bgSrcW = bgImageObj?.naturalWidth || bgImageObj?.width || canvasW;
+  const bgSrcH = bgImageObj?.naturalHeight || bgImageObj?.height || canvasH;
+  const bgFit = computeImageFit(
+    bgSrcW,
+    bgSrcH,
+    canvasW,
+    canvasH,
+    (page.background?.objectFit as any) || 'cover',
+    page.background?.focalPoint || { x: 0.5, y: 0.5 }
+  );
+
   // Variable context for template resolving
   const varContext = TextVariableResolver.createContext({
     book: book || undefined,
@@ -377,6 +411,26 @@ export default function KonvaPageCanvas({
     }
   };
 
+  // Gradient computation for Konva
+  const gradientAngleRad = (((page.background?.gradient?.angle ?? 180) - 90) * Math.PI) / 180;
+  const gradStartX = canvasW / 2 - (Math.cos(gradientAngleRad) * canvasW) / 2;
+  const gradStartY = canvasH / 2 - (Math.sin(gradientAngleRad) * canvasH) / 2;
+  const gradEndX = canvasW / 2 + (Math.cos(gradientAngleRad) * canvasW) / 2;
+  const gradEndY = canvasH / 2 + (Math.sin(gradientAngleRad) * canvasH) / 2;
+
+  const gradColorStops: (number | string)[] = [];
+  if (page.background?.type === 'gradient' && page.background.gradient?.stops) {
+    for (const stop of page.background.gradient.stops) {
+      gradColorStops.push(stop.offset, stop.color);
+    }
+  }
+
+  // Header fade effect heights & opacities
+  const headerFadeHeight = (page.background?.headerFade?.height ?? 0.345) * canvasH;
+  const headerFadeColor = page.background?.headerFade?.color || '#F9F5EC';
+  const gutterFadeWidth = (page.background?.gutterFade?.width ?? 0.14) * canvasW;
+  const gutterFadeColor = page.background?.gutterFade?.color || '#F9F5EC';
+
   return (
     <div
       className="relative shadow-2xl rounded border border-rosewood-900/50 overflow-hidden bg-[#0D070A] select-none"
@@ -396,33 +450,85 @@ export default function KonvaPageCanvas({
       >
         {/* Background Layer */}
         <Layer listening={false}>
-          {/* Base Paper Background */}
+          {/* Base Paper Color Fill */}
           <Rect
             width={canvasW}
             height={canvasH}
             fill={page.background?.color || book?.settings?.theme?.paperColor || '#F9F5EC'}
           />
 
-          {/* Photo background if present */}
+          {/* Gradient Background if type is gradient */}
+          {page.background?.type === 'gradient' && gradColorStops.length > 0 && (
+            <Rect
+              width={canvasW}
+              height={canvasH}
+              fillLinearGradientStartPoint={{ x: gradStartX, y: gradStartY }}
+              fillLinearGradientEndPoint={{ x: gradEndX, y: gradEndY }}
+              fillLinearGradientColorStops={gradColorStops}
+            />
+          )}
+
+          {/* Photo background using shared computeImageFit if present */}
           {bgImageObj && (
             <KonvaImage
               image={bgImageObj}
-              width={canvasW}
-              height={canvasH}
+              x={bgFit.dx}
+              y={bgFit.dy}
+              width={bgFit.dw}
+              height={bgFit.dh}
+              crop={{
+                x: bgFit.sx,
+                y: bgFit.sy,
+                width: bgFit.sw,
+                height: bgFit.sh,
+              }}
               opacity={page.background?.opacity ?? 1}
             />
           )}
 
-          {/* Spine Gutter Shadow Guide */}
-          <Rect
-            x={page.side === 'left' ? canvasW - 120 : 0}
-            y={0}
-            width={120}
-            height={canvasH}
-            fillLinearGradientStartPoint={{ x: page.side === 'left' ? 120 : 0, y: 0 }}
-            fillLinearGradientEndPoint={{ x: page.side === 'left' ? 0 : 120, y: 0 }}
-            fillLinearGradientColorStops={[0, 'rgba(0,0,0,0.12)', 1, 'rgba(0,0,0,0)']}
-          />
+          {/* Header Reading Zone Fade effect */}
+          {page.background?.headerFade?.enabled !== false && (
+            <Rect
+              x={0}
+              y={0}
+              width={canvasW}
+              height={headerFadeHeight}
+              fillLinearGradientStartPoint={{ x: 0, y: 0 }}
+              fillLinearGradientEndPoint={{ x: 0, y: headerFadeHeight }}
+              fillLinearGradientColorStops={[
+                0,
+                headerFadeColor,
+                0.66,
+                `${headerFadeColor}66`,
+                1,
+                'rgba(249, 245, 236, 0)',
+              ]}
+            />
+          )}
+
+          {/* Spine Gutter Fade effect */}
+          {page.background?.gutterFade?.enabled !== false && (
+            <Rect
+              x={page.side === 'left' ? canvasW - gutterFadeWidth : 0}
+              y={0}
+              width={gutterFadeWidth}
+              height={canvasH}
+              fillLinearGradientStartPoint={{
+                x: page.side === 'left' ? gutterFadeWidth : 0,
+                y: 0,
+              }}
+              fillLinearGradientEndPoint={{
+                x: page.side === 'left' ? 0 : gutterFadeWidth,
+                y: 0,
+              }}
+              fillLinearGradientColorStops={[
+                0,
+                gutterFadeColor,
+                1,
+                'rgba(249, 245, 236, 0)',
+              ]}
+            />
+          )}
 
           {/* Page Number Guide (if enabled) */}
           {page.showPageNumber !== false && page.pageNumber !== undefined && page.pageNumber > 0 && (
@@ -484,8 +590,7 @@ export default function KonvaPageCanvas({
               'bottom-center',
             ]}
             boundBoxFunc={(oldBox, newBox) => {
-              // Minimum size constraint
-              if (newBox.width < 15 || newBox.height === 0) {
+              if (newBox.width < 15 || newBox.height < 15) {
                 return oldBox;
               }
               return newBox;
