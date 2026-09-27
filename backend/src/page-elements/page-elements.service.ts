@@ -15,6 +15,28 @@ export class PageElementsService {
     private cacheService: PublicCacheService,
   ) {}
 
+  /**
+   * Canonicalizes media-backed element data before persistence.
+   * When a mediaId/posterMediaId exists, URLs are runtime-only and are resolved
+   * from the Media table by the Admin/Public compilers.
+   */
+  private canonicalizeMediaData(type: string, data?: Record<string, any>) {
+    if (!data) return data;
+    const canonical = { ...data };
+
+    if ((type === 'IMAGE' || type === 'VIDEO') && canonical.mediaId) {
+      delete canonical.src;
+      delete canonical.url;
+    }
+
+    if (type === 'VIDEO' && canonical.posterMediaId) {
+      delete canonical.thumbnailUrl;
+      delete canonical.posterUrl;
+    }
+
+    return canonical;
+  }
+
   async findByPage(pageId: string) {
     const page = await this.prisma.page.findUnique({ where: { id: pageId } });
     if (!page) throw new NotFoundException(`Page not found: ${pageId}`);
@@ -61,7 +83,7 @@ export class PageElementsService {
         opacity: dto.opacity !== undefined ? dto.opacity : 1.0,
         transform: cleanTransform,
         style: dto.style,
-        data: dto.data,
+        data: this.canonicalizeMediaData(dto.type, dto.data),
         interaction: (dto.interaction as any) || undefined,
       },
     });
@@ -92,9 +114,12 @@ export class PageElementsService {
       ? safeDeepMerge((el.style as any) || {}, dto.style)
       : dto.style;
 
-    const data = isPatch && dto.data
+    const mergedData = isPatch && dto.data
       ? safeDeepMerge((el.data as any) || {}, dto.data)
       : dto.data;
+    const data = mergedData
+      ? this.canonicalizeMediaData(dto.type || el.type, mergedData)
+      : undefined;
 
     const interaction = isPatch && dto.interaction
       ? safeDeepMerge((el.interaction as any) || {}, dto.interaction)
@@ -241,8 +266,11 @@ export class PageElementsService {
         const style = item.style
           ? safeDeepMerge((existing.style as any) || {}, item.style)
           : undefined;
-        const data = item.data
+        const mergedData = item.data
           ? safeDeepMerge((existing.data as any) || {}, item.data)
+          : undefined;
+        const data = mergedData
+          ? this.canonicalizeMediaData(existing.type, mergedData)
           : undefined;
         const interaction = item.interaction
           ? safeDeepMerge((existing.interaction as any) || {}, item.interaction)

@@ -10,6 +10,7 @@ import { uploadDirectToCloudinary } from '@/services/mediaApi';
 import { Media, MediaType } from '@/types/book';
 import {
   Image as ImageIcon,
+  Video,
   Upload,
   Search,
   Check,
@@ -182,7 +183,7 @@ export default function MediaPickerModal({
               type="file"
               onChange={handleFileUpload}
               className="hidden"
-              accept="image/*"
+              accept={filterType === 'VIDEO' ? 'video/mp4,video/*' : filterType === 'AUDIO' ? 'audio/*' : 'image/*'}
             />
 
             <button
@@ -192,7 +193,7 @@ export default function MediaPickerModal({
               className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-semibold shadow-md transition-all active:scale-95 disabled:opacity-50"
             >
               <Upload className="w-3.5 h-3.5" />
-              <span>{uploading ? `Đang tải lên (${uploadProgress}%)...` : 'Tải ảnh mới'}</span>
+              <span>{uploading ? `Đang tải lên (${uploadProgress}%)...` : filterType === 'VIDEO' ? 'Tải video mới' : 'Tải ảnh mới'}</span>
             </button>
           </div>
         </div>
@@ -202,11 +203,11 @@ export default function MediaPickerModal({
           {loading ? (
             <div className="py-20 flex flex-col items-center justify-center text-stone-500 text-xs">
               <div className="w-8 h-8 rounded-full border-2 border-rosewood-500 border-t-transparent animate-spin mb-3" />
-              <span>Đang nạp thư viện ảnh...</span>
+              <span>Đang nạp thư viện media...</span>
             </div>
           ) : mediaList.length === 0 ? (
             <div className="py-20 text-center text-xs text-stone-500">
-              Không tìm thấy hình ảnh nào. Bấm &quot;Tải ảnh mới&quot; để bổ sung vào thư viện.
+              Không tìm thấy media phù hợp. Bấm nút tải lên để bổ sung vào thư viện.
             </div>
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
@@ -223,11 +224,18 @@ export default function MediaPickerModal({
                         : 'border-transparent hover:border-rosewood-700/60 bg-[#1D1018]'
                     }`}
                   >
-                    <img
-                      src={m.url}
-                      alt={m.alt || ''}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
+                    {m.type === 'VIDEO' ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#2A1622] to-black text-amber-300 gap-2">
+                        <Video className="w-8 h-8" />
+                        <span className="text-[9px] font-mono uppercase tracking-wider">Video MP4</span>
+                      </div>
+                    ) : (
+                      <img
+                        src={m.url}
+                        alt={m.alt || ''}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    )}
 
                     {/* Check icon badge */}
                     {isSelected && (

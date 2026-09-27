@@ -371,7 +371,15 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
      - **Điểm neo cắt `focalPoint` (X / Y)**: Tùy chỉnh trọng tâm ảnh (0..1) kết hợp với thuật toán dùng chung `computeImageFit`.
      - **Phong cách Polaroid & Washi Tape**: Bật/tắt khung viền ảnh polaroid trắng cổ điển và dải băng dính washi tape trang trí.
      - **Transform nâng cao**: Điều chỉnh độ mờ đục `opacity`, góc xoay `rotation` và hệ số thu phóng `scale`.
-15. **Giai đoạn 15 (Prompt 21+ Nâng cao Editor & Undo/Redo/Snapping)**:
+15. **Giai đoạn 15 (Đã hoàn thành - Prompt 21 Video Element Editor)**:
+   - Hoàn thiện trình chỉnh sửa phần tử VIDEO chuyên sâu (`AdvancedVideoEditor.tsx`):
+     - Chọn hoặc tải video mới từ Media Library; lưu `mediaId` làm tham chiếu video canonical.
+     - Chọn hoặc tải ảnh poster riêng; lưu `posterMediaId` làm tham chiếu poster canonical.
+     - `src` và `thumbnailUrl` chỉ phục vụ preview/runtime sau khi Media API/Public Compiler resolve.
+     - Hỗ trợ thay video, thay poster, caption, muted và interaction `open-video`.
+     - Có modal phát thử video theo yêu cầu; Konva Canvas chỉ render poster tĩnh kèm play badge, không tạo `<video>` liên tục trên từng node.
+   - Media Picker được tổng quát hóa để tải/chọn cả `IMAGE` và `VIDEO` qua Cloudinary Signed Direct Upload.
+16. **Giai đoạn 16 (Prompt 22+ Nâng cao Editor & Undo/Redo/Snapping)**:
    - Tích hợp lịch sử Undo / Redo cho canvas editor.
    - Thêm đường gióng từ tính (Smart Snapping / Alignment Guides).
    - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.

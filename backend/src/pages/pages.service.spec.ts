@@ -24,6 +24,9 @@ describe('PagesService Option B Contract & Sequencing (Req 1, 2, 3, 4, 5, 6)', (
       book: {
         findUnique: jest.fn(),
       },
+      media: {
+        findMany: jest.fn(),
+      },
       $transaction: jest.fn(async (cb) => {
         return cb(prisma);
       }),
@@ -285,5 +288,41 @@ describe('PagesService Option B Contract & Sequencing (Req 1, 2, 3, 4, 5, 6)', (
     );
 
     expect(cacheService.touchBook).toHaveBeenCalledWith('book-1');
+  });
+
+  it('Prompt 21: should resolve canonical mediaId and posterMediaId into runtime src/thumbnailUrl for Admin page reads', async () => {
+    prisma.page.findUnique.mockResolvedValue({
+      id: 'page-video',
+      bookId: 'book-1',
+      pageNumber: 7,
+      order: 7,
+      side: PageSide.RIGHT,
+      elements: [
+        {
+          id: 'video-el',
+          type: 'VIDEO',
+          zIndex: 10,
+          data: {
+            mediaId: 'video-media',
+            posterMediaId: 'poster-media',
+          },
+        },
+      ],
+    });
+    prisma.media.findMany.mockResolvedValue([
+      { id: 'video-media', url: 'https://cdn.example.com/memory.mp4', alt: 'Video memory' },
+      { id: 'poster-media', url: 'https://cdn.example.com/poster.jpg', alt: 'Poster' },
+    ]);
+
+    const page = await service.findOne('page-video');
+
+    expect(page.elements[0].data).toEqual(
+      expect.objectContaining({
+        mediaId: 'video-media',
+        posterMediaId: 'poster-media',
+        src: 'https://cdn.example.com/memory.mp4',
+        thumbnailUrl: 'https://cdn.example.com/poster.jpg',
+      }),
+    );
   });
 });

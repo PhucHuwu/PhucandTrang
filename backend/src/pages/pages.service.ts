@@ -20,6 +20,42 @@ export class PagesService {
     private cacheService: PublicCacheService,
   ) {}
 
+  private async resolveElementMediaUrls<T extends { elements?: any[] }>(page: T): Promise<T> {
+    const ids = new Set<string>();
+    for (const el of page.elements || []) {
+      const data = (el.data as any) || {};
+      if (data.mediaId) ids.add(data.mediaId);
+      if (data.posterMediaId) ids.add(data.posterMediaId);
+    }
+
+    if (ids.size === 0) return page;
+
+    const media = await this.prisma.media.findMany({
+      where: { id: { in: Array.from(ids) } },
+      select: { id: true, url: true, alt: true },
+    });
+    const mediaMap = new Map(media.map((item) => [item.id, item]));
+
+    return {
+      ...page,
+      elements: (page.elements || []).map((el) => {
+        const data = { ...((el.data as any) || {}) };
+        const source = data.mediaId ? mediaMap.get(data.mediaId) : undefined;
+        const poster = data.posterMediaId ? mediaMap.get(data.posterMediaId) : undefined;
+
+        if (source) {
+          data.src = source.url;
+          data.alt = data.alt || source.alt;
+        }
+        if (poster) {
+          data.thumbnailUrl = poster.url;
+        }
+
+        return { ...el, data };
+      }),
+    } as T;
+  }
+
   /**
    * Option B Normalization:
    * Normalizes contiguous physical sequence: order = 0..N-1, side = derivePageSideEnum(order).
@@ -59,7 +95,7 @@ export class PagesService {
     const book = await this.prisma.book.findUnique({ where: { id: bookId } });
     if (!book) throw new NotFoundException(`Book not found: ${bookId}`);
 
-    return this.prisma.page.findMany({
+    const pages = await this.prisma.page.findMany({
       where: { bookId },
       include: {
         elements: { orderBy: { zIndex: 'asc' } },
@@ -68,6 +104,7 @@ export class PagesService {
       },
       orderBy: { order: 'asc' },
     });
+    return Promise.all(pages.map((page) => this.resolveElementMediaUrls(page)));
   }
 
   async findOne(id: string) {
@@ -80,7 +117,7 @@ export class PagesService {
       },
     });
     if (!page) throw new NotFoundException(`Không tìm thấy trang với ID: ${id}`);
-    return page;
+    return this.resolveElementMediaUrls(page);
   }
 
   async create(dto: CreatePageDto) {
