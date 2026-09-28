@@ -23,7 +23,7 @@ Hệ thống kỷ niệm tình yêu kết hợp trải nghiệm thị giác **3D
           Public API    │ (Frozen Published Snapshot)  │ Admin REST API
                         ▼                              │ (JWT + RBAC + BFF Proxy)
 ┌──────────────────────────────────────────────────────┴──────────────────────┐
-│                            BACKEND (NestJS 11)                              │
+│                            BACKEND (NestJS 10)                              │
 │                                                                             │
 │  - Modular Architecture: Auth, Books, Pages, Elements, Media, Audio,        │
 │    LayoutTemplates, Versions, Public, Validation                            │
@@ -67,7 +67,7 @@ API_PREFIX=api
 
 # Security & Authentication (Bắt buộc cấu hình bí mật riêng trên production)
 JWT_SECRET=your_super_strong_production_jwt_secret_key_here
-JWT_EXPIRES_IN=7d
+JWT_EXPIRATION=7d
 
 # PostgreSQL Database (Neon connection pooler)
 DATABASE_URL=postgresql://username:password@ep-host-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require
@@ -87,9 +87,11 @@ SEED_FORCE_CANONICAL_BOOK=false
 
 #### Frontend (`.env.local` hoặc Vercel Environment Variables)
 ```env
-# URL đến NestJS Backend API
-NEXT_PUBLIC_API_URL=http://localhost:4000/api
-# Hoặc trên Production: https://api.your-domain.com/api
+# URL đến NestJS Backend API cho client browser
+NEXT_PUBLIC_API_URL=https://api.your-domain.com/api
+
+# Internal Backend URL cho Next.js server-side / BFF Proxy (tránh roundtrip qua internet nếu deploy cùng network)
+BACKEND_INTERNAL_URL=https://api.your-domain.com/api
 
 # Mật khẩu dự phòng ngoại tuyến (chỉ dùng khi dev)
 NEXT_PUBLIC_ENABLE_LOCAL_BOOK_FALLBACK=false
@@ -134,7 +136,8 @@ npm run start
 
 ## 🛡️ Bảng Ma Trận Phân Quyền (Admin Role Matrix)
 
-Hệ thống bảo vệ đa tầng kết hợp HttpOnly Cookie BFF Proxy, NestJS `AuthGuard('jwt')` và `RolesGuard`:
+Hệ thống bảo vệ đa tầng kết hợp HttpOnly Cookie BFF Proxy, NestJS `AuthGuard('jwt')` và `RolesGuard`.
+> **Ghi chú về Rate Limiting**: Triển khai trong bộ nhớ Node.js (`in-memory rate limiting`) phù hợp hoàn hảo với kiến trúc container/single instance. Khi chạy trên môi trường đa instance hoặc Vercel Serverless Functions, khuyến nghị kích hoạt thêm Vercel WAF/Firewall hoặc tích hợp Upstash Redis để phân tán bộ đếm theo `IP + Email`.
 
 | Thao Tác / Chức Năng | VIEWER | EDITOR | ADMIN | Ghi Chú Bảo Mật |
 | :--- | :---: | :---: | :---: | :--- |

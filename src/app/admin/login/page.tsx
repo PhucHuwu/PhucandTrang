@@ -7,8 +7,8 @@ import { Lock, Mail, Sparkles, ArrowRight } from 'lucide-react';
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('admin@phucandtrang.love');
-  const [pass, setPass] = useState('PhucAndTrang@20221020');
+  const [email, setEmail] = useState('');
+  const [pass, setPass] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

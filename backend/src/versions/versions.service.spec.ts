@@ -31,6 +31,7 @@ describe('VersionsService Rollback Protection (Req 2, 3, 4, 14, 15, 16 & Prompt 
 
     cacheService = {
       touchBook: jest.fn(),
+      invalidateBookCache: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -119,8 +120,8 @@ describe('VersionsService Rollback Protection (Req 2, 3, 4, 14, 15, 16 & Prompt 
     expect(prisma.page.deleteMany).toHaveBeenCalledWith({ where: { bookId: 'book-1' } });
     expect(prisma.page.create).toHaveBeenCalled();
 
-    // Touch book cache
-    expect(cacheService.touchBook).toHaveBeenCalledWith('book-1');
+    // Invalidate book cache without double bumping contentRevision
+    expect(cacheService.invalidateBookCache).toHaveBeenCalledWith('book-1');
   });
 
   it('should reject rollback if snapshot does not have valid pages array, without deleting current pages', async () => {

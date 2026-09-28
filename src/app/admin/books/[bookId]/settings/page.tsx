@@ -178,7 +178,6 @@ export default function BookSettingsPage() {
         {
           title,
           slug,
-          status,
           description,
           heName,
           sheName,
@@ -378,16 +377,20 @@ export default function BookSettingsPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1.5">Trạng thái xuất bản</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white focus:outline-none focus:border-rosewood-500"
-              >
-                <option value="PUBLISHED">PUBLISHED (Công khai)</option>
-                <option value="DRAFT">DRAFT (Bản nháp)</option>
-                <option value="ARCHIVED">ARCHIVED (Lưu trữ)</option>
-              </select>
+              <label className="block text-xs font-medium text-stone-300 mb-1.5">Trạng thái hiện tại</label>
+              <div className="flex items-center gap-2 px-3.5 py-2.5 bg-[#20111A] border border-rosewood-900/60 rounded-xl text-xs">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    status === 'PUBLISHED' ? 'bg-emerald-400' : status === 'ARCHIVED' ? 'bg-stone-500' : 'bg-amber-400'
+                  }`}
+                />
+                <span className="font-mono text-white font-semibold">{status}</span>
+                <span className="text-[11px] text-stone-400 ml-auto">
+                  {status === 'PUBLISHED'
+                    ? 'Đang phát hành công khai'
+                    : 'Bản nháp (Dùng quy trình Preview ➔ Publish)'}
+                </span>
+              </div>
             </div>
 
             <div>

@@ -16,7 +16,7 @@ import { UpdateBookDto } from './dto/update-book.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { Role } from '@prisma/client';
+import { Role, BookStatus } from '@prisma/client';
 
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('books')
@@ -76,6 +76,12 @@ export class BooksController {
     @Request() req: any,
   ) {
     return this.booksService.publishBook(id, body?.changelog, req.user?.id);
+  }
+
+  @Roles(Role.ADMIN)
+  @Post(':id/archive')
+  async archiveBook(@Param('id') id: string) {
+    return this.booksService.updateStatus(id, Role.ADMIN ? BookStatus.ARCHIVED : BookStatus.ARCHIVED);
   }
 
   @Roles(Role.ADMIN, Role.EDITOR)

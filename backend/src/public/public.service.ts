@@ -87,15 +87,15 @@ export class PublicService {
       throw new NotFoundException(`Không tìm thấy cuốn sách đang xuất bản với slug: "${slug}"`);
     }
 
-    // PROMPT 23: If publishedSnapshot exists, serve it directly!
-    let document: CompiledBookDocument;
-    if (book.publishedSnapshot && typeof book.publishedSnapshot === 'object') {
-      document = book.publishedSnapshot as unknown as CompiledBookDocument;
-    } else {
-      // Fallback for pre-snapshot records: compile live
-      const mediaMap = await this.collectAndResolveMedia(book);
-      document = this.compileBookDocument(book, mediaMap);
+    // PROMPT 23 & 40.1: Strictly enforce publishedSnapshot isolation!
+    // No fallback compile of draft relational data allowed on production.
+    if (!book.publishedSnapshot || typeof book.publishedSnapshot !== 'object') {
+      throw new NotFoundException(
+        `Cuốn sách "${slug}" chưa có bản phát hành đóng băng (publishedSnapshot). Vui lòng thực hiện Publish từ Admin CMS.`,
+      );
     }
+
+    const document: CompiledBookDocument = book.publishedSnapshot as unknown as CompiledBookDocument;
 
     const latestVersion = book.versions?.[0]?.version || '2.0.0';
     const publishedRev = book.publishedRevision || book.contentRevision || 1;

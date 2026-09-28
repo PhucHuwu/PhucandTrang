@@ -192,8 +192,8 @@ export class VersionsService {
       }
     });
 
-    // Touch draft cache (does not alter live site published snapshot)
-    await this.cacheService.touchBook(bookId);
+    // Prompt 40.1 Fix: Use invalidateBookCache so contentRevision is incremented exactly once in transaction
+    await this.cacheService.invalidateBookCache(bookId);
 
     return {
       success: true,

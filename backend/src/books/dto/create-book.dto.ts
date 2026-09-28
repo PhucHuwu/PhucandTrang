@@ -26,10 +26,6 @@ export class CreateBookDto {
   @IsOptional()
   description?: string;
 
-  @IsEnum(BookStatus)
-  @IsOptional()
-  status?: BookStatus;
-
   @IsString()
   @IsOptional()
   heName?: string;

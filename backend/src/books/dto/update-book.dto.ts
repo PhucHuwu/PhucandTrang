@@ -25,10 +25,6 @@ export class UpdateBookDto {
   @IsOptional()
   description?: string;
 
-  @IsEnum(BookStatus)
-  @IsOptional()
-  status?: BookStatus;
-
   @IsString()
   @IsOptional()
   heName?: string;

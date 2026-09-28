@@ -45,6 +45,27 @@ export class PublicCacheService {
   }
 
   /**
+   * Invalidates memory cache for a specific book slug/id without touching the database counter.
+   * Used when an operation has already bumped contentRevision in an atomic transaction.
+   */
+  async invalidateBookCache(bookId: string): Promise<void> {
+    try {
+      const book = await this.prisma.book.findUnique({
+        where: { id: bookId },
+        select: { slug: true },
+      });
+      if (book?.slug) {
+        this.invalidate(book.slug);
+      }
+      this.invalidate(bookId);
+      this.invalidate('phuc-and-trang');
+      this.invalidate('chung-minh');
+    } catch {
+      this.invalidate();
+    }
+  }
+
+  /**
    * Increments the contentRevision counter on the Book model in PostgreSQL
    * and purges any compiled cache entries for this book.
    */

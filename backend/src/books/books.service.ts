@@ -88,7 +88,7 @@ export class BooksService {
         slug: dto.slug,
         title: dto.title,
         description: dto.description,
-        status: dto.status || BookStatus.DRAFT,
+        status: BookStatus.DRAFT, // Enforce initial state is always DRAFT (Prompt 40.1 fix)
         heName: dto.heName || 'Phúc',
         sheName: dto.sheName || 'Trang',
         anniversaryDate: dto.anniversaryDate
@@ -144,7 +144,6 @@ export class BooksService {
         ...(dto.slug ? { slug: dto.slug } : {}),
         ...(dto.title !== undefined ? { title: dto.title } : {}),
         ...(dto.description !== undefined ? { description: dto.description } : {}),
-        ...(dto.status !== undefined ? { status: dto.status } : {}),
         ...(dto.heName !== undefined ? { heName: dto.heName } : {}),
         ...(dto.sheName !== undefined ? { sheName: dto.sheName } : {}),
         ...(dto.anniversaryDate ? { anniversaryDate: new Date(dto.anniversaryDate) } : {}),
@@ -310,8 +309,8 @@ export class BooksService {
       }),
     ]);
 
-    // Invalidate public caches so live site immediately serves new snapshot
-    await this.cacheService.touchBook(id);
+    // Prompt 40.1 Fix: Use invalidateBookCache so contentRevision is incremented exactly once per publish
+    await this.cacheService.invalidateBookCache(id);
 
     return {
       success: true,

@@ -34,6 +34,7 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
 
     cacheService = {
       touchBook: jest.fn(),
+      invalidateBookCache: jest.fn(),
       invalidate: jest.fn(),
     };
 
@@ -173,6 +174,6 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
     expect(res.publishedRevision).toBe(2);
     expect(res.version).toBe('v2.2');
     expect(prisma.$transaction).toHaveBeenCalled();
-    expect(cacheService.touchBook).toHaveBeenCalledWith('book-1');
+    expect(cacheService.invalidateBookCache).toHaveBeenCalledWith('book-1');
   });
 });
