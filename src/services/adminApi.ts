@@ -159,11 +159,40 @@ export async function deleteAdminBook(id: string): Promise<any> {
   });
 }
 
-export async function publishAdminBook(id: string): Promise<{
+export interface ValidationIssue {
+  id: string;
+  severity: 'ERROR' | 'WARNING';
+  code: string;
+  message: string;
+  location: {
+    type: 'BOOK' | 'COVER' | 'PAGE' | 'ELEMENT' | 'AUDIO';
+    pageId?: string;
+    pageNumber?: number;
+    pageOrder?: number;
+    elementId?: string;
+    elementType?: string;
+    mediaId?: string;
+  };
+  fixLink?: string;
+}
+
+export interface ValidationReport {
+  isValid: boolean;
+  errorCount: number;
+  warningCount: number;
+  issues: ValidationIssue[];
+}
+
+export async function validateAdminBookForPublish(id: string): Promise<ValidationReport> {
+  return adminFetch<ValidationReport>(`books/${id}/validate-publish`);
+}
+
+export async function publishAdminBook(id: string, changelog?: string): Promise<{
   success: boolean;
   message: string;
   publishedRevision: number;
   publishedAt: string;
+  validationReport?: ValidationReport;
   book: any;
 }> {
   return adminFetch<{
@@ -171,9 +200,11 @@ export async function publishAdminBook(id: string): Promise<{
     message: string;
     publishedRevision: number;
     publishedAt: string;
+    validationReport?: ValidationReport;
     book: any;
   }>(`books/${id}/publish`, {
     method: 'POST',
+    body: JSON.stringify({ changelog }),
   });
 }
 

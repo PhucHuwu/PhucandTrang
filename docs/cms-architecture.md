@@ -539,6 +539,27 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
       - **Quy tắc hiển thị**: `showPageNumber = false` (không hiển thị số trang trên bìa).
       - **Hỗ trợ đầy đủ phần tử đồ họa**: `TEXT`, `IMAGE`, `VIDEO`, `SHAPE`, `DECORATION` cùng hệ thống phân giải biến động `{{couple.he}}`, `{{couple.she}}`, `{{anniversaryDate}}`.
       - **Tích hợp Media Library Picker & Reference Checker**: Media IDs được quét và bảo vệ tính toàn vẹn khi kiểm tra tham chiếu trước khi xóa.
-28. **Giai đoạn 28 (Prompt 34+ Texture Cache IndexedDB & Polishing)**:
+28. **Giai đoạn 28 (Đã hoàn thành - Prompt 34 Pre-Publish Validation System)**:
+    - Xây dựng hệ sinh thái kiểm toán chất lượng trước khi xuất bản (`PublishValidationService`):
+      - **Các lỗi chặn xuất bản (Blocking Errors — Reject Publish 400)**:
+        - `MISSING_REQUIRED_MEDIA`: Thiếu file ảnh/video của phần tử.
+        - `BROKEN_MEDIA_ID`: ID media tham chiếu không tồn tại trong Thư viện Media.
+        - `INVALID_VIDEO_POSTER`: Phần tử VIDEO thiếu ảnh poster đại diện.
+        - `INVALID_INTERACTION_TARGET`: Mục tiêu tương tác không hợp lệ (URL sai định dạng, thiếu pageId, sai audioTrackId).
+        - `INVALID_PAGE_ORDER`: Thứ tự trang bị trùng lặp, âm hoặc đứt quãng.
+        - `INVALID_LAYOUT`: Sử dụng layout template ID không tồn tại.
+        - `MISSING_COVER`: Bìa trước (Front Cover) thiếu ảnh nền.
+        - `MALFORMED_ELEMENT_TRANSFORM`: Kích thước hoặc tọa độ phần tử bị NaN, âm hoặc bằng 0.
+        - `DELETED_AUDIO_REFERENCE`: Tham chiếu bài hát đã bị xóa khỏi Thư viện Audio.
+      - **Các cảnh báo khuyến nghị (Warnings — Non-Blocking)**:
+        - `EMPTY_PAGE`: Trang có 0 phần tử nội dung.
+        - `NO_ALT_TEXT`: Ảnh thiếu chú thích văn bản thay thế (SEO/Trợ năng).
+        - `VERY_LARGE_MEDIA`: File media vượt quá dung lượng khuyến nghị 10MB.
+      - **Giao diện Quản trị (`PublishValidationModal.tsx`)**:
+        - Phân nhóm rõ ràng Errors (màu đỏ) và Warnings (màu vàng hổ phách).
+        - Chỉ rõ vị trí lỗi (Cover, Trang số bao nhiêu, Loại phần tử nào).
+        - Cung cấp nút **"Khắc phục" (Fix Link)** điều hướng trực tiếp tới đúng trang/phần tử lỗi.
+        - Nút "Xác nhận xuất bản" bị vô hiệu hóa hoàn toàn khi còn ít nhất 1 Blocking Error.
+29. **Giai đoạn 29 (Prompt 35+ Texture Cache IndexedDB & Polishing)**:
     - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.
     - Dọn dẹp/xóa bỏ an toàn các component legacy không dùng trong `src/components/spreads` và `src/components/pages`.

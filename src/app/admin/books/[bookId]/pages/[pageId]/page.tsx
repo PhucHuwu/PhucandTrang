@@ -63,8 +63,9 @@ import {
   Redo2,
   Magnet,
 } from 'lucide-react';
-import { publishAdminBook } from '@/services/adminApi';
+import { publishAdminBook, validateAdminBookForPublish, ValidationReport } from '@/services/adminApi';
 import VersionHistoryModal from '@/components/admin/VersionHistoryModal';
+import PublishValidationModal from '@/components/admin/PublishValidationModal';
 import { useAutosavePage } from '@/hooks/useAutosavePage';
 import AutosaveIndicator from '@/components/admin/AutosaveIndicator';
 import { usePageHistory } from '@/hooks/usePageHistory';
@@ -91,6 +92,10 @@ export default function VisualPageEditorPage() {
   const [allPages, setAllPages] = useState<any[]>([]);
   const [publishing, setPublishing] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [validationModal, setValidationModal] = useState<{
+    bookId: string;
+    report: ValidationReport;
+  } | null>(null);
   const [audioTracks, setAudioTracks] = useState<any[]>([]);
   const [videoMedia, setVideoMedia] = useState<any[]>([]);
   const [page, setPage] = useState<Page | null>(null);
@@ -326,19 +331,16 @@ export default function VisualPageEditorPage() {
 
   const handlePublishBook = async () => {
     if (!bookId || isViewer || publishing) return;
-    const confirmPub = window.confirm(
-      'Xuất bản (Publish) cuốn sách này?\n\n' +
-      'Các thay đổi bản nháp (Draft) sẽ được tổng hợp thành bản snapshot mới và hiển thị ngay trên website công khai.'
-    );
-    if (!confirmPub) return;
-
     try {
       setPublishing(true);
-      const res = await publishAdminBook(bookId);
-      setToast(res.message || 'Đã xuất bản thành công!');
-      setTimeout(() => setToast(null), 4000);
+      // Run pre-publish validation first (Prompt 34)
+      const report = await validateAdminBookForPublish(bookId);
+      setValidationModal({
+        bookId,
+        report,
+      });
     } catch (err: any) {
-      alert(`Lỗi khi xuất bản: ${err?.message || 'Vui lòng thử lại.'}`);
+      alert(`Lỗi kiểm tra tính toàn vẹn: ${err?.message || 'Vui lòng thử lại.'}`);
     } finally {
       setPublishing(false);
     }
@@ -1213,6 +1215,19 @@ export default function VisualPageEditorPage() {
           }
         }}
       />
+      {/* Publish Validation & Confirmation Modal (Prompt 34) */}
+      {validationModal && (
+        <PublishValidationModal
+          bookId={validationModal.bookId}
+          isOpen={true}
+          onClose={() => setValidationModal(null)}
+          report={validationModal.report}
+          onPublishSuccess={() => {
+            setToast('Đã xuất bản thành công bản phát hành mới!');
+            setTimeout(() => setToast(null), 3000);
+          }}
+        />
+      )}
     </div>
   );
 }

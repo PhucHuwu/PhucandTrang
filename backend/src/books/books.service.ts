@@ -10,6 +10,7 @@ import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { PublicCacheService } from '../public/public-cache.service';
 import { PublicService } from '../public/public.service';
+import { PublishValidationService } from './publish-validation.service';
 import { safeDeepMerge } from '../utils/safe-merge';
 
 @Injectable()
@@ -18,6 +19,7 @@ export class BooksService {
     private prisma: PrismaService,
     private cacheService: PublicCacheService,
     private publicService: PublicService,
+    private publishValidationService: PublishValidationService,
   ) {}
 
   async findAll() {
@@ -183,6 +185,13 @@ export class BooksService {
   }
 
   /**
+   * Prompt 34: Inspects validation report before publish
+   */
+  async validateForPublish(id: string) {
+    return this.publishValidationService.validateBookForPublish(id);
+  }
+
+  /**
    * Prompt 23: Previews current live draft of book (authenticated).
    * Does NOT touch or require publishedSnapshot, completely isolated from public viewers.
    */
@@ -222,14 +231,28 @@ export class BooksService {
   }
 
   /**
-   * Prompt 23 & 24: Publishes current draft to live public site.
-   * 1. Validates draft integrity.
+   * Prompt 23, 24 & 34: Publishes current draft to live public site.
+   * 1. Runs exhaustive pre-publish validation. If ANY BLOCKING ERROR exists, rejects with 400 BadRequestException.
    * 2. Compiles complete document snapshot.
    * 3. Saves to Book.publishedSnapshot, bumps publishedRevision & contentRevision, sets status = PUBLISHED, publishedAt = now.
    * 4. Automatically creates a BookVersion history snapshot record.
    * 5. Invalidates public caches.
    */
   async publishBook(id: string, changelog?: string, userId?: string) {
+    // PROMPT 34 CORE RULE: Run validation first. Cannot publish if blocking errors exist!
+    const validationReport = await this.publishValidationService.validateBookForPublish(id);
+
+    if (!validationReport.isValid) {
+      const errorSummaries = validationReport.issues
+        .filter((i) => i.severity === 'ERROR')
+        .map((i) => `• ${i.message}`)
+        .join('\n');
+
+      throw new BadRequestException(
+        `Không thể xuất bản cuốn sách do có ${validationReport.errorCount} lỗi nghiêm trọng cần khắc phục:\n${errorSummaries}`
+      );
+    }
+
     const book = await this.prisma.book.findUnique({
       where: { id },
       include: {
@@ -254,11 +277,6 @@ export class BooksService {
     });
 
     if (!book) throw new NotFoundException(`Không tìm thấy sách với ID: ${id}`);
-
-    // Validation: book must have at least 1 page
-    if (!book.pages || book.pages.length === 0) {
-      throw new BadRequestException('Không thể xuất bản cuốn sách khi chưa có bất kỳ trang nội dung nào.');
-    }
 
     const nextPublishedRevision = (book.publishedRevision || 0) + 1;
     const versionTag = `v2.${nextPublishedRevision}`;
@@ -305,6 +323,7 @@ export class BooksService {
       version: versionTag,
       publishedRevision: nextPublishedRevision,
       publishedAt: now.toISOString(),
+      validationReport,
       book: updated,
     };
   }

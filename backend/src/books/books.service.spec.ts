@@ -3,13 +3,16 @@ import { BooksService } from './books.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PublicCacheService } from '../public/public-cache.service';
 import { PublicService } from '../public/public.service';
+import { PublishValidationService } from './publish-validation.service';
 import { BookStatus } from '@prisma/client';
+import { BadRequestException } from '@nestjs/common';
 
-describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish)', () => {
+describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Validation)', () => {
   let service: BooksService;
   let prisma: any;
   let cacheService: any;
   let publicService: any;
+  let publishValidationService: any;
 
   beforeEach(async () => {
     prisma = {
@@ -45,12 +48,22 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish)', () => {
       })),
     };
 
+    publishValidationService = {
+      validateBookForPublish: jest.fn().mockResolvedValue({
+        isValid: true,
+        errorCount: 0,
+        warningCount: 0,
+        issues: [],
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BooksService,
         { provide: PrismaService, useValue: prisma },
         { provide: PublicCacheService, useValue: cacheService },
         { provide: PublicService, useValue: publicService },
+        { provide: PublishValidationService, useValue: publishValidationService },
       ],
     }).compile();
 
@@ -127,11 +140,25 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish)', () => {
     expect(publicService.compileBookDocument).toHaveBeenCalled();
   });
 
-  it('Prompt 23 & 24: publishBook validates draft, compiles snapshot, increments publishedRevision, saves version history, and clears cache', async () => {
+  it('Prompt 34: publishBook rejects when validation fails with blocking errors', async () => {
+    publishValidationService.validateBookForPublish.mockResolvedValue({
+      isValid: false,
+      errorCount: 2,
+      warningCount: 0,
+      issues: [
+        { id: 'err-1', severity: 'ERROR', code: 'MISSING_COVER', message: 'Thiếu bìa sách' },
+      ],
+    });
+
+    await expect(service.publishBook('book-1')).rejects.toThrow();
+    expect(prisma.book.update).not.toHaveBeenCalled();
+  });
+
+  it('Prompt 23, 24 & 34: publishBook succeeds when validation passes', async () => {
     prisma.book.findUnique.mockResolvedValue(mockExistingBook);
     prisma.book.update.mockResolvedValue({
       ...mockExistingBook,
-      status: BookStatus.PUBLISHED,
+      status: 'PUBLISHED',
       publishedRevision: 2,
     });
     prisma.bookVersion.create.mockResolvedValue({

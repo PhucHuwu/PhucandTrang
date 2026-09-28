@@ -21,8 +21,9 @@ import {
   Send,
   History,
 } from 'lucide-react';
-import { publishAdminBook } from '@/services/adminApi';
+import { publishAdminBook, validateAdminBookForPublish, ValidationReport } from '@/services/adminApi';
 import VersionHistoryModal from '@/components/admin/VersionHistoryModal';
+import PublishValidationModal from '@/components/admin/PublishValidationModal';
 
 export default function AdminBooksPage() {
   const [books, setBooks] = useState<any[]>([]);
@@ -33,6 +34,13 @@ export default function AdminBooksPage() {
 
   // Version History Modal State
   const [historyBook, setHistoryBook] = useState<{ id: string; title: string } | null>(null);
+
+  // Publish Validation Modal State (Prompt 34)
+  const [validationModal, setValidationModal] = useState<{
+    bookId: string;
+    bookTitle: string;
+    report: ValidationReport;
+  } | null>(null);
 
   // New book form state
   const [title, setTitle] = useState('');
@@ -109,19 +117,17 @@ export default function AdminBooksPage() {
   };
 
   const handlePublishBook = async (id: string, bookTitle: string) => {
-    const confirmPub = confirm(
-      `Xuất bản (Publish) cuốn sách "${bookTitle}"?\n\n` +
-      'Bản snapshot sẽ được lưu vào DB và phục vụ ngay trên website công khai mà không ảnh hưởng bởi các chỉnh sửa nháp tiếp theo.'
-    );
-    if (!confirmPub) return;
-
     try {
       setPublishingId(id);
-      const res = await publishAdminBook(id);
-      alert(res.message || 'Đã xuất bản thành công!');
-      await fetchBooks();
+      // Run pre-publish validation first (Prompt 34)
+      const report = await validateAdminBookForPublish(id);
+      setValidationModal({
+        bookId: id,
+        bookTitle,
+        report,
+      });
     } catch (err: any) {
-      alert(`Lỗi khi xuất bản: ${err?.message || 'Vui lòng thử lại.'}`);
+      alert(`Lỗi kiểm tra tính toàn vẹn: ${err?.message || 'Vui lòng thử lại.'}`);
     } finally {
       setPublishingId(null);
     }
@@ -432,6 +438,19 @@ export default function AdminBooksPage() {
           isOpen={true}
           onClose={() => setHistoryBook(null)}
           onRollbackSuccess={() => {
+            fetchBooks();
+          }}
+        />
+      )}
+      {/* Publish Validation & Confirmation Modal (Prompt 34) */}
+      {validationModal && (
+        <PublishValidationModal
+          bookId={validationModal.bookId}
+          bookTitle={validationModal.bookTitle}
+          isOpen={true}
+          onClose={() => setValidationModal(null)}
+          report={validationModal.report}
+          onPublishSuccess={() => {
             fetchBooks();
           }}
         />

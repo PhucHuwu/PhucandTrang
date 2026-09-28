@@ -42,6 +42,15 @@ export class BooksController {
   }
 
   /**
+   * Prompt 34: Run pre-publish validation report without altering database
+   */
+  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
+  @Get(':id/validate-publish')
+  async validateForPublish(@Param('id') id: string) {
+    return this.booksService.validateForPublish(id);
+  }
+
+  /**
    * Prompt 23: Previews current editing draft without affecting public viewers
    */
   @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
@@ -57,7 +66,7 @@ export class BooksController {
   }
 
   /**
-   * Prompt 23 & 24: Publishes current draft to live public site with optional changelog
+   * Prompt 23, 24 & 34: Publishes current draft to live public site with validation check
    */
   @Roles(Role.ADMIN, Role.EDITOR)
   @Post(':id/publish')
