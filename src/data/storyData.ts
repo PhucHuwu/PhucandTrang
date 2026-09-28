@@ -1,3 +1,12 @@
+/**
+ * LOVE_STORY_DATA
+ * =====================
+ * LEGACY MOCK DATA (Prompt 25 Verified)
+ * 
+ * In Production, the application strictly uses dynamic relational data from the database
+ * via NestJS API endpoints (/public/books/:slug) and Admin CMS.
+ * Kept strictly for backward-compatible imports in legacy scrapbooks / offline components.
+ */
 export interface LoveStoryPage {
   id: string;
   chapterNumber: string;

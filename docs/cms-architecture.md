@@ -430,8 +430,17 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
         - Ngăn chặn triệt để cross-book rollback và snapshot rỗng/thiếu trang.
     - Giao diện Admin:
       - Tích hợp modal `VersionHistoryModal` trực quan tại: Danh sách sách (`/admin/books`), Danh sách trang (`/admin/books/:bookId/pages`), và Visual Editor (`/admin/books/:bookId/pages/:pageId`).
-19. **Giai đoạn 19 (Prompt 25+ Nâng cao Editor & Undo/Redo/Snapping)**:
+19. **Giai đoạn 19 (Đã hoàn thành - Prompt 25 Final Legacy Data Migration)**:
+    - Audit toàn diện dữ liệu hardcoded legacy (`src/data/bookData.ts`, `src/data/storyData.ts`, covers, layouts, local metadata).
+    - Tạo migration script one-time: `backend/src/scripts/legacy-migration.ts`:
+      - Quét toàn bộ kho ảnh/video trong database (`Media` table).
+      - Map tự động toàn bộ Cloudinary raw URLs sang canonical `mediaId` và `posterMediaId` cho cả bìa sách (Front & Back covers), hình nền trang (`Page.background`), và toàn bộ phần tử `PageElement`.
+      - Biên dịch lại snapshot công khai chuẩn tắc và cập nhật `Book.publishedSnapshot`.
+    - Xác minh đường truyền:
+      - **Runtime Production Flow**: `PostgreSQL (Neon) ➔ NestJS API (/public/books/:slug) ➔ Frontend (QbjectAuthenticExperience)`.
+      - Local fallback (`PHUC_AND_TRANG_BOOK`) chỉ còn vai trò tương thích cho môi trường dev khi backend offline và bắt buộc flag `NEXT_PUBLIC_ENABLE_LOCAL_BOOK_FALLBACK=true` nếu muốn chạy offline ở production.
+20. **Giai đoạn 20 (Prompt 26+ Nâng cao Editor & Undo/Redo/Snapping)**:
     - Tích hợp lịch sử Undo / Redo cho canvas editor.
     - Thêm đường gióng từ tính (Smart Snapping / Alignment Guides).
     - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.
-    - Di dời/xóa bỏ an toàn các file legacy trong `src/components/spreads` và `src/components/pages`.
+    - Dọn dẹp/xóa bỏ an toàn các component legacy không dùng trong `src/components/spreads` và `src/components/pages`.

@@ -1,3 +1,13 @@
+/**
+ * PHUC_AND_TRANG_BOOK
+ * =====================
+ * LEGACY / OFFLINE DEV FALLBACK ONLY (Prompt 25 Verified)
+ * 
+ * In Production, the application strictly streams canonical content from PostgreSQL & NestJS API:
+ *   Database (PostgreSQL Neon) -> API (/api/public/books/:slug) -> Frontend (QbjectAuthenticExperience).
+ * 
+ * This file is retained solely for local development offline mode when the backend is not running.
+ */
 import { Book, Page, LayoutTemplate, PageMediaItem } from '@/types/book';
 import { applyLayoutTemplate } from '@/templates/layoutPresets';
 import { getMediaUrl } from '@/data/mediaConfig';
