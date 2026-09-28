@@ -465,6 +465,7 @@ export interface BookCoverConfig {
     outsideBackgroundUrl: string;
     outsideMediaId?: string;
     elements?: PageElement[];
+    insideElements?: PageElement[];
   };
 }
 

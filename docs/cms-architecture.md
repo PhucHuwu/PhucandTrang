@@ -529,6 +529,16 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
         7. **Cover**: Cấu hình URL ảnh nền và tiêu đề cho Bìa trước, Mặt trong và Mặt ngoài bìa sau.
       - **Safe PATCH Semantics**: Gửi payload PATCH partial JSON đối tượng `settings` mà không ghi đè mất các nhánh con chưa chỉnh sửa.
       - **Reset to Defaults Confirmation**: Hỗ trợ nút khôi phục giá trị mặc định cho từng tab chuyên biệt (`Reset Mặc Định`) kèm hộp thoại xác nhận.
-27. **Giai đoạn 27 (Prompt 33+ Nâng cao Editor & Cache / Clean up)**:
+27. **Giai đoạn 27 (Đã hoàn thành - Prompt 33 Full Visual Cover Studio)**:
+    - Xây dựng Visual Cover Studio chuyên sâu (`/admin/books/:bookId/cover`):
+      - **Tái sử dụng 100% Visual Canvas Engine**: Sử dụng trực tiếp `KonvaPageCanvas`, `LayersPanel`, `BackgroundEditor`, `AdvancedTextEditor`, `AdvancedImageEditor`, `AdvancedVideoEditor`, `InteractionEditor` mà không tạo renderer riêng biệt.
+      - **Hỗ trợ 3 mặt bìa (3 Cover Sides)**:
+        1. `Bìa trước (Front)`: `Book.cover.front.elements` & `Book.cover.front.backgroundUrl`.
+        2. `Mặt trong bìa sau (Inside Back Cover)`: `Book.cover.back.insideElements` & `Book.cover.back.insideBackgroundUrl`.
+        3. `Mặt ngoài bìa sau (Outside Back Cover)`: `Book.cover.back.elements` & `Book.cover.back.outsideBackgroundUrl`.
+      - **Quy tắc hiển thị**: `showPageNumber = false` (không hiển thị số trang trên bìa).
+      - **Hỗ trợ đầy đủ phần tử đồ họa**: `TEXT`, `IMAGE`, `VIDEO`, `SHAPE`, `DECORATION` cùng hệ thống phân giải biến động `{{couple.he}}`, `{{couple.she}}`, `{{anniversaryDate}}`.
+      - **Tích hợp Media Library Picker & Reference Checker**: Media IDs được quét và bảo vệ tính toàn vẹn khi kiểm tra tham chiếu trước khi xóa.
+28. **Giai đoạn 28 (Prompt 34+ Texture Cache IndexedDB & Polishing)**:
     - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.
     - Dọn dẹp/xóa bỏ an toàn các component legacy không dùng trong `src/components/spreads` và `src/components/pages`.

@@ -815,7 +815,26 @@ export default function BookSettingsPage() {
         {/* 7. Cover Tab */}
         {activeTab === 'cover' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="p-4 rounded-xl bg-gradient-to-r from-rosewood-950/60 to-[#2A1120] border border-rosewood-800/60 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-serif font-bold text-champagne-300">
+                  Visual Cover Studio (Prompt 33)
+                </h3>
+                <p className="text-xs text-stone-400 mt-0.5">
+                  Thiết kế đồ họa chuyên sâu cho Bìa trước, Bìa sau trong và ngoài với đầy đủ Text, Image, Video, Shapes và Dynamic Variables.
+                </p>
+              </div>
+
+              <Link
+                href={`/admin/books/${bookId}/cover`}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rosewood-600 hover:bg-rosewood-500 text-white text-xs font-semibold shadow-lg shadow-rosewood-950/50 transition-all active:scale-95"
+              >
+                <Layers className="w-4 h-4" />
+                <span>Mở Visual Cover Studio</span>
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
               <div>
                 <label className="block text-xs font-medium text-stone-300 mb-1.5">Ảnh nền Bìa trước (Front Cover URL)</label>
                 <input
