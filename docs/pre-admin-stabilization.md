@@ -7,9 +7,9 @@
 
 ### 1.1. Chiến Lược Migration Prisma Bắt Buộc (Prisma Migration Strategy)
 - **Khôi phục migration ban đầu sạch**:
-  - `backend/prisma/migrations/20260920000000_init/migration.sql` được đưa về đúng trạng thái gốc, loại bỏ hoàn toàn lỗi duplicate index `media_type_idx`.
+  - `apps/api/prisma/migrations/20260920000000_init/migration.sql` được đưa về đúng trạng thái gốc, loại bỏ hoàn toàn lỗi duplicate index `media_type_idx`.
 - **Tạo migration mới cho stabilization**:
-  - `backend/prisma/migrations/20260921000000_pre_admin_stabilization/migration.sql`:
+  - `apps/api/prisma/migrations/20260921000000_pre_admin_stabilization/migration.sql`:
     - Thay đổi default role của `User.role` thành `'VIEWER'`.
     - Bổ sung cột `content_revision` (INTEGER NOT NULL DEFAULT 1) vào bảng `books`.
 - Cả hai trường hợp database mới tinh và database đã chạy init cũ đều có migration path 100% hợp lệ.
@@ -78,7 +78,7 @@
 - Bảo tồn ngữ nghĩa `safeDeepMerge`: Khi gửi request `PATCH`, các trường lồng nhau không bị xóa mất dữ liệu cũ và chặn đứng prototype pollution (`__proto__`, `constructor`, `prototype`).
 
 ### 1.11. Loại Bỏ Trùng Lặp Nguồn Chân Lý (Shared Workspace Module)
-- Toàn bộ definitions của 9 Layout Presets, `imageFitting`, `coordinateConversion`, `safeMerge`, `textVariableResolver` và `pageUtils` được đặt tập trung tại thư mục `shared/`.
+- Toàn bộ definitions của 9 Layout Presets, `imageFitting`, `coordinateConversion`, `safeMerge`, `textVariableResolver` và `pageUtils` được đặt tập trung tại workspace package `packages/shared/`.
 - Cả Frontend Next.js và Backend NestJS đều import trực tiếp từ nguồn chân lý duy nhất này, loại bỏ hoàn toàn nguy cơ sửa một bên mà quên bên còn lại.
 - Hỗ trợ `LayoutTemplateId = BuiltInLayoutTemplateId | string` để không bị xung đột kiểu khi quản trị viên tạo thêm layout tùy biến trong CMS.
 
@@ -137,8 +137,8 @@
   13. `prisma/prisma.service.spec.ts`: Test production fail-fast without DATABASE_URL, hardened shutdown cleanup (pool.end called even if $disconnect fails).
   14. `app.controller.spec.ts`: Test basic server controller.
 - **Biên dịch & Chạy thực tế**:
-  - `backend`: `npm run build` thành công 100%.
-  - `backend start:prod`: `node dist/backend/src/main` smoke test thành công 100% (cổng 4000).
+  - `apps/api`: `npm run build:api` thành công 100%.
+  - `apps/api start:prod`: `node dist/apps/api/src/main` smoke test thành công 100% (cổng 4000).
   - `frontend`: `npm run build` thành công 100% (0 errors).
 
 ---
@@ -181,7 +181,7 @@ Trước khi bước vào Prompt 14 (Admin CMS Foundation), toàn bộ kiến tr
    - `PrismaService` và `seed.ts` bắt buộc `DATABASE_URL` khi chạy `NODE_ENV=production`, fail-fast ngay lập tức nếu thiếu hoặc mất kết nối cơ sở dữ liệu.
 
 5. **Prisma 7 Seed & Non-Destructive Policy**:
-   - `backend/prisma7.config.ts` cấu hình:
+   - `apps/api/prisma7.config.ts` cấu hình:
      ```ts
      migrations: { path: "prisma/migrations", seed: "ts-node prisma/seed.ts" }
      ```

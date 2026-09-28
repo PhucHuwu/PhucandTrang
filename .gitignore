@@ -1,23 +1,22 @@
 node_modules/
-.vercel
+.vercel/
 .env*.local
 .env
+.env.*
+!.env.example
 .DS_Store
-.next/
-out/
+**/.next/
+**/out/
+**/dist/
+coverage/
+*.tsbuildinfo
 
-# Media is delivered through Cloudinary CDN
-/public/memories/
-/public/page_backgrounds/
+# Local media mirrors are not committed; production uses Cloudinary CDN
+/apps/web/public/memories/
+/apps/web/public/page_backgrounds/
 
-# Backend Build & Dependencies
-backend/dist/
-backend/node_modules/
-backend/.env
-backend/.env.*
-backend/.agents/
-backend/.claude/
-backend/.windsurf/
-backend/skills-lock.json
-
-.vercel
+# Local agent/tool metadata
+**/.agents/
+**/.claude/
+**/.windsurf/
+**/skills-lock.json

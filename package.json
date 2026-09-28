@@ -1,36 +1,21 @@
 {
-  "name": "phuc-and-trang-love-journey",
+  "name": "phuc-and-trang",
   "version": "2.0.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "@gsap/react": "^2.1.2",
-    "@types/three": "^0.186.0",
-    "canvas-confetti": "^1.9.4",
-    "clsx": "^2.1.1",
-    "gsap": "^3.12.7",
-    "konva": "^10.7.0",
-    "lucide-react": "^1.16.0",
-    "next": "^15.2.1",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-konva": "^19.3.0",
-    "tailwind-merge": "^3.0.2",
-    "three": "^0.186.0"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4.3.3",
-    "@types/canvas-confetti": "^1.9.0",
-    "@types/node": "^22.13.10",
-    "@types/react": "^19.0.10",
-    "@types/react-dom": "^19.0.4",
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.3",
-    "tailwindcss": "^3.4.17",
-    "typescript": "^5.8.2"
+    "prepare": "npm run build:shared",
+    "build:shared": "npm run build --workspace=@phucandtrang/shared",
+    "dev:web": "npm run dev --workspace=@phucandtrang/web",
+    "dev:api": "npm run start:dev --workspace=@phucandtrang/api",
+    "build:web": "npm run build --workspace=@phucandtrang/web",
+    "build:api": "npm run build:shared && npm run build --workspace=@phucandtrang/api",
+    "build": "npm run build:shared && npm run build:api && npm run build:web",
+    "test:api": "npm run prisma:generate && npm run test --workspace=@phucandtrang/api",
+    "prisma:validate": "npm exec --workspace=@phucandtrang/api -- prisma validate --config prisma7.config.ts",
+    "prisma:generate": "npm exec --workspace=@phucandtrang/api -- prisma generate --config prisma7.config.ts"
   }
 }

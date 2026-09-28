@@ -4,7 +4,7 @@
 > **BLOCKER P0 / P1:** `0` (Đã xử lý dứt điểm tất cả 3 blocker P1 và 4 hạng mục P2)  
 > **KIỂM THỬ BACKEND:** `22 Test Suites, 113 Tests Passed (100%)`  
 > **BIÊN DỊCH DỰ ÁN:** `Frontend Next.js: 16 Static/Dynamic Routes OK (0 Errors), Backend NestJS Build OK (0 Errors)`  
-> **LOCKFILES & CI:** Đã tạo và commit `package-lock.json` cho cả root và backend; thiết lập GitHub Actions CI Pipeline (`.github/workflows/ci.yml`).
+> **LOCKFILE & CI:** npm workspaces sử dụng một root `package-lock.json`; GitHub Actions CI Pipeline nằm tại `.github/workflows/ci.yml`.
 
 ---
 
@@ -14,7 +14,7 @@
 | :--- | :---: | :--- | :--- | :---: |
 | **Xóa Hardcoded Credential** | **P1** | `admin/login/page.tsx` chứa sẵn email và password mẫu trong state `useState` | Đưa về chuỗi rỗng `useState('')`, chỉ dùng placeholder gợi ý | **ĐÃ GIẢI QUYẾT** |
 | **Đóng Đường Bypass Publish** | **P1** | `CreateBookDto`, `UpdateBookDto` và Settings UI cho phép set `status: PUBLISHED` trực tiếp, `PublicService` fallback compile draft | 1. Bỏ `status` khỏi Create/Update DTO.<br>2. Sách tạo mới luôn là `DRAFT`.<br>3. Chỉ `publishBook()` được phép chuyển sang `PUBLISHED` sau khi qua validation.<br>4. Settings UI chuyển status thành read-only badge.<br>5. `PublicService` từ chối biên dịch draft khi thiếu `publishedSnapshot` (throw 404).<br>6. Thêm regression test suite `publish-bypass-regression.spec.ts`. | **ĐÃ GIẢI QUYẾT** |
-| **Thiếu Package Lockfile** | **P1** | Repo không có lockfile, nguy cơ trôi lệch dependency | Đã sinh và commit `package-lock.json` cho cả Root và `backend/` | **ĐÃ GIẢI QUYẾT** |
+| **Thiếu Package Lockfile** | **P1** | Repo không có lockfile, nguy cơ trôi lệch dependency | Đã chuyển sang npm workspaces và duy trì một root `package-lock.json` | **ĐÃ GIẢI QUYẾT** |
 | **BFF Verify Signature JWT** | **P2** | `/api/admin/auth/me` chỉ đọc `admin_user` cookie không HttpOnly | Bổ sung endpoint backend `GET /api/auth/me` kiểm tra `AuthGuard('jwt')`; BFF route gọi backend để xác thực chữ ký token thực tế | **ĐÃ GIẢI QUYẾT** |
 | **Double Bump contentRevision** | **P2** | `publishBook` & `rollback` tăng `contentRevision` trong transaction rồi `touchBook` lại tăng thêm lần nữa | Bổ sung `PublicCacheService.invalidateBookCache(id)` xóa cache mà không tăng đúp `contentRevision` | **ĐÃ GIẢI QUYẾT** |
 | **Documentation Mismatch** | **P2** | README ghi `NestJS 11`, `JWT_EXPIRES_IN`, thiếu `BACKEND_INTERNAL_URL` | Đã chuẩn hóa thành `NestJS 10`, `JWT_EXPIRATION`, bổ sung `BACKEND_INTERNAL_URL` và ghi chú về distributed rate limiting | **ĐÃ GIẢI QUYẾT** |

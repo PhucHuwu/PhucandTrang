@@ -4,6 +4,24 @@ Hệ thống kỷ niệm tình yêu kết hợp trải nghiệm thị giác **3D
 
 ---
 
+## 📁 Cấu Trúc Monorepo
+
+```text
+PhucandTrang/
+├── apps/
+│   ├── web/                 # Next.js 15 frontend, Admin BFF, public 3D journal
+│   └── api/                 # NestJS 10 API, Prisma schema, migrations, seed
+├── packages/
+│   └── shared/              # Pure TypeScript contracts, math and utilities
+├── docs/
+├── .github/workflows/
+├── package.json             # npm workspace orchestration
+├── package-lock.json        # single lockfile for all workspaces
+└── tsconfig.base.json
+```
+
+---
+
 ## 🏗️ Tổng Quan Kiến Trúc (Architecture Overview)
 
 ```
@@ -51,7 +69,7 @@ Hệ thống kỷ niệm tình yêu kết hợp trải nghiệm thị giác **3D
 
 ### 1. Yêu Cầu Hệ Thống (Prerequisites)
 - **Node.js**: v20.x hoặc v22.x LTS
-- **Package Manager**: npm v10+ (Đã bao gồm `package-lock.json` cho cả Root và Backend)
+- **Package Manager**: npm v10+ với một root `package-lock.json`
 - **Database**: PostgreSQL 15+ (Khuyến nghị sử dụng Neon Serverless Postgres với SSL)
 - **Media CDN**: Tài khoản Cloudinary (Cloud Name, API Key, API Secret)
 
@@ -59,7 +77,7 @@ Hệ thống kỷ niệm tình yêu kết hợp trải nghiệm thị giác **3D
 
 ### 2. Thiết Lập Biến Môi Trường (Environment Variables)
 
-#### Backend (`backend/.env`)
+#### Backend (`apps/api/.env`)
 ```env
 # Application
 NODE_ENV=production
@@ -105,32 +123,35 @@ NEXT_PUBLIC_ENABLE_LOCAL_BOOK_FALLBACK=false
 Thực hiện tuần tự các bước sau trong terminal:
 
 ```bash
-# 1. Cài đặt toàn bộ dependencies cho Frontend & Backend bằng package-lock
-npm ci
-cd backend
+# 1. Cài đặt toàn bộ npm workspaces bằng root lockfile
 npm ci
 
-# 2. Sinh Prisma Client v7
-npx prisma generate --config prisma7.config.ts
+# 2. Kiểm tra và sinh Prisma Client v7
+npm run prisma:validate
+npm run prisma:generate
 
 # 3. Áp dụng tất cả migrations vào cơ sở dữ liệu PostgreSQL
-npx prisma migrate deploy
+cd apps/api
+npx prisma migrate deploy --config prisma7.config.ts
 
 # 4. Nạp dữ liệu khởi tạo (Seeding)
 npx prisma db seed
 
-# 5. Build ứng dụng
+# 5. Quay về root và build toàn bộ monorepo
+cd ../..
 npm run build
 
 # 6. Khởi chạy Backend Production Server
-npm run start:prod
+npm run start:prod --workspace=@phucandtrang/api
 ```
 
-Khởi chạy Frontend ở cửa sổ terminal gốc:
+Các lệnh phát triển từ root:
 ```bash
-cd ..
-npm run build
-npm run start
+npm run dev:web
+npm run dev:api
+npm run build:web
+npm run build:api
+npm run test:api
 ```
 
 ---
@@ -166,7 +187,7 @@ Sau khi đăng nhập, hệ thống điều hướng trực tiếp tới trang q
 
 ## 🔄 Cơ Chế Seeding: Normal Seed vs. Force Canonical Seed
 
-Tệp khởi tạo `backend/prisma/seed.ts` đảm bảo luôn chỉ tồn tại một cuốn nhật ký chuẩn tắc duy nhất:
+Tệp khởi tạo `apps/api/prisma/seed.ts` đảm bảo luôn chỉ tồn tại một cuốn nhật ký chuẩn tắc duy nhất:
 
 1. **Non-Destructive Seed (`SEED_FORCE_CANONICAL_BOOK=false` - Mặc Định)**:
    - Kiểm tra nếu tài khoản Admin, nhật ký chuẩn tắc (`phuc-and-trang`), layout templates hoặc audio tracks đã tồn tại thì **giữ nguyên vẹn 100% dữ liệu đang có**.
@@ -234,12 +255,29 @@ pg_restore -d "YOUR_TARGET_DATABASE_URL" -v "phuc_and_trang_backup_YYYYMMDD_HHMM
 
 ## 🧪 Kiểm Thử Hệ Thống (Automated Test Suites)
 
-Hệ thống sở hữu bộ kiểm thử tự động gồm **23 Test Suites với 117 Unit Tests** bao phủ 100% logic trọng yếu:
+Hệ thống sở hữu bộ kiểm thử tự động gồm **23 Test Suites với 117 Unit Tests** bao phủ logic trọng yếu:
 
 ```bash
-cd backend
-npm test
+npm run test:api
 ```
+
+---
+
+## ☁️ Cấu Hình Vercel Monorepo
+
+### Web Project
+- **Root Directory**: `apps/web`
+- **Framework**: Next.js
+- `apps/web/vercel.json` giữ `{"framework":"nextjs"}`
+- Biến môi trường: `NEXT_PUBLIC_API_URL`, `BACKEND_INTERNAL_URL`, `NEXT_PUBLIC_ENABLE_LOCAL_BOOK_FALLBACK`
+
+### API Project
+- **Root Directory**: `apps/api`
+- **Framework**: NestJS
+- `apps/api/vercel.json` giữ schema và `"framework": "nestjs"`
+- Biến môi trường: `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `JWT_SECRET`, `JWT_EXPIRATION`, `CORS_ORIGINS`, Cloudinary keys và seed admin variables
+
+Hai Vercel projects phải cho phép npm cài dependency từ root workspace để liên kết `@phucandtrang/shared`.
 
 ---
 

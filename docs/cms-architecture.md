@@ -46,3 +46,30 @@ Hệ thống đã hoàn tất chuyển đổi toàn diện từ mô hình **Mult
 - **Backend NestJS**: **23/23 Test Suites Passed (117/117 Unit Tests, 100%)**.
 - **Backend Build**: Thành công 100% (0 errors).
 - **Frontend Build**: Thành công 100% (0 errors, 18 static & dynamic routes).
+
+---
+
+## 4. Monorepo Restructure
+
+Repository được tổ chức bằng npm workspaces mà không thay đổi product behavior:
+
+```text
+PhucandTrang/
+├── apps/
+│   ├── web/                 # Next.js 15, Admin UI, BFF routes, public 3D journal
+│   └── api/                 # NestJS 10, Prisma schema/migrations/seed
+├── packages/
+│   └── shared/              # Framework-independent contracts and pure utilities
+├── docs/
+├── .github/workflows/
+├── package.json
+├── package-lock.json
+└── tsconfig.base.json
+```
+
+- Frontend source moved from root `src/` and `public/` to `apps/web/`.
+- Backend moved from `backend/` to `apps/api/`.
+- Shared code moved from `shared/` to the compiled workspace package `@phucandtrang/shared`.
+- Prisma seed catalog moved into the shared package, so API seed no longer imports frontend files.
+- Root scripts orchestrate development, builds, tests and Prisma commands.
+- CI installs once with root `npm ci` and verifies shared, Prisma, API tests/build and web build.
