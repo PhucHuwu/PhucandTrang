@@ -106,7 +106,7 @@ export class AuthService {
     // Login successful: reset failed attempt counter
     this.clearFailedAttempts(rateLimitKey);
 
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    const payload = { sub: user.id, email: user.email, name: user.name || 'Phúc & Trang Admin', role: user.role };
     return {
       accessToken: this.jwtService.sign(payload),
       user,

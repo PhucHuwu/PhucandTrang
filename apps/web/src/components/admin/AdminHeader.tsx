@@ -46,11 +46,11 @@ export default function AdminHeader() {
         {user && (
           <div className="flex items-center gap-2.5 pl-2 border-l border-rosewood-900/40">
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-rosewood-700 to-rosewood-900 border border-rosewood-500/40 flex items-center justify-center text-champagne-200 text-xs font-serif font-bold shadow">
-              {user.name.charAt(0).toUpperCase()}
+              {(user.name || user.email || 'A').charAt(0).toUpperCase()}
             </div>
             <div className="hidden md:block text-left">
-              <p className="text-xs font-medium text-parchment-100 leading-tight">{user.name}</p>
-              <p className="text-[10px] font-mono text-stone-400">{user.email}</p>
+              <p className="text-xs font-medium text-parchment-100 leading-tight">{user.name || 'Quản trị viên'}</p>
+              <p className="text-[10px] font-mono text-stone-400">{user.email || 'admin'}</p>
             </div>
           </div>
         )}
