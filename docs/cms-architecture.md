@@ -478,8 +478,19 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
         - `Error` (Màu đỏ + thông báo lỗi kèm nút "Thử lại" manual retry).
       - **Bảo Vệ Rời Trang (`beforeunload`)**:
         - Bắt sự kiện trình duyệt khi người dùng định đóng tab hoặc chuyển URL khi còn dữ liệu `unsaved` hoặc đang `saving`.
-23. **Giai đoạn 23 (Prompt 29+ Nâng cao Editor & Undo/Redo/Snapping)**:
-    - Tích hợp lịch sử Undo / Redo cho canvas editor.
+23. **Giai đoạn 23 (Đã hoàn thành - Prompt 29 Visual Editor Undo / Redo Engine)**:
+    - Xây dựng hệ thống quản lý lịch sử thao tác (History Engine) cho Visual Page Editor:
+      - Custom Hook `usePageHistory`:
+        - Duy trì 2 ngăn xếp phân tách: `pastRef` (ngăn xếp hoàn tác) và `futureRef` (ngăn xếp làm lại) với dung lượng tối đa 40 snapshots.
+        - **Phạm vi ghi nhận lịch sử**: Move (kéo vị trí), Resize (co giãn), Rotate (xoay), Style edit (màu sắc, font, shadow), Data edit (chữ, mediaId, focalPoint), Add element, Delete element, Duplicate element, Apply layout template.
+        - **Quy tắc Gesture Granularity (Một thao tác = Một entry)**: Không lưu từng pixel chuyển động khi đang drag/transform. Chỉ lưu duy nhất 1 snapshot tại thời điểm kết thúc thao tác (`onDragEnd`, `onTransformEnd`).
+        - **Phối hợp chuẩn xác với Autosave**: Khi Undo hoặc Redo được kích hoạt, trang được cập nhật lại, tự động đánh dấu `unsaved` và kích hoạt chu kỳ autosave debounced 800ms để lưu xuống database.
+      - **Phím tắt chuẩn công nghiệp (Keyboard Shortcuts)**:
+        - `Ctrl + Z` / `Cmd + Z`: Hoàn tác (Undo).
+        - `Ctrl + Shift + Z` / `Cmd + Shift + Z`: Làm lại (Redo).
+        - Tự động bỏ qua phím tắt khi người dùng đang gõ phím bên trong `<input>`, `<textarea>` hoặc contentEditable.
+      - **Nút điều khiển trực quan**: Bổ sung cụm nút Undo / Redo ngay trên Top Bar của Visual Editor.
+24. **Giai đoạn 24 (Prompt 30+ Nâng cao Editor & Snapping / Cache)**:
     - Thêm đường gióng từ tính (Smart Snapping / Alignment Guides).
     - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.
     - Dọn dẹp/xóa bỏ an toàn các component legacy không dùng trong `src/components/spreads` và `src/components/pages`.

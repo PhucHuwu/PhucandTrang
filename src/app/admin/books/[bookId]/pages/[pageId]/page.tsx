@@ -59,11 +59,14 @@ import {
   Send,
   ExternalLink,
   History,
+  Undo2,
+  Redo2,
 } from 'lucide-react';
 import { publishAdminBook } from '@/services/adminApi';
 import VersionHistoryModal from '@/components/admin/VersionHistoryModal';
 import { useAutosavePage } from '@/hooks/useAutosavePage';
 import AutosaveIndicator from '@/components/admin/AutosaveIndicator';
+import { usePageHistory } from '@/hooks/usePageHistory';
 
 // Dynamic import KonvaPageCanvas with ssr: false because Konva requires DOM window & canvas
 const KonvaPageCanvas = dynamic(() => import('@/components/admin/KonvaPageCanvas'), {
@@ -104,6 +107,25 @@ export default function VisualPageEditorPage() {
   const [inspectorTab, setInspectorTab] = useState<'element' | 'interaction' | 'background'>('element');
   const [editingActiveArea, setEditingActiveArea] = useState(false);
 
+  // Prompt 29: Undo / Redo History Hook
+  const {
+    canUndo,
+    canRedo,
+    undo: performUndo,
+    redo: performRedo,
+    recordHistory,
+    initHistory,
+  } = usePageHistory(page, {
+    maxHistory: 40,
+    onHistoryChange: (restoredPage) => {
+      setPage(restoredPage);
+      if (restoredPage.elements?.length > 0 && selectedElementId) {
+        const stillExists = restoredPage.elements.some((el) => el.id === selectedElementId);
+        if (!stillExists) setSelectedElementId(restoredPage.elements[0].id);
+      }
+    },
+  });
+
   // Prompt 28: Autosave integration with debounce and state tracking
   const {
     status: autosaveStatus,
@@ -131,6 +153,7 @@ export default function VisualPageEditorPage() {
         ]);
         setBook(bookData);
         setPage(pageData);
+        initHistory(pageData);
         setAllPages(pagesList);
         setAudioTracks(tracks);
         setVideoMedia(videos.items || []);
@@ -159,13 +182,15 @@ export default function VisualPageEditorPage() {
         }
         return el;
       });
-      return {
+      const nextPage = {
         ...prevPage,
         isCustomized: true, // Setting property sets isCustomized = true
         elements: updatedElements,
       };
+      recordHistory(nextPage, 'Chỉnh sửa thuộc tính phần tử');
+      return nextPage;
     });
-  }, [selectedElementId]);
+  }, [selectedElementId, recordHistory]);
 
   // Update normalized transform when dragged or resized on Konva Canvas -> sets isCustomized = true (Prompt 16 Requirement)
   const handleUpdateElementTransform = useCallback(
@@ -184,21 +209,24 @@ export default function VisualPageEditorPage() {
           }
           return el;
         });
-        return {
+        const nextPage = {
           ...prevPage,
           isCustomized: true, // Dragging/resizing sets isCustomized = true
           elements: updatedElements,
         };
+        // Record drag/resize/rotate gesture commit into history
+        recordHistory(nextPage, 'Thay đổi vị trí / kích thước phần tử');
+        return nextPage;
       });
     },
-    []
+    [recordHistory]
   );
 
   const handleUpdateActiveArea = useCallback(
     (id: string, activeArea: { left: number; top: number; width: number; height: number }) => {
       setPage((prevPage) => {
         if (!prevPage) return prevPage;
-        return {
+        const nextPage = {
           ...prevPage,
           isCustomized: true,
           elements: prevPage.elements.map((el) =>
@@ -213,9 +241,11 @@ export default function VisualPageEditorPage() {
               : el
           ),
         };
+        recordHistory(nextPage, 'Cập nhật vùng bấm tương tác');
+        return nextPage;
       });
     },
-    []
+    [recordHistory]
   );
 
   // Apply Layout Template (Prompt 16 Core Requirement)
@@ -275,6 +305,7 @@ export default function VisualPageEditorPage() {
       // Refresh page from backend to ensure consistent state
       const refreshedPage = await getAdminPage(pageId);
       setPage(refreshedPage);
+      recordHistory(refreshedPage, `Áp dụng bố cục ${templateDef.name}`);
       if (refreshedPage.elements?.length > 0) {
         setSelectedElementId(refreshedPage.elements[0].id);
       }
@@ -363,7 +394,12 @@ export default function VisualPageEditorPage() {
 
     try {
       const created = await createAdminElement(newElementPayload);
-      setPage((prev) => (prev ? { ...prev, isCustomized: true, elements: [...prev.elements, created] } : prev));
+      setPage((prev) => {
+        if (!prev) return prev;
+        const nextPage = { ...prev, isCustomized: true, elements: [...prev.elements, created] };
+        recordHistory(nextPage, `Thêm phần tử ${type}`);
+        return nextPage;
+      });
       setSelectedElementId(created.id);
     } catch (err: any) {
       alert(err?.message || 'Lỗi thêm phần tử mới');
@@ -375,7 +411,12 @@ export default function VisualPageEditorPage() {
     if (isViewer || !selectedElementId) return;
     try {
       const dup = await duplicateAdminElement(selectedElementId, 0.03, 0.03);
-      setPage((prev) => (prev ? { ...prev, isCustomized: true, elements: [...prev.elements, dup] } : prev));
+      setPage((prev) => {
+        if (!prev) return prev;
+        const nextPage = { ...prev, isCustomized: true, elements: [...prev.elements, dup] };
+        recordHistory(nextPage, 'Nhân bản phần tử');
+        return nextPage;
+      });
       setSelectedElementId(dup.id);
       setToast('Đã nhân bản phần tử!');
       setTimeout(() => setToast(null), 2500);
@@ -393,7 +434,9 @@ export default function VisualPageEditorPage() {
       setPage((prev) => {
         if (!prev) return prev;
         const remaining = prev.elements.filter((el) => el.id !== elementId);
-        return { ...prev, isCustomized: true, elements: remaining };
+        const nextPage = { ...prev, isCustomized: true, elements: remaining };
+        recordHistory(nextPage, 'Xóa phần tử');
+        return nextPage;
       });
       setSelectedElementId(null);
     } catch (err: any) {
@@ -443,6 +486,40 @@ export default function VisualPageEditorPage() {
     }
   };
 
+  // Keyboard Shortcuts: Ctrl/Cmd + Z (Undo), Ctrl/Cmd + Shift + Z (Redo)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore shortcut when user is typing in form inputs/textarea/contentEditable
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      const isMac = typeof window !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+      if (isCmdOrCtrl && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          // Redo: Ctrl/Cmd + Shift + Z
+          if (canRedo) performRedo();
+        } else {
+          // Undo: Ctrl/Cmd + Z
+          if (canUndo) performUndo();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [canUndo, canRedo, performUndo, performRedo]);
+
   if (loading || !page) {
     return (
       <div className="py-32 flex flex-col items-center justify-center text-stone-500 text-xs">
@@ -488,9 +565,31 @@ export default function VisualPageEditorPage() {
           </div>
         </div>
 
-        {/* Center Quick Action Bar (Add Elements + Layout Preset Picker) */}
+        {/* Center Quick Action Bar (Undo/Redo + Add Elements + Layout Preset Picker) */}
         {!isViewer && (
           <div className="flex items-center gap-2">
+            {/* Prompt 29: Undo & Redo Tool Buttons */}
+            <div className="flex items-center gap-0.5 bg-[#20111A] p-1 rounded-xl border border-rosewood-900/40 text-xs">
+              <button
+                type="button"
+                onClick={() => performUndo()}
+                disabled={!canUndo}
+                className="p-1.5 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                title="Hoàn tác (Ctrl+Z)"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => performRedo()}
+                disabled={!canRedo}
+                className="p-1.5 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                title="Làm lại (Ctrl+Shift+Z)"
+              >
+                <Redo2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
             {/* Prompt 16: Layout Picker Button */}
             <button
               type="button"
