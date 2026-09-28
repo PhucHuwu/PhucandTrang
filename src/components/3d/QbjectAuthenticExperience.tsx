@@ -6,6 +6,7 @@ import Flipbook from './qbject/flipbook';
 import { PageTextureGenerator } from './PageTextureGenerator';
 import { AtmosphericSystem } from './AtmosphericSystem';
 import { LazyPageTextureManager } from './LazyPageTextureManager';
+import { MediaPreloader } from './MediaPreloader';
 import VintageMusicPlayer from '@/components/VintageMusicPlayer';
 import { ensureCustomFontLoaded } from '@/data/fontLoader';
 import { fetchPublishedBook } from '@/services/bookApi';
@@ -33,6 +34,7 @@ export default function QbjectAuthenticExperience({
   const [error, setError] = useState<string | null>(null);
   const flipbookInstanceRef = useRef<Flipbook | null>(null);
   const lazyTextureManagerRef = useRef<LazyPageTextureManager | null>(null);
+  const mediaPreloaderRef = useRef<MediaPreloader | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -68,6 +70,11 @@ export default function QbjectAuthenticExperience({
         // 3. Prompt 26: Initialize Lazy Texture Manager
         const lazyManager = new LazyPageTextureManager(book);
         lazyTextureManagerRef.current = lazyManager;
+
+        // Prompt 27: Initialize MediaPreloader for priority-driven background preloading
+        const mediaPreloader = new MediaPreloader(book);
+        mediaPreloaderRef.current = mediaPreloader;
+        mediaPreloader.init(0);
 
         const totalInsidePages = book.pages.length;
         const totalFaces = totalInsidePages + 3; // front cover + N inside pages + 2 back covers
@@ -194,6 +201,9 @@ export default function QbjectAuthenticExperience({
                   flipbookInstanceRef.current.updateFaceTexture(faceIdx, textureUrl);
                 }
               });
+
+              // Prompt 27: Re-prioritize media preloading based on current spread
+              mediaPreloader.updatePagePriorities(current);
             }
             requestAnimationFrame(checkProgress);
           }
@@ -211,6 +221,8 @@ export default function QbjectAuthenticExperience({
 
     return () => {
       destroyed = true;
+      mediaPreloaderRef.current?.destroy();
+      mediaPreloaderRef.current = null;
       lazyTextureManagerRef.current?.destroy();
       lazyTextureManagerRef.current = null;
       flipbookInstanceRef.current?.destroy();

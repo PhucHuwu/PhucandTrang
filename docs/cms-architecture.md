@@ -448,7 +448,22 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
         - Xử lý mượt mà khi lật trang nhanh (Fast Page Flipping): Các request render texture được gom trong hàng đợi `inFlightGenerations` chống duplicate generation.
         - **Cơ chế dọn dẹp bộ nhớ (Texture Cache & Pruning)**: Khi bộ nhớ cache vượt ngưỡng 16 textures, hệ thống tự động `dispose()` các texture xa ngoài cửa sổ trượt để bảo toàn VRAM.
         - Phương thức `page.setSideTexture(side, url)` và `flipbook.updateFaceTexture(faceIndex, url)` cập nhật trực tiếp material mặt lật trong Three.js scene mà không cần reload trang.
-21. **Giai đoạn 21 (Prompt 27+ Nâng cao Editor & Undo/Redo/Snapping)**:
+21. **Giai đoạn 21 (Đã hoàn thành - Prompt 27 Media Preloading Engine)**:
+    - Xây dựng module `MediaPreloader` chuyên trách tải trước tài nguyên dựa trên độ ưu tiên (Priority-Driven Preloading):
+      - **Thứ tự ưu tiên (Priority Levels)**:
+        1. `Priority 1`: Bìa trước, Bìa sau (Covers) và Nhạc nền chính (Background Music Metadata).
+        2. `Priority 2`: Trang hiện tại (Current Page / Spread).
+        3. `Priority 3`: Các trang lân cận (Adjacent Pages: `current ± 2`).
+        4. `Priority 4`: Các trang còn lại trong cuốn sách.
+      - **Tài nguyên hỗ trợ tải trước**:
+        - Hình ảnh (`HTMLImageElement` kết hợp `img.decode()` giải nén đa luồng ngoài main thread).
+        - Video Posters (chỉ tải poster ảnh tĩnh, **tuyệt đối không preload toàn bộ file video MP4 nặng**).
+        - Âm thanh (nạp metadata bằng `audio.preload = 'metadata'`).
+      - **Khả năng kiểm soát**:
+        - Khử trùng lặp (`preloadedUrls: Set<string>`).
+        - Hủy tải an toàn qua `AbortController` khi chuyển trang hoặc unmount.
+        - Không làm chậm tiến trình first meaningful render (hoạt động ngầm với concurrency = 4).
+22. **Giai đoạn 22 (Prompt 28+ Nâng cao Editor & Undo/Redo/Snapping)**:
     - Tích hợp lịch sử Undo / Redo cho canvas editor.
     - Thêm đường gióng từ tính (Smart Snapping / Alignment Guides).
     - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.
