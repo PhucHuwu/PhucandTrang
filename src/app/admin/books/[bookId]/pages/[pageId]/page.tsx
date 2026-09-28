@@ -58,8 +58,10 @@ import {
   BookmarkPlus,
   Send,
   ExternalLink,
+  History,
 } from 'lucide-react';
 import { publishAdminBook } from '@/services/adminApi';
+import VersionHistoryModal from '@/components/admin/VersionHistoryModal';
 
 // Dynamic import KonvaPageCanvas with ssr: false because Konva requires DOM window & canvas
 const KonvaPageCanvas = dynamic(() => import('@/components/admin/KonvaPageCanvas'), {
@@ -81,6 +83,7 @@ export default function VisualPageEditorPage() {
   const [book, setBook] = useState<Partial<Book> | null>(null);
   const [allPages, setAllPages] = useState<any[]>([]);
   const [publishing, setPublishing] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [audioTracks, setAudioTracks] = useState<any[]>([]);
   const [videoMedia, setVideoMedia] = useState<any[]>([]);
   const [page, setPage] = useState<Page | null>(null);
@@ -545,6 +548,17 @@ export default function VisualPageEditorPage() {
               <span>{toast}</span>
             </span>
           )}
+
+          {/* Version History Button */}
+          <button
+            type="button"
+            onClick={() => setShowHistoryModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#20111A] hover:bg-[#2C1923] text-amber-300 border border-rosewood-900/40 text-xs font-medium transition-colors shadow-sm"
+            title="Lịch sử phiên bản và Rollback"
+          >
+            <History className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden lg:inline">Lịch sử</span>
+          </button>
 
           {/* Preview Draft Button */}
           <Link
@@ -1071,6 +1085,21 @@ export default function VisualPageEditorPage() {
         onSaved={(newTpl) => {
           setToast(`Đã lưu bố cục "${newTpl.name}" thành công!`);
           setTimeout(() => setToast(null), 3000);
+        }}
+      />
+      {/* Version History & Rollback Modal */}
+      <VersionHistoryModal
+        bookId={bookId}
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        onRollbackSuccess={async () => {
+          // Refresh current page
+          try {
+            const refreshed = await getAdminPage(pageId);
+            setPage(refreshed);
+          } catch {
+            window.location.reload();
+          }
         }}
       />
     </div>

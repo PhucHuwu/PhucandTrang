@@ -417,7 +417,20 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
     - Tích hợp nút thao tác trực quan:
       - Nút "Preview Draft" & "Publish" tại Visual Editor (`/admin/books/:bookId/pages/:pageId`).
       - Nút "Preview Draft" & "Publish" tại Danh sách sách (`/admin/books`) và Danh sách trang (`/admin/books/:bookId/pages`).
-18. **Giai đoạn 18 (Prompt 24+ Nâng cao Editor & Undo/Redo/Snapping)**:
+18. **Giai đoạn 18 (Đã hoàn thành - Prompt 24 Version History & Rollback)**:
+    - Hoàn thiện module `BookVersion` với kiến trúc snapshot an toàn:
+      - Quản lý phiên bản đầy đủ: `version`, `createdAt`, `createdBy` (kèm email/tên người tạo qua quan hệ User), `changelog`.
+      - **Tự động lưu Version Snapshot khi Publish**: Mỗi lần người dùng bấm "Publish", hệ thống tự động lưu bản phát hành vào `BookVersion` (VD: `v2.1`, `v2.2`, `v2.3`), đảm bảo lịch sử liên tục.
+      - **Tạo Snapshot thủ công (Create Snapshot)**: Cho phép Quản trị viên/Biên tập viên gắn nhãn tag tùy chỉnh và changelog ghi nhớ trước khi chỉnh sửa lớn.
+      - **Inspect Metadata & Snapshot Architecture**: Xem cấu trúc chi tiết (số trang, số elements, nhạc nền, thông tin người thực hiện, thời gian lưu).
+      - **Rollback Draft (Phục hồi bản nháp)**:
+        - Sử dụng transaction atomic `$transaction` để xóa và nạp lại trang/phần tử vào bản nháp.
+        - **Tuyệt đối KHÔNG tự động publish sau rollback**: Dữ liệu công khai trên Live Site (`publishedSnapshot`) được giữ nguyên không đổi.
+        - Bắt buộc quy trình an toàn: User Rollback Draft ➔ Preview ➔ Bấm Publish lại khi sẵn sàng.
+        - Ngăn chặn triệt để cross-book rollback và snapshot rỗng/thiếu trang.
+    - Giao diện Admin:
+      - Tích hợp modal `VersionHistoryModal` trực quan tại: Danh sách sách (`/admin/books`), Danh sách trang (`/admin/books/:bookId/pages`), và Visual Editor (`/admin/books/:bookId/pages/:pageId`).
+19. **Giai đoạn 19 (Prompt 25+ Nâng cao Editor & Undo/Redo/Snapping)**:
     - Tích hợp lịch sử Undo / Redo cho canvas editor.
     - Thêm đường gióng từ tính (Smart Snapping / Alignment Guides).
     - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.

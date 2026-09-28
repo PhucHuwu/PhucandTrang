@@ -417,8 +417,28 @@ export async function deleteAdminAudioTrack(id: string): Promise<any> {
 // 8. VERSIONS API
 // ==========================================
 
-export async function getAdminVersions(bookId: string): Promise<any[]> {
-  return adminFetch<any[]>(`versions/book/${bookId}`);
+export interface BookVersionItem {
+  id: string;
+  bookId: string;
+  version: string;
+  changelog?: string;
+  createdById?: string;
+  createdBy?: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+  createdAt: string;
+  snapshot?: any;
+}
+
+export async function getAdminVersions(bookId: string): Promise<BookVersionItem[]> {
+  return adminFetch<BookVersionItem[]>(`versions/book/${bookId}`);
+}
+
+export async function getAdminVersion(id: string): Promise<BookVersionItem> {
+  return adminFetch<BookVersionItem>(`versions/${id}`);
 }
 
 export async function createAdminSnapshot(bookId: string, version: string, changelog?: string): Promise<any> {
@@ -428,8 +448,18 @@ export async function createAdminSnapshot(bookId: string, version: string, chang
   });
 }
 
-export async function rollbackAdminSnapshot(bookId: string, versionId: string): Promise<any> {
-  return adminFetch<any>(`versions/book/${bookId}/rollback/${versionId}`, {
+export async function rollbackAdminSnapshot(bookId: string, versionId: string): Promise<{
+  success: boolean;
+  message: string;
+  version: string;
+}> {
+  return adminFetch<{
+    success: boolean;
+    message: string;
+    version: string;
+  }>(`versions/book/${bookId}/rollback/${versionId}`, {
     method: 'POST',
   });
 }
+
+export const rollbackAdminBookSnapshot = rollbackAdminSnapshot;

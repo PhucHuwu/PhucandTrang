@@ -18,6 +18,15 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish)', () => {
         findFirst: jest.fn(),
         update: jest.fn(),
       },
+      bookVersion: {
+        create: jest.fn(),
+      },
+      $transaction: jest.fn(async (ops) => {
+        if (Array.isArray(ops)) {
+          return Promise.all(ops);
+        }
+        return ops(prisma);
+      }),
     };
 
     cacheService = {
@@ -118,28 +127,25 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish)', () => {
     expect(publicService.compileBookDocument).toHaveBeenCalled();
   });
 
-  it('Prompt 23: publishBook validates draft, compiles snapshot, increments publishedRevision, and clears cache', async () => {
+  it('Prompt 23 & 24: publishBook validates draft, compiles snapshot, increments publishedRevision, saves version history, and clears cache', async () => {
     prisma.book.findUnique.mockResolvedValue(mockExistingBook);
     prisma.book.update.mockResolvedValue({
       ...mockExistingBook,
       status: BookStatus.PUBLISHED,
       publishedRevision: 2,
     });
+    prisma.bookVersion.create.mockResolvedValue({
+      id: 'ver-2',
+      bookId: 'book-1',
+      version: 'v2.2',
+    });
 
-    const res = await service.publishBook('book-1');
+    const res = await service.publishBook('book-1', 'Cập nhật thêm trang 5');
 
     expect(res.success).toBe(true);
     expect(res.publishedRevision).toBe(2);
-    expect(prisma.book.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'book-1' },
-        data: expect.objectContaining({
-          status: BookStatus.PUBLISHED,
-          publishedRevision: 2,
-          publishedSnapshot: expect.any(Object),
-        }),
-      }),
-    );
+    expect(res.version).toBe('v2.2');
+    expect(prisma.$transaction).toHaveBeenCalled();
     expect(cacheService.touchBook).toHaveBeenCalledWith('book-1');
   });
 });

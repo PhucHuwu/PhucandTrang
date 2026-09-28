@@ -19,8 +19,10 @@ import {
   RefreshCw,
   Eye,
   Send,
+  History,
 } from 'lucide-react';
 import { publishAdminBook } from '@/services/adminApi';
+import VersionHistoryModal from '@/components/admin/VersionHistoryModal';
 
 export default function AdminBooksPage() {
   const [books, setBooks] = useState<any[]>([]);
@@ -28,6 +30,9 @@ export default function AdminBooksPage() {
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [publishingId, setPublishingId] = useState<string | null>(null);
+
+  // Version History Modal State
+  const [historyBook, setHistoryBook] = useState<{ id: string; title: string } | null>(null);
 
   // New book form state
   const [title, setTitle] = useState('');
@@ -288,6 +293,13 @@ export default function AdminBooksPage() {
                       >
                         <Settings className="w-4 h-4" />
                       </Link>
+                      <button
+                        onClick={() => setHistoryBook({ id: book.id, title: book.title })}
+                        className="p-1.5 rounded-xl bg-[#25151F] hover:bg-[#331C2A] text-amber-300 border border-rosewood-900/40 transition-colors"
+                        title="Lịch sử phiên bản & Rollback"
+                      >
+                        <History className="w-4 h-4" />
+                      </button>
                       <Link
                         href="/"
                         target="_blank"
@@ -411,6 +423,18 @@ export default function AdminBooksPage() {
             </form>
           </div>
         </div>
+      )}
+      {/* Version History & Rollback Modal */}
+      {historyBook && (
+        <VersionHistoryModal
+          bookId={historyBook.id}
+          bookTitle={historyBook.title}
+          isOpen={true}
+          onClose={() => setHistoryBook(null)}
+          onRollbackSuccess={() => {
+            fetchBooks();
+          }}
+        />
       )}
     </div>
   );

@@ -24,8 +24,10 @@ import {
   RefreshCw,
   Eye,
   Send,
+  History,
 } from 'lucide-react';
 import { publishAdminBook } from '@/services/adminApi';
+import VersionHistoryModal from '@/components/admin/VersionHistoryModal';
 
 export default function AdminPagesListPage() {
   const params = useParams();
@@ -45,6 +47,7 @@ export default function AdminPagesListPage() {
   const [layoutTemplateId, setLayoutTemplateId] = useState('single-hero');
   const [creating, setCreating] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   const fetchPages = async () => {
     setLoading(true);
@@ -186,6 +189,16 @@ export default function AdminPagesListPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* History & Rollback Button */}
+          <button
+            onClick={() => setShowHistoryModal(true)}
+            className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#201319] hover:bg-[#2C1923] text-amber-300 border border-rosewood-900/40 text-xs font-medium transition-colors shadow-sm"
+            title="Lịch sử phiên bản và Rollback"
+          >
+            <History className="w-4 h-4 text-amber-400" />
+            <span className="hidden md:inline">Lịch sử phiên bản</span>
+          </button>
+
           {/* Preview Draft Button */}
           <Link
             href={`/admin/books/${bookId}/preview`}
@@ -481,6 +494,15 @@ export default function AdminPagesListPage() {
           </div>
         </div>
       )}
+      {/* Version History & Rollback Modal */}
+      <VersionHistoryModal
+        bookId={bookId}
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        onRollbackSuccess={() => {
+          fetchPages();
+        }}
+      />
     </div>
   );
 }

@@ -57,12 +57,16 @@ export class BooksController {
   }
 
   /**
-   * Prompt 23: Publishes current draft to live public site
+   * Prompt 23 & 24: Publishes current draft to live public site with optional changelog
    */
   @Roles(Role.ADMIN, Role.EDITOR)
   @Post(':id/publish')
-  async publishBook(@Param('id') id: string) {
-    return this.booksService.publishBook(id);
+  async publishBook(
+    @Param('id') id: string,
+    @Body() body: { changelog?: string } = {},
+    @Request() req: any,
+  ) {
+    return this.booksService.publishBook(id, body?.changelog, req.user?.id);
   }
 
   @Roles(Role.ADMIN, Role.EDITOR)

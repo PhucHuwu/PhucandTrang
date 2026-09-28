@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PublicCacheService } from '../public/public-cache.service';
 import { BadRequestException } from '@nestjs/common';
 
-describe('VersionsService Rollback Protection (Req 2, 3, 4, 14, 15, 16)', () => {
+describe('VersionsService Rollback Protection (Req 2, 3, 4, 14, 15, 16 & Prompt 24)', () => {
   let service: VersionsService;
   let prisma: any;
   let cacheService: any;
@@ -13,6 +13,8 @@ describe('VersionsService Rollback Protection (Req 2, 3, 4, 14, 15, 16)', () => 
     prisma = {
       bookVersion: {
         findUnique: jest.fn(),
+        findMany: jest.fn(),
+        create: jest.fn(),
       },
       book: {
         findUnique: jest.fn(),
@@ -63,14 +65,14 @@ describe('VersionsService Rollback Protection (Req 2, 3, 4, 14, 15, 16)', () => 
     expect(cacheService.touchBook).not.toHaveBeenCalled();
   });
 
-  it('should properly restore backgroundMusicId = null if snapshot has null music', async () => {
+  it('Prompt 24: rollbackToSnapshot restores draft pages & book fields, but does NOT publish or touch publishedSnapshot', async () => {
     const validSnapshotVersion = {
       id: 'ver-silent',
       bookId: 'book-1',
       version: '1.2.0',
       snapshot: {
         bookId: 'book-1',
-        title: 'Chúng Mình',
+        title: 'Chúng Mình (Bản Cũ)',
         backgroundMusicId: null, // Explicit null music
         pages: [
           {
@@ -85,21 +87,39 @@ describe('VersionsService Rollback Protection (Req 2, 3, 4, 14, 15, 16)', () => 
     };
 
     prisma.bookVersion.findUnique.mockResolvedValue(validSnapshotVersion);
-    prisma.book.findUnique.mockResolvedValue({ id: 'book-1', backgroundMusicId: 'track-van-vat' });
+    prisma.book.findUnique.mockResolvedValue({
+      id: 'book-1',
+      title: 'Chúng Mình (Bản Mới)',
+      backgroundMusicId: 'track-van-vat',
+      publishedSnapshot: { frozen: true },
+      publishedRevision: 3,
+    });
 
     const result = await service.rollbackToSnapshot('book-1', 'ver-silent');
 
     expect(result.success).toBe(true);
+    // Draft book metadata updated
     expect(prisma.book.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'book-1' },
         data: expect.objectContaining({
+          title: 'Chúng Mình (Bản Cũ)',
           backgroundMusicId: null,
         }),
       }),
     );
-    // Verified: touchBook called exactly once for cache invalidation & revision
-    expect(cacheService.touchBook).toHaveBeenCalledTimes(1);
+
+    // CRITICAL (Prompt 24): publishedSnapshot and publishedRevision must NOT be altered or published
+    const updateCallData = prisma.book.update.mock.calls[0][0].data;
+    expect(updateCallData.publishedSnapshot).toBeUndefined();
+    expect(updateCallData.publishedRevision).toBeUndefined();
+    expect(updateCallData.status).toBeUndefined();
+
+    // Draft pages deleted and re-created
+    expect(prisma.page.deleteMany).toHaveBeenCalledWith({ where: { bookId: 'book-1' } });
+    expect(prisma.page.create).toHaveBeenCalled();
+
+    // Touch book cache
     expect(cacheService.touchBook).toHaveBeenCalledWith('book-1');
   });
 

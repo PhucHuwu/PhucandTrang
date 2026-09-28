@@ -222,13 +222,14 @@ export class BooksService {
   }
 
   /**
-   * Prompt 23: Publishes current draft to live public site.
+   * Prompt 23 & 24: Publishes current draft to live public site.
    * 1. Validates draft integrity.
    * 2. Compiles complete document snapshot.
    * 3. Saves to Book.publishedSnapshot, bumps publishedRevision & contentRevision, sets status = PUBLISHED, publishedAt = now.
-   * 4. Invalidates public caches.
+   * 4. Automatically creates a BookVersion history snapshot record.
+   * 5. Invalidates public caches.
    */
-  async publishBook(id: string) {
+  async publishBook(id: string, changelog?: string, userId?: string) {
     const book = await this.prisma.book.findUnique({
       where: { id },
       include: {
@@ -260,6 +261,7 @@ export class BooksService {
     }
 
     const nextPublishedRevision = (book.publishedRevision || 0) + 1;
+    const versionTag = `v2.${nextPublishedRevision}`;
     const mediaMap = await this.publicService.collectAndResolveMedia(book);
     const compiledDocument = this.publicService.compileBookDocument(book, mediaMap);
 
@@ -268,26 +270,39 @@ export class BooksService {
 
     const now = new Date();
 
-    const updated = await this.prisma.book.update({
-      where: { id },
-      data: {
-        status: BookStatus.PUBLISHED,
-        publishedSnapshot: compiledDocument as any,
-        publishedRevision: nextPublishedRevision,
-        contentRevision: { increment: 1 },
-        publishedAt: now,
-      },
-      include: {
-        backgroundMusic: true,
-      },
-    });
+    const [updated] = await this.prisma.$transaction([
+      this.prisma.book.update({
+        where: { id },
+        data: {
+          status: BookStatus.PUBLISHED,
+          publishedSnapshot: compiledDocument as any,
+          publishedRevision: nextPublishedRevision,
+          contentRevision: { increment: 1 },
+          publishedAt: now,
+        },
+        include: {
+          backgroundMusic: true,
+        },
+      }),
+      // Create version history snapshot record automatically
+      this.prisma.bookVersion.create({
+        data: {
+          bookId: id,
+          version: versionTag,
+          snapshot: book as any,
+          changelog: changelog || `Xuất bản bản phát hành revision #${nextPublishedRevision}`,
+          createdById: userId,
+        },
+      }),
+    ]);
 
     // Invalidate public caches so live site immediately serves new snapshot
     await this.cacheService.touchBook(id);
 
     return {
       success: true,
-      message: `Đã xuất bản thành công bản phát hành revision #${nextPublishedRevision}`,
+      message: `Đã xuất bản thành công bản phát hành ${versionTag} (revision #${nextPublishedRevision})`,
+      version: versionTag,
       publishedRevision: nextPublishedRevision,
       publishedAt: now.toISOString(),
       book: updated,
