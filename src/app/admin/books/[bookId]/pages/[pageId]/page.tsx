@@ -56,7 +56,10 @@ import {
   Palette,
   LayoutGrid,
   BookmarkPlus,
+  Send,
+  ExternalLink,
 } from 'lucide-react';
+import { publishAdminBook } from '@/services/adminApi';
 
 // Dynamic import KonvaPageCanvas with ssr: false because Konva requires DOM window & canvas
 const KonvaPageCanvas = dynamic(() => import('@/components/admin/KonvaPageCanvas'), {
@@ -77,6 +80,7 @@ export default function VisualPageEditorPage() {
 
   const [book, setBook] = useState<Partial<Book> | null>(null);
   const [allPages, setAllPages] = useState<any[]>([]);
+  const [publishing, setPublishing] = useState(false);
   const [audioTracks, setAudioTracks] = useState<any[]>([]);
   const [videoMedia, setVideoMedia] = useState<any[]>([]);
   const [page, setPage] = useState<Page | null>(null);
@@ -263,6 +267,26 @@ export default function VisualPageEditorPage() {
       alert(err?.message || 'Lỗi áp dụng bố cục mới');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePublishBook = async () => {
+    if (!bookId || isViewer || publishing) return;
+    const confirmPub = window.confirm(
+      'Xuất bản (Publish) cuốn sách này?\n\n' +
+      'Các thay đổi bản nháp (Draft) sẽ được tổng hợp thành bản snapshot mới và hiển thị ngay trên website công khai.'
+    );
+    if (!confirmPub) return;
+
+    try {
+      setPublishing(true);
+      const res = await publishAdminBook(bookId);
+      setToast(res.message || 'Đã xuất bản thành công!');
+      setTimeout(() => setToast(null), 4000);
+    } catch (err: any) {
+      alert(`Lỗi khi xuất bản: ${err?.message || 'Vui lòng thử lại.'}`);
+    } finally {
+      setPublishing(false);
     }
   };
 
@@ -513,25 +537,50 @@ export default function VisualPageEditorPage() {
           </div>
         )}
 
-        {/* Right Action: Save Button */}
-        <div className="flex items-center gap-3">
+        {/* Right Action: Preview & Publish & Save Buttons */}
+        <div className="flex items-center gap-2">
           {toast && (
-            <span className="text-xs text-emerald-400 font-mono flex items-center gap-1 animate-fade-in">
+            <span className="text-xs text-emerald-400 font-mono flex items-center gap-1 animate-fade-in mr-2">
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>{toast}</span>
             </span>
           )}
 
+          {/* Preview Draft Button */}
+          <Link
+            href={`/admin/books/${bookId}/preview`}
+            target="_blank"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 border border-amber-800/40 text-xs font-medium transition-colors shadow-sm"
+            title="Xem trước bản nháp trên 3D Flipbook thực tế"
+          >
+            <Eye className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden md:inline">Preview Draft</span>
+          </Link>
+
           {!isViewer && (
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-semibold shadow-lg shadow-rosewood-950/50 transition-all active:scale-95 disabled:opacity-50"
-            >
-              <Save className="w-3.5 h-3.5" />
-              <span>{saving ? 'Đang lưu...' : 'Lưu trang'}</span>
-            </button>
+            <>
+              {/* Publish Button */}
+              <button
+                type="button"
+                onClick={handlePublishBook}
+                disabled={publishing}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-700/80 hover:bg-emerald-600 text-white text-xs font-medium shadow-md transition-colors disabled:opacity-50"
+                title="Đóng gói snapshot và xuất bản công khai"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">{publishing ? 'Đang xuất bản...' : 'Publish'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-semibold shadow-lg shadow-rosewood-950/50 transition-all active:scale-95 disabled:opacity-50"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{saving ? 'Đang lưu...' : 'Lưu trang'}</span>
+              </button>
+            </>
           )}
         </div>
       </div>

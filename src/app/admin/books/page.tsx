@@ -17,13 +17,17 @@ import {
   Calendar,
   Heart,
   RefreshCw,
+  Eye,
+  Send,
 } from 'lucide-react';
+import { publishAdminBook } from '@/services/adminApi';
 
 export default function AdminBooksPage() {
   const [books, setBooks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
 
   // New book form state
   const [title, setTitle] = useState('');
@@ -96,6 +100,25 @@ export default function AdminBooksPage() {
       await fetchBooks();
     } catch (err: any) {
       alert(err?.message || 'Lỗi xóa sách');
+    }
+  };
+
+  const handlePublishBook = async (id: string, bookTitle: string) => {
+    const confirmPub = confirm(
+      `Xuất bản (Publish) cuốn sách "${bookTitle}"?\n\n` +
+      'Bản snapshot sẽ được lưu vào DB và phục vụ ngay trên website công khai mà không ảnh hưởng bởi các chỉnh sửa nháp tiếp theo.'
+    );
+    if (!confirmPub) return;
+
+    try {
+      setPublishingId(id);
+      const res = await publishAdminBook(id);
+      alert(res.message || 'Đã xuất bản thành công!');
+      await fetchBooks();
+    } catch (err: any) {
+      alert(`Lỗi khi xuất bản: ${err?.message || 'Vui lòng thử lại.'}`);
+    } finally {
+      setPublishingId(null);
     }
   };
 
@@ -217,22 +240,50 @@ export default function AdminBooksPage() {
                         <FileText className="w-3.5 h-3.5 text-stone-500" />
                         <span>{pagesCount} trang nội dung</span>
                       </div>
+                      {book.publishedRevision > 0 && (
+                        <div className="flex items-center gap-2 text-emerald-400 font-mono text-[11px]">
+                          <span>Revision đã xuất bản: #{book.publishedRevision}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="pt-4 border-t border-rosewood-900/40 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 flex-1">
+                  <div className="pt-4 border-t border-rosewood-900/40 flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5 w-full">
+                      {/* Preview Draft Button */}
+                      <Link
+                        href={`/admin/books/${book.id}/preview`}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 border border-amber-800/40 text-xs font-medium transition-colors"
+                        title="Xem trước bản nháp hiện tại"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Preview Draft</span>
+                      </Link>
+
+                      {/* Publish Button */}
+                      <button
+                        onClick={() => handlePublishBook(book.id, book.title)}
+                        disabled={publishingId === book.id}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-700/80 hover:bg-emerald-600 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                        title="Đóng gói snapshot và xuất bản công khai"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>{publishingId === book.id ? 'Đang...' : 'Publish'}</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 w-full">
                       <Link
                         href={`/admin/books/${book.id}/pages`}
-                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-rosewood-900/40 hover:bg-rosewood-900/70 text-champagne-300 text-xs font-medium border border-rosewood-800/40 transition-colors"
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-rosewood-900/40 hover:bg-rosewood-900/70 text-champagne-300 text-xs font-medium border border-rosewood-800/40 transition-colors"
                       >
                         <FileText className="w-3.5 h-3.5" />
                         <span>Các trang</span>
                       </Link>
                       <Link
                         href={`/admin/books/${book.id}/settings`}
-                        className="p-2 rounded-xl bg-[#25151F] hover:bg-[#331C2A] text-stone-300 border border-rosewood-900/40 transition-colors"
+                        className="p-1.5 rounded-xl bg-[#25151F] hover:bg-[#331C2A] text-stone-300 border border-rosewood-900/40 transition-colors"
                         title="Cài đặt sách"
                       >
                         <Settings className="w-4 h-4" />
@@ -240,20 +291,19 @@ export default function AdminBooksPage() {
                       <Link
                         href="/"
                         target="_blank"
-                        className="p-2 rounded-xl bg-[#25151F] hover:bg-[#331C2A] text-stone-300 border border-rosewood-900/40 transition-colors"
-                        title="Xem trang thực tế"
+                        className="p-1.5 rounded-xl bg-[#25151F] hover:bg-[#331C2A] text-emerald-400 border border-rosewood-900/40 transition-colors"
+                        title="Xem trang thực tế (Live Site)"
                       >
                         <ExternalLink className="w-4 h-4" />
                       </Link>
+                      <button
+                        onClick={() => handleDeleteBook(book.id, book.title)}
+                        className="p-1.5 rounded-xl bg-red-950/30 hover:bg-red-900/50 text-red-400 border border-red-900/30 transition-colors"
+                        title="Xóa sách"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
-
-                    <button
-                      onClick={() => handleDeleteBook(book.id, book.title)}
-                      className="p-2 rounded-xl bg-red-950/30 hover:bg-red-900/50 text-red-400 border border-red-900/30 transition-colors"
-                      title="Xóa sách"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
                   </div>
                 </div>
               </div>

@@ -41,10 +41,28 @@ export class BooksController {
     return this.booksService.findBySlug(slug);
   }
 
+  /**
+   * Prompt 23: Previews current editing draft without affecting public viewers
+   */
+  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
+  @Get(':id/preview')
+  async previewDraft(@Param('id') id: string) {
+    return this.booksService.previewDraft(id);
+  }
+
   @Roles(Role.ADMIN, Role.EDITOR)
   @Post()
   async create(@Body() dto: CreateBookDto, @Request() req: any) {
     return this.booksService.create(dto, req.user?.id);
+  }
+
+  /**
+   * Prompt 23: Publishes current draft to live public site
+   */
+  @Roles(Role.ADMIN, Role.EDITOR)
+  @Post(':id/publish')
+  async publishBook(@Param('id') id: string) {
+    return this.booksService.publishBook(id);
   }
 
   @Roles(Role.ADMIN, Role.EDITOR)

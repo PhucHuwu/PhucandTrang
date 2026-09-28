@@ -1007,8 +1007,93 @@ async function main() {
       createdById: admin.id,
     },
   });
-    console.log('✅ Initial version snapshot 2.0.0 created with complete pages.');
-  }
+  console.log('✅ Initial version snapshot 2.0.0 created with complete pages.');
+
+  // 9. Prompt 23: Pre-compile and seed publishedSnapshot for live production site
+  const publishedMediaSet = new Set<string>();
+  if (firstCoverUrl) publishedMediaSet.add(firstCoverUrl);
+  if (lastCoverUrl) publishedMediaSet.add(lastCoverUrl);
+
+  const publishedPagesCompiled = (fullBookForSnapshot?.pages || []).map((page: any, pIdx: number) => {
+    return {
+      id: page.id,
+      order: page.order,
+      displayPageNumber: page.pageNumber,
+      pageNumber: page.pageNumber,
+      side: page.side.toLowerCase(),
+      chapter: page.chapter,
+      title: page.title,
+      quote: page.quote,
+      handwriting: page.handwriting,
+      layout: page.layoutTemplateId || 'auto',
+      layoutMode: page.layoutMode || 'PRESET',
+      background: page.background,
+      elements: (page.elements || []).map((el: any) => ({
+        id: el.id,
+        type: el.type,
+        slot: el.slot,
+        order: el.order,
+        zIndex: el.zIndex,
+        opacity: el.opacity,
+        transform: el.transform,
+        style: el.style,
+        data: el.data,
+        interaction: el.interaction,
+      })),
+      audio: null,
+    };
+  });
+
+  const compiledPublishedDoc = {
+    id: book.id,
+    slug: book.slug,
+    title: book.title,
+    description: book.description,
+    contentRevision: 1,
+    couple: {
+      he: book.heName,
+      she: book.sheName,
+      anniversaryDate: book.anniversaryDate ? new Date(book.anniversaryDate).toISOString() : '2022-10-20T00:00:00Z',
+      proposalQuote: book.proposalQuote,
+    },
+    cover: canonicalCover,
+    audio: {
+      id: audioTrack.id,
+      title: audioTrack.title,
+      artist: audioTrack.artist,
+      src: audioTrack.src,
+      mediaId: null,
+      autoPlay: audioTrack.autoPlay ?? true,
+      loop: audioTrack.loop ?? true,
+      volume: audioTrack.volume ?? 0.8,
+      startAt: audioTrack.startAt ?? 0.0,
+      fadeIn: audioTrack.fadeIn ?? 2.0,
+      fadeOut: audioTrack.fadeOut ?? 2.0,
+      durationSeconds: audioTrack.durationSeconds ?? null,
+    },
+    settings: canonicalSettings,
+    pages: publishedPagesCompiled,
+    media: {
+      allUrls: [firstCoverUrl, lastCoverUrl, audioTrack.src],
+      images: [firstCoverUrl, lastCoverUrl],
+      videos: [],
+      audio: [audioTrack.src],
+      backgrounds: [firstCoverUrl, lastCoverUrl],
+    },
+    publishedAt: new Date().toISOString(),
+    version: '2.0.0',
+  };
+
+  await prisma.book.update({
+    where: { id: book.id },
+    data: {
+      publishedSnapshot: compiledPublishedDoc as any,
+      publishedRevision: 1,
+      publishedAt: new Date(),
+    },
+  });
+  console.log('✅ Canonical publishedSnapshot initialized for production viewers.');
+}
 
   console.log('🎉 Database seeding completed successfully! Ready for production.');
 }

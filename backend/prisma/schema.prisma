@@ -72,6 +72,9 @@ model Book {
   cover             Json          // { front: { backgroundUrl, title, titleFont, counterBadge, elements }, back: { insideBackgroundUrl, outsideBackgroundUrl, elements } }
   settings          Json          // { dimensions: { pageWidth, pageHeight, canvasResolution }, camera: { fov, distance }, theme: { ... }, atmospheric: { ... } }
   contentRevision   Int           @default(1) @map("content_revision")
+  publishedRevision Int           @default(0) @map("published_revision")
+  publishedSnapshot Json?         @map("published_snapshot")
+  publishedAt       DateTime?     @map("published_at")
   backgroundMusicId String?       @map("background_music_id")
   backgroundMusic   AudioTrack?   @relation("BookBackgroundMusic", fields: [backgroundMusicId], references: [id], onDelete: SetNull)
   ownerId           String?

@@ -19,7 +19,9 @@ export class PublicService {
 
   /**
    * Retrieves the compiled published book document by slug.
-   * Returns cached document if available and fresh.
+   * PROMPT 23 CORE RULE:
+   * Public API MUST serve the frozen publishedSnapshot if present.
+   * Any ongoing edits/drafts in the Admin relational tables do NOT leak into live public site.
    */
   async getPublishedBook(slug: string): Promise<{ document: CompiledBookDocument; etag: string }> {
     const cached = this.cacheService.get<CompiledBookDocument>(slug);
@@ -85,12 +87,19 @@ export class PublicService {
       throw new NotFoundException(`Không tìm thấy cuốn sách đang xuất bản với slug: "${slug}"`);
     }
 
-    // Resolve any mediaId references to canonical URLs
-    const mediaMap = await this.collectAndResolveMedia(book);
+    // PROMPT 23: If publishedSnapshot exists, serve it directly!
+    let document: CompiledBookDocument;
+    if (book.publishedSnapshot && typeof book.publishedSnapshot === 'object') {
+      document = book.publishedSnapshot as unknown as CompiledBookDocument;
+    } else {
+      // Fallback for pre-snapshot records: compile live
+      const mediaMap = await this.collectAndResolveMedia(book);
+      document = this.compileBookDocument(book, mediaMap);
+    }
 
-    const document = this.compileBookDocument(book, mediaMap);
     const latestVersion = book.versions?.[0]?.version || '2.0.0';
-    const etag = `"${book.id}-rev${book.contentRevision || 1}-v${latestVersion}"`;
+    const publishedRev = book.publishedRevision || book.contentRevision || 1;
+    const etag = `"${book.id}-rev${publishedRev}-v${latestVersion}"`;
 
     this.cacheService.set(slug, document, etag);
 
@@ -120,7 +129,7 @@ export class PublicService {
    * Scans all mediaIds referenced in covers, cover elements, backgrounds, elements, and audio,
    * then fetches them in one batch to resolve canonical runtime URLs.
    */
-  private async collectAndResolveMedia(book: any): Promise<Map<string, any>> {
+  async collectAndResolveMedia(book: any): Promise<Map<string, any>> {
     const mediaIdSet = new Set<string>();
 
     // 1. Cover background & cover elements mediaIds
@@ -175,7 +184,7 @@ export class PublicService {
   /**
    * Compiles an individual element, resolving canonical media URLs and normalizing transform.
    */
-  private compileElement(
+  compileElement(
     el: any,
     mediaMap: Map<string, any>,
     images: Set<string>,
@@ -250,7 +259,7 @@ export class PublicService {
    * Compiles raw database entities into a pristine, lean client document.
    * Resolves canonical URLs, strips sensitive fields, and computes deterministic page side sequencing.
    */
-  private compileBookDocument(book: any, mediaMap: Map<string, any>): CompiledBookDocument {
+  compileBookDocument(book: any, mediaMap: Map<string, any>): CompiledBookDocument {
     const allUrls = new Set<string>();
     const images = new Set<string>();
     const videos: Array<{ url: string; thumbnailUrl?: string; caption?: string }> = [];
@@ -409,7 +418,7 @@ export class PublicService {
       slug: book.slug,
       title: book.title,
       description: book.description || null,
-      contentRevision: book.contentRevision || 1,
+      contentRevision: book.publishedRevision || book.contentRevision || 1,
       couple: {
         he: book.heName,
         she: book.sheName,
@@ -435,7 +444,7 @@ export class PublicService {
       settings: (book.settings as any) || {},
       pages: compiledPages,
       media: mediaReferences,
-      publishedAt: book.updatedAt instanceof Date ? book.updatedAt.toISOString() : book.updatedAt,
+      publishedAt: book.publishedAt ? new Date(book.publishedAt).toISOString() : book.updatedAt instanceof Date ? book.updatedAt.toISOString() : book.updatedAt,
       version: latestVersion,
     };
   }

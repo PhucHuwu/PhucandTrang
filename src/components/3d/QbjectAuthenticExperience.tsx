@@ -13,14 +13,22 @@ import { BookOpen, RefreshCw } from 'lucide-react';
 import { deriveFaceIndex } from '@/utils/pageUtils';
 import { computeActiveAreaPageRect } from '@/utils/coordinateConversion';
 
-export default function QbjectAuthenticExperience() {
+interface QbjectAuthenticExperienceProps {
+  customBookData?: Book;
+  isDraftPreview?: boolean;
+}
+
+export default function QbjectAuthenticExperience({
+  customBookData,
+  isDraftPreview = false,
+}: QbjectAuthenticExperienceProps = {}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [isReady, setIsReady] = useState(false);
   const [showLoading, setShowLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0.04);
-  const [bookData, setBookData] = useState<Book | null>(null);
+  const [bookData, setBookData] = useState<Book | null>(customBookData || null);
   const [error, setError] = useState<string | null>(null);
   const flipbookInstanceRef = useRef<Flipbook | null>(null);
 
@@ -35,8 +43,17 @@ export default function QbjectAuthenticExperience() {
         setError(null);
         setLoadingProgress(0.04);
 
-        // 1. Fetch published book document from Backend API (with automatic local fallback)
-        const { book, source, error: fetchErr } = await fetchPublishedBook('phuc-and-trang');
+        // 1. If customBookData provided (e.g. preview mode), use it; otherwise fetch published book
+        let book: Book;
+        if (customBookData) {
+          book = customBookData;
+        } else {
+          const { book: fetchedBook, error: fetchErr } = await fetchPublishedBook('phuc-and-trang');
+          if (fetchErr && !fetchedBook) {
+            throw new Error(fetchErr);
+          }
+          book = fetchedBook;
+        }
         if (destroyed) return;
         setBookData(book);
         setLoadingProgress(0.08);
@@ -282,6 +299,14 @@ export default function QbjectAuthenticExperience() {
         id="flipbook-container"
         className="absolute inset-0 z-0"
       />
+
+      {/* Draft Preview Badge indicator */}
+      {isDraftPreview && (
+        <div className="absolute top-4 left-4 z-40 flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 backdrop-blur-md text-xs font-sans font-medium shadow-lg pointer-events-none">
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+          <span>CHẾ ĐỘ XEM TRƯỚC BẢN NHÁP (DRAFT PREVIEW)</span>
+        </div>
+      )}
 
       {/* Romantic Music Player */}
       <VintageMusicPlayer

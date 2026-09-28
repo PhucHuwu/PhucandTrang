@@ -22,7 +22,10 @@ import {
   ArrowLeft,
   Layers,
   RefreshCw,
+  Eye,
+  Send,
 } from 'lucide-react';
+import { publishAdminBook } from '@/services/adminApi';
 
 export default function AdminPagesListPage() {
   const params = useParams();
@@ -41,6 +44,7 @@ export default function AdminPagesListPage() {
   const [quote, setQuote] = useState('');
   const [layoutTemplateId, setLayoutTemplateId] = useState('single-hero');
   const [creating, setCreating] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   const fetchPages = async () => {
     setLoading(true);
@@ -140,6 +144,25 @@ export default function AdminPagesListPage() {
     }
   };
 
+  const handlePublishBook = async () => {
+    if (publishing) return;
+    const confirmPub = confirm(
+      'Xuất bản (Publish) toàn bộ cuốn sách này lên Live Site?\n\n' +
+      'Bản snapshot sẽ được lưu lại an toàn và phát hành cho độc giả, trong khi bạn có thể tiếp tục chỉnh sửa bản nháp sau đó.'
+    );
+    if (!confirmPub) return;
+
+    try {
+      setPublishing(true);
+      const res = await publishAdminBook(bookId);
+      alert(res.message || 'Đã xuất bản thành công!');
+    } catch (err: any) {
+      alert(`Lỗi khi xuất bản: ${err?.message || 'Vui lòng thử lại.'}`);
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto w-full space-y-6">
       {/* Top Header */}
@@ -163,6 +186,28 @@ export default function AdminPagesListPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Preview Draft Button */}
+          <Link
+            href={`/admin/books/${bookId}/preview`}
+            target="_blank"
+            className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 border border-amber-800/40 text-xs font-medium transition-colors shadow-sm"
+            title="Xem trước bản nháp trên 3D Flipbook thực tế"
+          >
+            <Eye className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline">Preview Draft</span>
+          </Link>
+
+          {/* Publish Book Button */}
+          <button
+            onClick={handlePublishBook}
+            disabled={publishing}
+            className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-700/80 hover:bg-emerald-600 text-white text-xs font-medium shadow-md transition-colors disabled:opacity-50"
+            title="Đóng gói snapshot và xuất bản công khai"
+          >
+            <Send className="w-4 h-4" />
+            <span className="hidden sm:inline">{publishing ? 'Đang xuất bản...' : 'Publish'}</span>
+          </button>
+
           <button
             onClick={fetchPages}
             className="p-2.5 rounded-xl bg-[#201319] hover:bg-[#2C1923] text-parchment-300 border border-rosewood-900/40 transition-colors"

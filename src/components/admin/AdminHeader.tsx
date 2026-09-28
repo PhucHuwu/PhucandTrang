@@ -36,11 +36,11 @@ export default function AdminHeader() {
         <Link
           href="/"
           target="_blank"
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#23141E] hover:bg-[#301B29] text-parchment-200 hover:text-champagne-300 text-xs font-medium border border-rosewood-900/40 transition-colors shadow-sm"
-          title="Preview / Mở xem Public Site trên tab mới"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 hover:text-emerald-200 text-xs font-medium border border-emerald-800/40 transition-colors shadow-sm"
+          title="Mở xem website công khai đã xuất bản (Live Published Site)"
         >
-          <ExternalLink className="w-3.5 h-3.5 text-rosewood-400" />
-          <span className="hidden sm:inline">Preview / Public Site</span>
+          <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
+          <span className="hidden sm:inline">Live Public Site</span>
         </Link>
 
         {/* Current User Info */}

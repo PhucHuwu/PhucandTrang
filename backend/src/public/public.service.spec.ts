@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PublicCacheService } from './public-cache.service';
 import { BookStatus, PageSide, ElementType } from '@prisma/client';
 
-describe('PublicService (Req 15, 19, 20 & 21)', () => {
+describe('PublicService (Req 15, 19, 20 & Prompt 23 Draft Isolation)', () => {
   let service: PublicService;
   let prisma: any;
   let cacheService: PublicCacheService;
@@ -32,7 +32,56 @@ describe('PublicService (Req 15, 19, 20 & 21)', () => {
     cacheService = module.get<PublicCacheService>(PublicCacheService);
   });
 
-  it('should compile book document and resolve canonical mediaId into runtime src URL', async () => {
+  it('Prompt 23: Live public site serves frozen publishedSnapshot directly so admin drafts do not bleed', async () => {
+    const mockFrozenSnapshot = {
+      id: 'book-1',
+      slug: 'phuc-and-trang',
+      title: 'Tiêu Đề Đã Xuất Bản (Frozen)',
+      contentRevision: 5,
+      couple: { he: 'Phúc', she: 'Trang' },
+      cover: { front: {}, back: {} },
+      pages: [
+        {
+          id: 'page-published-1',
+          order: 0,
+          title: 'Trang Đã Xuất Bản',
+          elements: [],
+        },
+      ],
+      audio: null,
+      publishedAt: '2026-09-28T00:00:00Z',
+    };
+
+    const mockBookWithDraftDiff = {
+      id: 'book-1',
+      slug: 'phuc-and-trang',
+      title: 'Tiêu Đề Bản Nháp Mới Nhất Trong Admin (Draft)',
+      status: BookStatus.PUBLISHED,
+      publishedSnapshot: mockFrozenSnapshot,
+      publishedRevision: 5,
+      contentRevision: 8,
+      pages: [
+        {
+          id: 'page-published-1',
+          order: 0,
+          title: 'Trang Nháp Đang Được Sửa Trong Admin',
+          elements: [],
+        },
+      ],
+      versions: [{ version: '2.0.0' }],
+    };
+
+    prisma.book.findFirst.mockResolvedValue(mockBookWithDraftDiff);
+
+    const result = await service.getPublishedBook('phuc-and-trang');
+
+    // Live public result MUST be the frozen snapshot, not the live draft relation
+    expect(result.document.title).toBe('Tiêu Đề Đã Xuất Bản (Frozen)');
+    expect(result.document.pages[0].title).toBe('Trang Đã Xuất Bản');
+    expect(result.document.contentRevision).toBe(5);
+  });
+
+  it('should compile book document and resolve canonical mediaId when no snapshot exists (fallback)', async () => {
     const mockMedia = {
       id: 'media-image-1',
       url: 'https://cdn.example.com/photo.jpg',
@@ -50,6 +99,8 @@ describe('PublicService (Req 15, 19, 20 & 21)', () => {
       anniversaryDate: new Date('2022-10-20T00:00:00Z'),
       proposalQuote: 'Thế cậu đồng ý làm bạn gái tớ không?',
       contentRevision: 3,
+      publishedRevision: 3,
+      publishedSnapshot: null,
       backgroundMusicId: null,
       backgroundMusic: null,
       updatedAt: new Date('2026-09-21T00:00:00Z'),
@@ -79,7 +130,7 @@ describe('PublicService (Req 15, 19, 20 & 21)', () => {
               type: ElementType.TEXT,
               order: 2,
               zIndex: 11,
-              visible: false, // Hidden element must be excluded
+              visible: false,
               transform: { x: 0.1, y: 0.8, width: 0.8, height: 0.1, rotation: 0, scale: 1 },
               data: { text: 'Hidden draft' },
             },

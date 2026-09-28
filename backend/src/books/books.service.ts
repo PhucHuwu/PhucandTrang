@@ -2,12 +2,14 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BookStatus } from '@prisma/client';
 import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { PublicCacheService } from '../public/public-cache.service';
+import { PublicService } from '../public/public.service';
 import { safeDeepMerge } from '../utils/safe-merge';
 
 @Injectable()
@@ -15,6 +17,7 @@ export class BooksService {
   constructor(
     private prisma: PrismaService,
     private cacheService: PublicCacheService,
+    private publicService: PublicService,
   ) {}
 
   async findAll() {
@@ -177,5 +180,117 @@ export class BooksService {
     });
     await this.cacheService.touchBook(id);
     return updated;
+  }
+
+  /**
+   * Prompt 23: Previews current live draft of book (authenticated).
+   * Does NOT touch or require publishedSnapshot, completely isolated from public viewers.
+   */
+  async previewDraft(id: string) {
+    const book = await this.prisma.book.findUnique({
+      where: { id },
+      include: {
+        backgroundMusic: true,
+        pages: {
+          orderBy: { order: 'asc' },
+          include: {
+            elements: {
+              where: { visible: true },
+              orderBy: { zIndex: 'asc' },
+            },
+            layoutTemplate: true,
+            audioTrack: true,
+          },
+        },
+        versions: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { version: true },
+        },
+      },
+    });
+
+    if (!book) throw new NotFoundException(`Không tìm thấy sách với ID: ${id}`);
+
+    const mediaMap = await this.publicService.collectAndResolveMedia(book);
+    const compiledDraft = this.publicService.compileBookDocument(book, mediaMap);
+
+    return {
+      isDraftPreview: true,
+      document: compiledDraft,
+    };
+  }
+
+  /**
+   * Prompt 23: Publishes current draft to live public site.
+   * 1. Validates draft integrity.
+   * 2. Compiles complete document snapshot.
+   * 3. Saves to Book.publishedSnapshot, bumps publishedRevision & contentRevision, sets status = PUBLISHED, publishedAt = now.
+   * 4. Invalidates public caches.
+   */
+  async publishBook(id: string) {
+    const book = await this.prisma.book.findUnique({
+      where: { id },
+      include: {
+        backgroundMusic: true,
+        pages: {
+          orderBy: { order: 'asc' },
+          include: {
+            elements: {
+              where: { visible: true },
+              orderBy: { zIndex: 'asc' },
+            },
+            layoutTemplate: true,
+            audioTrack: true,
+          },
+        },
+        versions: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { version: true },
+        },
+      },
+    });
+
+    if (!book) throw new NotFoundException(`Không tìm thấy sách với ID: ${id}`);
+
+    // Validation: book must have at least 1 page
+    if (!book.pages || book.pages.length === 0) {
+      throw new BadRequestException('Không thể xuất bản cuốn sách khi chưa có bất kỳ trang nội dung nào.');
+    }
+
+    const nextPublishedRevision = (book.publishedRevision || 0) + 1;
+    const mediaMap = await this.publicService.collectAndResolveMedia(book);
+    const compiledDocument = this.publicService.compileBookDocument(book, mediaMap);
+
+    // Embed current publication revision into snapshot document
+    compiledDocument.contentRevision = nextPublishedRevision;
+
+    const now = new Date();
+
+    const updated = await this.prisma.book.update({
+      where: { id },
+      data: {
+        status: BookStatus.PUBLISHED,
+        publishedSnapshot: compiledDocument as any,
+        publishedRevision: nextPublishedRevision,
+        contentRevision: { increment: 1 },
+        publishedAt: now,
+      },
+      include: {
+        backgroundMusic: true,
+      },
+    });
+
+    // Invalidate public caches so live site immediately serves new snapshot
+    await this.cacheService.touchBook(id);
+
+    return {
+      success: true,
+      message: `Đã xuất bản thành công bản phát hành revision #${nextPublishedRevision}`,
+      publishedRevision: nextPublishedRevision,
+      publishedAt: now.toISOString(),
+      book: updated,
+    };
   }
 }

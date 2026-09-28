@@ -397,8 +397,28 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
      - Hiển thị overlay vàng trên Konva Canvas.
      - Hỗ trợ kéo và resize vùng click.
      - Dùng shared helpers `computeActiveAreaPageRect()` và `computeRelativeActiveArea()` để chuyển đổi page-space và element-relative normalized coordinates.
-17. **Giai đoạn 17 (Prompt 23+ Nâng cao Editor & Undo/Redo/Snapping)**:
-   - Tích hợp lịch sử Undo / Redo cho canvas editor.
-   - Thêm đường gióng từ tính (Smart Snapping / Alignment Guides).
-   - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.
-   - Di dời/xóa bỏ an toàn các file legacy trong `src/components/spreads` và `src/components/pages`.
+17. **Giai đoạn 17 (Đã hoàn thành - Prompt 23 Draft / Preview / Publish Workflow)**:
+    - Thiết kế kiến trúc Publishing Model cô lập hoàn toàn giữa bản nháp (Draft) và bản công khai (Live Public):
+      - Bổ sung các trường vào `Book`: `publishedSnapshot` (Json?), `publishedRevision` (Int @default(0)), `publishedAt` (DateTime?).
+      - Dữ liệu quan hệ trong PostgreSQL (`books`, `pages`, `page_elements`, `audio_tracks`) đại diện cho **Live Relational Data = Draft / Current Editing State**.
+      - Mọi thao tác chỉnh sửa, thêm, xóa, đổi thứ tự trong Admin CMS diễn ra trên Live Draft và **tuyệt đối KHÔNG xuất hiện ngay trên public site**.
+    - Luồng **Publish (Xuất bản)**:
+      - Endpoint: `POST /api/books/:id/publish`.
+      - Kiểm tra tính toàn vẹn (validate draft: sách phải có ít nhất 1 trang).
+      - Tự động biên dịch toàn bộ cấu trúc sách thành `CompiledBookDocument` hoàn chỉnh với các canonical URL được phân giải.
+      - Lưu snapshot vào `Book.publishedSnapshot`, tăng `publishedRevision` và `contentRevision`, cập nhật `status = PUBLISHED`, `publishedAt = now()`.
+      - Xóa và làm mới cache public (`PublicCacheService.touchBook`).
+    - Luồng **Public API (`GET /api/public/books/:slug` & `GET /api/public/book/master`)**:
+      - Đọc và trả về trực tiếp từ `Book.publishedSnapshot` đã đóng băng. Các chỉnh sửa nháp tiếp theo trong Admin không làm thay đổi dữ liệu công khai này.
+    - Luồng **Preview Draft (Xem trước bản nháp)**:
+      - Endpoint authenticated: `GET /api/books/:id/preview`.
+      - Màn hình chuyên dụng: `/admin/books/:bookId/preview`.
+      - Render trực tiếp Live Draft trên 3D Flipbook thực tế (`QbjectAuthenticExperience`), có thanh điều khiển trên cùng kèm nút "Xuất bản ngay (Publish)", hoàn toàn cô lập và không ảnh hưởng đến độc giả bên ngoài.
+    - Tích hợp nút thao tác trực quan:
+      - Nút "Preview Draft" & "Publish" tại Visual Editor (`/admin/books/:bookId/pages/:pageId`).
+      - Nút "Preview Draft" & "Publish" tại Danh sách sách (`/admin/books`) và Danh sách trang (`/admin/books/:bookId/pages`).
+18. **Giai đoạn 18 (Prompt 24+ Nâng cao Editor & Undo/Redo/Snapping)**:
+    - Tích hợp lịch sử Undo / Redo cho canvas editor.
+    - Thêm đường gióng từ tính (Smart Snapping / Alignment Guides).
+    - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.
+    - Di dời/xóa bỏ an toàn các file legacy trong `src/components/spreads` và `src/components/pages`.

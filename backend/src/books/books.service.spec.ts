@@ -2,11 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BooksService } from './books.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PublicCacheService } from '../public/public-cache.service';
+import { PublicService } from '../public/public.service';
+import { BookStatus } from '@prisma/client';
 
-describe('BooksService Nullable Audio Semantics (Prompt 13.9 Req 3, 4, 9)', () => {
+describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish)', () => {
   let service: BooksService;
   let prisma: any;
   let cacheService: any;
+  let publicService: any;
 
   beforeEach(async () => {
     prisma = {
@@ -19,6 +22,18 @@ describe('BooksService Nullable Audio Semantics (Prompt 13.9 Req 3, 4, 9)', () =
 
     cacheService = {
       touchBook: jest.fn(),
+      invalidate: jest.fn(),
+    };
+
+    publicService = {
+      collectAndResolveMedia: jest.fn().mockResolvedValue(new Map()),
+      compileBookDocument: jest.fn().mockImplementation((book, mediaMap) => ({
+        id: book.id,
+        slug: book.slug,
+        title: book.title,
+        contentRevision: 1,
+        pages: book.pages || [],
+      })),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -26,6 +41,7 @@ describe('BooksService Nullable Audio Semantics (Prompt 13.9 Req 3, 4, 9)', () =
         BooksService,
         { provide: PrismaService, useValue: prisma },
         { provide: PublicCacheService, useValue: cacheService },
+        { provide: PublicService, useValue: publicService },
       ],
     }).compile();
 
@@ -37,8 +53,10 @@ describe('BooksService Nullable Audio Semantics (Prompt 13.9 Req 3, 4, 9)', () =
     slug: 'phuc-and-trang',
     title: 'Chúng Mình',
     backgroundMusicId: 'track-1',
+    publishedRevision: 1,
     cover: {},
     settings: {},
+    pages: [{ id: 'p1', order: 0, elements: [] }],
   };
 
   it('Case A: PATCH backgroundMusicId = null should set backgroundMusicId to null (disable music)', async () => {
@@ -84,9 +102,44 @@ describe('BooksService Nullable Audio Semantics (Prompt 13.9 Req 3, 4, 9)', () =
     const patchDto = { title: 'Updated' };
     await service.update('book-1', patchDto, true);
 
-    const updateCall = prisma.book.update.mock.calls[0][0];
-    expect(updateCall.data.title).toBe('Updated');
-    expect('backgroundMusicId' in updateCall.data).toBe(false);
+    const callArgs = prisma.book.update.mock.calls[0][0];
+    expect(callArgs.data.title).toBe('Updated');
+    expect('backgroundMusicId' in callArgs.data).toBe(false);
+  });
+
+  it('Prompt 23: previewDraft returns current editing state isolated from published site', async () => {
+    prisma.book.findUnique.mockResolvedValue(mockExistingBook);
+
+    const preview = await service.previewDraft('book-1');
+
+    expect(preview.isDraftPreview).toBe(true);
+    expect(preview.document.id).toBe('book-1');
+    expect(publicService.collectAndResolveMedia).toHaveBeenCalledWith(mockExistingBook);
+    expect(publicService.compileBookDocument).toHaveBeenCalled();
+  });
+
+  it('Prompt 23: publishBook validates draft, compiles snapshot, increments publishedRevision, and clears cache', async () => {
+    prisma.book.findUnique.mockResolvedValue(mockExistingBook);
+    prisma.book.update.mockResolvedValue({
+      ...mockExistingBook,
+      status: BookStatus.PUBLISHED,
+      publishedRevision: 2,
+    });
+
+    const res = await service.publishBook('book-1');
+
+    expect(res.success).toBe(true);
+    expect(res.publishedRevision).toBe(2);
+    expect(prisma.book.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'book-1' },
+        data: expect.objectContaining({
+          status: BookStatus.PUBLISHED,
+          publishedRevision: 2,
+          publishedSnapshot: expect.any(Object),
+        }),
+      }),
+    );
     expect(cacheService.touchBook).toHaveBeenCalledWith('book-1');
   });
 });

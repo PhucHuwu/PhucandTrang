@@ -159,6 +159,34 @@ export async function deleteAdminBook(id: string): Promise<any> {
   });
 }
 
+export async function publishAdminBook(id: string): Promise<{
+  success: boolean;
+  message: string;
+  publishedRevision: number;
+  publishedAt: string;
+  book: any;
+}> {
+  return adminFetch<{
+    success: boolean;
+    message: string;
+    publishedRevision: number;
+    publishedAt: string;
+    book: any;
+  }>(`books/${id}/publish`, {
+    method: 'POST',
+  });
+}
+
+export async function previewAdminBookDraft(id: string): Promise<{
+  isDraftPreview: boolean;
+  document: any;
+}> {
+  return adminFetch<{
+    isDraftPreview: boolean;
+    document: any;
+  }>(`books/${id}/preview`);
+}
+
 // ==========================================
 // 3. PAGES API
 // ==========================================
