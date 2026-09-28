@@ -24,6 +24,7 @@ import {
 } from '@/utils/coordinateConversion';
 import { computeImageFit } from '@/utils/imageFitting';
 import { TextVariableResolver } from '@/utils/textVariableResolver';
+import { computeSnapping, SnapGuideLine, BoxRect } from '@/utils/snappingEngine';
 
 interface KonvaPageCanvasProps {
   page: Page;
@@ -40,6 +41,7 @@ interface KonvaPageCanvasProps {
     activeArea: { left: number; top: number; width: number; height: number }
   ) => void;
   scale: number;
+  snappingEnabled?: boolean;
 }
 
 // Custom hook to load an image safely for Konva
@@ -67,12 +69,16 @@ function KonvaElementItem({
   isSelected,
   onSelect,
   onChange,
+  onDragMoveSnap,
+  onDragEndSnap,
   varContext,
 }: {
   element: PageElement;
   isSelected: boolean;
   onSelect: () => void;
   onChange: (newAttrs: { x: number; y: number; width: number; height: number; rotation: number }) => void;
+  onDragMoveSnap?: (id: string, currentX: number, currentY: number, width: number, height: number, shiftKey: boolean) => { x: number; y: number };
+  onDragEndSnap?: () => void;
   varContext?: any;
 }) {
   const groupRef = useRef<Konva.Group | null>(null);
@@ -163,7 +169,23 @@ function KonvaElementItem({
       draggable={!isLocked}
       onClick={onSelect}
       onTap={onSelect}
+      onDragMove={(e) => {
+        if (onDragMoveSnap) {
+          const shiftKey = Boolean((e.evt as MouseEvent)?.shiftKey);
+          const snappedPos = onDragMoveSnap(
+            element.id,
+            e.target.x(),
+            e.target.y(),
+            t.width,
+            t.height,
+            shiftKey
+          );
+          e.target.x(snappedPos.x);
+          e.target.y(snappedPos.y);
+        }
+      }}
       onDragEnd={(e) => {
+        if (onDragEndSnap) onDragEndSnap();
         onChange({
           x: e.target.x(),
           y: e.target.y(),
@@ -368,11 +390,15 @@ export default function KonvaPageCanvas({
   editingActiveArea = false,
   onUpdateActiveArea,
   scale,
+  snappingEnabled = true,
 }: KonvaPageCanvasProps) {
   const stageRef = useRef<Konva.Stage | null>(null);
   const transformerRef = useRef<Konva.Transformer | null>(null);
   const activeAreaRef = useRef<Konva.Rect | null>(null);
   const activeAreaTransformerRef = useRef<Konva.Transformer | null>(null);
+
+  // Active magnetic snapping guide lines
+  const [activeGuides, setActiveGuides] = useState<SnapGuideLine[]>([]);
 
   const canvasW = book?.settings?.dimensions?.canvasResolution?.width || DESIGN_CANVAS_WIDTH;
   const canvasH = book?.settings?.dimensions?.canvasResolution?.height || DESIGN_CANVAS_HEIGHT;
@@ -464,6 +490,55 @@ export default function KonvaPageCanvas({
         selectedElement.interaction?.activeArea
       )
     : null;
+
+  // Snapping handler for KonvaElementItem
+  const handleDragMoveSnap = (
+    elementId: string,
+    currentX: number,
+    currentY: number,
+    width: number,
+    height: number,
+    shiftKey: boolean
+  ) => {
+    // If Shift key is held down or snapping is toggled OFF, disable magnetic snapping
+    if (!snappingEnabled || shiftKey) {
+      setActiveGuides([]);
+      return { x: currentX, y: currentY };
+    }
+
+    // Build bounding boxes of all OTHER elements on the page
+    const otherBoxes: BoxRect[] = (page.elements || [])
+      .filter((el) => el.id !== elementId && el.visible !== false)
+      .map((el) => {
+        const trans = normalizedToCanvasTransform(el.transform);
+        return {
+          x: trans.x,
+          y: trans.y,
+          width: trans.width,
+          height: trans.height,
+        };
+      });
+
+    const draggingBox: BoxRect = {
+      x: currentX,
+      y: currentY,
+      width,
+      height,
+    };
+
+    const snapResult = computeSnapping(draggingBox, otherBoxes, canvasW, canvasH, {
+      threshold: 8,
+      margin: 60,
+      enabled: true,
+    });
+
+    setActiveGuides(snapResult.guides);
+    return { x: snapResult.x, y: snapResult.y };
+  };
+
+  const handleDragEndSnap = () => {
+    setActiveGuides([]);
+  };
 
   return (
     <div
@@ -589,6 +664,8 @@ export default function KonvaPageCanvas({
               element={el}
               isSelected={el.id === selectedElementId}
               onSelect={() => onSelectElement(el.id)}
+              onDragMoveSnap={handleDragMoveSnap}
+              onDragEndSnap={handleDragEndSnap}
               onChange={(newAttrs) => {
                 const normalized = canvasToNormalizedTransform(
                   {
@@ -704,6 +781,18 @@ export default function KonvaPageCanvas({
               />
             </>
           )}
+
+          {/* Prompt 31: Dynamic Alignment Snapping Guide Lines Overlay */}
+          {activeGuides.map((guide, idx) => (
+            <Line
+              key={`snap-guide-${idx}`}
+              points={guide.points}
+              stroke="#06B6D4" // Cyan / Aqua magnetic guideline
+              strokeWidth={1.5}
+              dash={[6, 4]}
+              listening={false}
+            />
+          ))}
         </Layer>
       </Stage>
     </div>

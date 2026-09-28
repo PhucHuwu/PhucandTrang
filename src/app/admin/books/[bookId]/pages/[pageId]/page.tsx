@@ -61,6 +61,7 @@ import {
   History,
   Undo2,
   Redo2,
+  Magnet,
 } from 'lucide-react';
 import { publishAdminBook } from '@/services/adminApi';
 import VersionHistoryModal from '@/components/admin/VersionHistoryModal';
@@ -107,6 +108,9 @@ export default function VisualPageEditorPage() {
   // Active Inspector Tab: 'element' | 'background' (Prompt 18)
   const [inspectorTab, setInspectorTab] = useState<'element' | 'interaction' | 'background'>('element');
   const [editingActiveArea, setEditingActiveArea] = useState(false);
+
+  // Prompt 31: Snapping Toggle State (Snap ON / OFF)
+  const [snappingEnabled, setSnappingEnabled] = useState(true);
 
   // Prompt 29: Undo / Redo History Hook
   const {
@@ -588,6 +592,21 @@ export default function VisualPageEditorPage() {
               </button>
             </div>
 
+            {/* Prompt 31: Magnet Snapping Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setSnappingEnabled(!snappingEnabled)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-mono transition-all ${
+                snappingEnabled
+                  ? 'bg-cyan-950/60 border-cyan-500/60 text-cyan-300 shadow-sm'
+                  : 'bg-[#20111A] border-rosewood-900/40 text-stone-500 hover:text-stone-300'
+              }`}
+              title={snappingEnabled ? 'Đang bật hít từ tính (Bấm để tắt hoặc giữ phím Shift khi kéo)' : 'Đang tắt hít từ tính (Bấm để bật)'}
+            >
+              <Magnet className={`w-3.5 h-3.5 ${snappingEnabled ? 'text-cyan-400' : 'text-stone-500'}`} />
+              <span className="hidden sm:inline">Snap: {snappingEnabled ? 'BẬT' : 'TẮT'}</span>
+            </button>
+
             {/* Prompt 16: Layout Picker Button */}
             <button
               type="button"
@@ -846,6 +865,7 @@ export default function VisualPageEditorPage() {
               editingActiveArea={editingActiveArea && inspectorTab === 'interaction'}
               onUpdateActiveArea={handleUpdateActiveArea}
               scale={canvasScale}
+              snappingEnabled={snappingEnabled}
             />
           </div>
         </main>

@@ -504,7 +504,19 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
         - `Move Backward` (Xuống 1 lớp).
         - `Bring to Front` (Lên trên cùng).
         - `Send to Back` (Xuống dưới cùng).
-25. **Giai đoạn 25 (Prompt 31+ Nâng cao Editor & Snapping / Cache)**:
-    - Thêm đường gióng từ tính (Smart Snapping / Alignment Guides).
+25. **Giai đoạn 25 (Đã hoàn thành - Prompt 31 Snapping & Magnetic Alignment Guides)**:
+    - Xây dựng thuật toán định vị từ tính thông minh (`snappingEngine.ts`):
+      - **Các điểm neo từ tính (Snap Targets)**:
+        - `Canvas Center`: Trục dọc tâm trang (X = 512) và trục ngang tâm trang (Y = 680).
+        - `Page Edges`: Mép ngoài cùng trang (X = 0, X = 1024, Y = 0, Y = 1360).
+        - `Margins / Safe Zone`: Đường viền an toàn (Margin padding 60px xung quanh).
+        - `Other Elements`: Tự động nhận diện và hít theo các cạnh (Left, Right, Top, Bottom) và tâm (Center X, Middle Y) của tất cả các phần tử khác trên cùng một trang.
+      - **Đường gióng trực quan (Visual Snap Guides)**:
+        - Khi phần tử di chuyển vào vùng ngưỡng hít (Threshold = 8px), đường gióng nét đứt màu xanh ngọc Cyan/Aqua (`#06B6D4`) sẽ hiển thị tức thì trên canvas để hướng dẫn người dùng căn chỉnh đối xứng.
+      - **Tính năng bật/tắt (Toggle) & Phím tắt Modifier**:
+        - Nút bấm `Snap: BẬT / TẮT` (`Magnet`) trên Quick Action Bar.
+        - **Phím Shift Modifier**: Giữ phím `Shift` trong khi kéo thả chuột để tạm thời vô hiệu hóa lực hút từ tính mà không cần bấm tắt nút Snap.
+      - **Bảo toàn Coordinate Contract**: Snapping chỉ can thiệp vào tọa độ pixel tức thời trong khi kéo thả trên Konva Canvas, sau khi nhả chuột (`onDragEnd`), tọa độ vẫn được chuẩn hóa về dải tỷ lệ thập phân `0.0..1.0` truyền thống.
+26. **Giai đoạn 26 (Prompt 32+ Texture Cache IndexedDB & Polishing)**:
     - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.
     - Dọn dẹp/xóa bỏ an toàn các component legacy không dùng trong `src/components/spreads` và `src/components/pages`.
