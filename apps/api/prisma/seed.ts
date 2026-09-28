@@ -46,11 +46,14 @@ async function main() {
 
   if (adminEmail && adminPassword) {
     const existing = await prisma.user.findUnique({ where: { email: adminEmail } });
+    const passwordHash = await bcrypt.hash(adminPassword, 10);
     if (existing) {
-      console.log(`ℹ️ Admin user ${adminEmail} already exists. Preserving existing password.`);
-      admin = existing;
+      admin = await prisma.user.update({
+        where: { email: adminEmail },
+        data: { passwordHash, role: Role.ADMIN },
+      });
+      console.log(`✅ Admin user password updated for ${admin.email}`);
     } else {
-      const passwordHash = await bcrypt.hash(adminPassword, 10);
       admin = await prisma.user.create({
         data: {
           email: adminEmail,
@@ -64,16 +67,19 @@ async function main() {
   } else if (enableDevSeed) {
     const devEmail = 'admin@phucandtrang.love';
     const existing = await prisma.user.findUnique({ where: { email: devEmail } });
+    const passwordHash = await bcrypt.hash('Phuc3724@', 10);
     if (existing) {
-      console.log(`ℹ️ Dev admin user already exists. Preserving existing password.`);
-      admin = existing;
+      admin = await prisma.user.update({
+        where: { email: devEmail },
+        data: { passwordHash, role: Role.ADMIN },
+      });
+      console.log(`✅ Dev admin user password updated: ${admin.email}`);
     } else {
-      const passwordHash = await bcrypt.hash('PhucAndTrang@20221020', 10);
       admin = await prisma.user.create({
         data: {
           email: devEmail,
           passwordHash,
-          name: 'Phúc & Trang Admin (Dev)',
+          name: 'Phúc & Trang Admin',
           role: Role.ADMIN,
         },
       });

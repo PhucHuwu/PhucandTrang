@@ -6,29 +6,29 @@ const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, pass } = body;
+    const { pass } = body;
 
-    if (!email || !pass) {
+    if (!pass) {
       return NextResponse.json(
-        { message: 'Vui lòng nhập đầy đủ email và mật khẩu' },
+        { message: 'Vui lòng nhập mật khẩu quản trị' },
         { status: 400 }
       );
     }
 
-    // Call backend login endpoint
+    // Call backend login endpoint (password-only)
     const backendRes = await fetch(`${BACKEND_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ email, pass }),
+      body: JSON.stringify({ pass }),
     });
 
     const data = await backendRes.json();
 
     if (!backendRes.ok) {
       return NextResponse.json(
-        { message: data.message || 'Đăng nhập không thành công' },
+        { message: data.message || 'Mật khẩu không chính xác' },
         { status: backendRes.status }
       );
     }

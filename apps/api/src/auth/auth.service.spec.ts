@@ -5,7 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 
-describe('AuthService Security Hardening (Prompt 35: Brute-Force Rate Limiting)', () => {
+describe('AuthService Security Hardening (Prompt 35 & Single Password Login)', () => {
   let service: AuthService;
   let prisma: any;
   let jwtService: any;
@@ -13,6 +13,7 @@ describe('AuthService Security Hardening (Prompt 35: Brute-Force Rate Limiting)'
   beforeEach(async () => {
     prisma = {
       user: {
+        findFirst: jest.fn(),
         findUnique: jest.fn(),
       },
     };
@@ -33,9 +34,9 @@ describe('AuthService Security Hardening (Prompt 35: Brute-Force Rate Limiting)'
   });
 
   it('should lock account after 5 consecutive failed login attempts (Brute-Force Protection)', async () => {
-    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.findFirst.mockResolvedValue(null);
 
-    const loginDto = { email: 'attacker@example.com', pass: 'wrong-pass' };
+    const loginDto = { pass: 'wrong-pass' };
 
     // 1st to 5th attempt must throw UnauthorizedException
     for (let i = 0; i < 5; i++) {
@@ -53,20 +54,21 @@ describe('AuthService Security Hardening (Prompt 35: Brute-Force Rate Limiting)'
     }
   });
 
-  it('should reset failed attempt counter upon successful login', async () => {
-    const passwordHash = await bcrypt.hash('correct-pass', 10);
-    const mockUser = {
-      id: 'user-1',
-      email: 'admin@example.com',
+  it('should authenticate single admin solely with password and reset failed attempt counter', async () => {
+    const passwordHash = await bcrypt.hash('Phuc3724@', 10);
+    const mockAdminUser = {
+      id: 'admin-1',
+      email: 'admin@phucandtrang.love',
       passwordHash,
-      name: 'Admin',
+      name: 'Phúc & Trang Admin',
       role: 'ADMIN',
     };
 
-    prisma.user.findUnique.mockResolvedValue(mockUser);
+    prisma.user.findFirst.mockResolvedValue(mockAdminUser);
 
-    const res = await service.login({ email: 'admin@example.com', pass: 'correct-pass' });
+    const res = await service.login({ pass: 'Phuc3724@' });
     expect(res.accessToken).toBe('mock-jwt-token');
-    expect(res.user.email).toBe('admin@example.com');
+    expect(res.user.email).toBe('admin@phucandtrang.love');
+    expect(res.user.role).toBe('ADMIN');
   });
 });

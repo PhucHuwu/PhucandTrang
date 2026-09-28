@@ -86,13 +86,14 @@ async function adminFetch<T>(endpoint: string, options: RequestInit = {}): Promi
 // ==========================================
 
 export async function loginAdmin(
-  email: string,
-  pass: string
+  passOrEmail: string,
+  optionalPass?: string
 ): Promise<{ user: AdminUser }> {
+  const pass = optionalPass !== undefined ? optionalPass : passOrEmail;
   const res = await fetch('/api/admin/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, pass }),
+    body: JSON.stringify({ pass }),
   });
 
   const data = await res.json();

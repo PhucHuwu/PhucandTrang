@@ -73,8 +73,19 @@ export class AuthService {
     this.loginAttempts.delete(email.toLowerCase().trim());
   }
 
-  async validateUser(email: string, pass: string): Promise<any> {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+  async validateUser(pass: string): Promise<any> {
+    // Single Admin CMS: Authenticate directly against the single administrator account
+    let user = await this.prisma.user.findFirst({
+      where: { role: Role.ADMIN },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (!user) {
+      user = await this.prisma.user.findFirst({
+        orderBy: { createdAt: 'asc' },
+      });
+    }
+
     if (user && (await bcrypt.compare(pass, user.passwordHash))) {
       const { passwordHash, ...result } = user;
       return result;
@@ -83,16 +94,17 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    this.checkRateLimit(dto.email);
+    const rateLimitKey = 'admin_single_access';
+    this.checkRateLimit(rateLimitKey);
 
-    const user = await this.validateUser(dto.email, dto.pass);
+    const user = await this.validateUser(dto.pass);
     if (!user) {
-      this.recordFailedAttempt(dto.email);
-      throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
+      this.recordFailedAttempt(rateLimitKey);
+      throw new UnauthorizedException('Mật khẩu không chính xác');
     }
 
     // Login successful: reset failed attempt counter
-    this.clearFailedAttempts(dto.email);
+    this.clearFailedAttempts(rateLimitKey);
 
     const payload = { sub: user.id, email: user.email, role: user.role };
     return {
