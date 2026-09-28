@@ -59,8 +59,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi" className={`${cormorant.variable} ${montserrat.variable} ${dancingScript.variable}`}>
-      <body className="bg-[#12100E] text-ink-800 antialiased selection:bg-rosewood-200 selection:text-rosewood-900">
+    <html lang="vi" suppressHydrationWarning className={`${cormorant.variable} ${montserrat.variable} ${dancingScript.variable}`}>
+      <body suppressHydrationWarning className="bg-[#12100E] text-ink-800 antialiased selection:bg-rosewood-200 selection:text-rosewood-900">
         {children}
       </body>
     </html>

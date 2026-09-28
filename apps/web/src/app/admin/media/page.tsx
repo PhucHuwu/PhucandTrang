@@ -154,8 +154,9 @@ export default function AdminMediaPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rosewood-900/40 pb-5">
         <div className="flex items-center gap-3">
           <Link
-            href="/admin/books"
+            href="/admin"
             className="p-2 rounded-xl bg-[#201319] hover:bg-[#2C1923] text-stone-300 border border-rosewood-900/40 transition-colors"
+            title="Quay lại Dashboard"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
