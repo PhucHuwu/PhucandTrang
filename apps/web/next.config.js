@@ -1,10 +1,4 @@
-const path = require('path');
-
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+module.exports = {
   reactStrictMode: true,
   transpilePackages: ['@phucandtrang/shared'],
-  outputFileTracingRoot: path.join(__dirname, '../..'),
 };
-
-module.exports = nextConfig;
