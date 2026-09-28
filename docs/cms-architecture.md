@@ -490,7 +490,21 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
         - `Ctrl + Shift + Z` / `Cmd + Shift + Z`: Làm lại (Redo).
         - Tự động bỏ qua phím tắt khi người dùng đang gõ phím bên trong `<input>`, `<textarea>` hoặc contentEditable.
       - **Nút điều khiển trực quan**: Bổ sung cụm nút Undo / Redo ngay trên Top Bar của Visual Editor.
-24. **Giai đoạn 24 (Prompt 30+ Nâng cao Editor & Snapping / Cache)**:
+24. **Giai đoạn 24 (Đã hoàn thành - Prompt 30 Figma/Canva-Style Layers Panel)**:
+    - Xây dựng bảng điều khiển danh sách layer chuyên nghiệp (`LayersPanel.tsx`):
+      - **Sắp xếp theo canonical `PageElement.zIndex`**: Danh sách hiển thị theo thứ tự giảm dần từ trên xuống dưới (phần tử zIndex cao nhất nằm ở trên cùng, chuẩn quy ước Figma/Canva). Loại bỏ triệt để và cấm dùng `transform.zIndex`.
+      - **Chọn (Select)**: Nhấp chuột để chọn phần tử tương ứng trên Konva Canvas.
+      - **Đổi tên nhãn (Rename Label)**: Nhấp đúp chuột hoặc bấm nút sửa để đặt tên gợi nhớ cho layer (`data.customLabel`).
+      - **Kéo thả sắp xếp thứ tự (Drag Reorder)**: Sử dụng HTML5 Drag & Drop để kéo thả vị trí layer trong danh sách và tự động chuẩn hóa lại dải z-index 1..N.
+      - **Ẩn / Hiện (Hide / Show)**: Nút mắt bật tắt `visible`.
+      - **Khóa / Mở khóa (Lock / Unlock)**: Nút khóa bảo vệ không cho vô tình kéo di chuyển trên Canvas.
+      - **Nhân bản (Duplicate) & Xóa (Delete)**: Thao tác nhanh trực tiếp trên từng row layer.
+      - **Điều hướng lớp xếp chồng (Stack Navigation)**:
+        - `Move Forward` (Lên 1 lớp).
+        - `Move Backward` (Xuống 1 lớp).
+        - `Bring to Front` (Lên trên cùng).
+        - `Send to Back` (Xuống dưới cùng).
+25. **Giai đoạn 25 (Prompt 31+ Nâng cao Editor & Snapping / Cache)**:
     - Thêm đường gióng từ tính (Smart Snapping / Alignment Guides).
     - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.
     - Dọn dẹp/xóa bỏ an toàn các component legacy không dùng trong `src/components/spreads` và `src/components/pages`.

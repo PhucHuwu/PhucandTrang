@@ -67,6 +67,7 @@ import VersionHistoryModal from '@/components/admin/VersionHistoryModal';
 import { useAutosavePage } from '@/hooks/useAutosavePage';
 import AutosaveIndicator from '@/components/admin/AutosaveIndicator';
 import { usePageHistory } from '@/hooks/usePageHistory';
+import LayersPanel from '@/components/admin/LayersPanel';
 
 // Dynamic import KonvaPageCanvas with ssr: false because Konva requires DOM window & canvas
 const KonvaPageCanvas = dynamic(() => import('@/components/admin/KonvaPageCanvas'), {
@@ -529,9 +530,6 @@ export default function VisualPageEditorPage() {
     );
   }
 
-  // Sort elements for Layers panel
-  const sortedLayers = [...(page.elements || [])].sort((a, b) => (b.zIndex ?? 1) - (a.zIndex ?? 1));
-
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#0C0609] select-none text-parchment-100 font-sans">
       {/* Top Application Bar */}
@@ -729,79 +727,44 @@ export default function VisualPageEditorPage() {
 
       {/* 3-Column Visual Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* LEFT COLUMN: Pages / Layers (width: 260px) */}
-        <aside className="w-64 bg-[#140B10] border-r border-rosewood-900/40 flex flex-col justify-between shrink-0 overflow-hidden">
-          {/* Section 1: Layers Stacking Order */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="p-3 bg-[#1C0F16] border-b border-rosewood-900/40 flex items-center justify-between text-xs font-semibold text-parchment-200">
-              <span className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-champagne-300">
-                <Layers className="w-3.5 h-3.5 text-rosewood-400" />
-                <span>Layers (Lớp phần tử)</span>
-              </span>
-              <span className="text-[10px] font-mono text-stone-500">{page.elements?.length || 0}</span>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {sortedLayers.map((el) => {
-                const isSelected = el.id === selectedElementId;
-                const isLocked = Boolean(el.locked);
-                const isVisible = el.visible !== false;
-
-                return (
-                  <div
-                    key={el.id}
-                    onClick={() => setSelectedElementId(el.id)}
-                    className={`flex items-center justify-between px-2.5 py-2 rounded-xl text-xs cursor-pointer transition-all ${
-                      isSelected
-                        ? 'bg-rosewood-600 text-white font-semibold shadow-md'
-                        : 'bg-[#1E1119] text-stone-400 hover:text-white hover:bg-[#2A1622]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate flex-1 pr-2">
-                      <span className="font-mono text-[10px] opacity-70 w-5">z{el.zIndex}</span>
-                      <span className="truncate">
-                        {(el.data as any).text || (el.data as any).caption || el.slot || el.type}
-                      </span>
-                    </div>
-
-                    {!isViewer && (
-                      <div className="flex items-center gap-1 text-stone-400">
-                        {/* Lock toggle button */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateSelectedElement((target) => (target.id === el.id ? { ...target, locked: !isLocked } : target));
-                          }}
-                          className={`p-1 rounded hover:text-white ${isLocked ? 'text-amber-400' : 'opacity-60'}`}
-                          title={isLocked ? 'Mở khóa' : 'Khóa layer'}
-                        >
-                          {isLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-                        </button>
-
-                        {/* Visibility toggle button */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateSelectedElement((target) => (target.id === el.id ? { ...target, visible: !isVisible } : target));
-                          }}
-                          className={`p-1 rounded hover:text-white ${!isVisible ? 'text-stone-600' : 'opacity-60'}`}
-                          title={isVisible ? 'Ẩn layer' : 'Hiện layer'}
-                        >
-                          {isVisible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                        </button>
-                      </div>
-                    )}
-                  </div>
+        {/* LEFT COLUMN: Pages / Layers (width: 270px) */}
+        <aside className="w-68 bg-[#140B10] border-r border-rosewood-900/40 flex flex-col justify-between shrink-0 overflow-hidden">
+          {/* Section 1: Professional Layers Panel (Prompt 30) */}
+          <LayersPanel
+            elements={page.elements || []}
+            selectedElementId={selectedElementId}
+            onSelectElement={setSelectedElementId}
+            onUpdateElement={(elId, updater) => {
+              setPage((prevPage) => {
+                if (!prevPage) return prevPage;
+                const updatedElements = (prevPage.elements || []).map((el) =>
+                  el.id === elId ? updater(el) : el
                 );
-              })}
-
-              {sortedLayers.length === 0 && (
-                <div className="p-6 text-center text-xs text-stone-500">Chưa có phần tử nào trên trang này.</div>
-              )}
-            </div>
-          </div>
+                const nextPage = {
+                  ...prevPage,
+                  isCustomized: true,
+                  elements: updatedElements,
+                };
+                recordHistory(nextPage, 'Cập nhật layer');
+                return nextPage;
+              });
+            }}
+            onReorderElements={(newElements) => {
+              setPage((prevPage) => {
+                if (!prevPage) return prevPage;
+                const nextPage = {
+                  ...prevPage,
+                  isCustomized: true,
+                  elements: newElements,
+                };
+                recordHistory(nextPage, 'Sắp xếp lại thứ tự z-index layers');
+                return nextPage;
+              });
+            }}
+            onDuplicateElement={handleDuplicateSelected}
+            onDeleteElement={handleDeleteElement}
+            isViewer={isViewer}
+          />
 
           {/* Section 2: Quick Pages Navigation Switcher */}
           <div className="h-44 border-t border-rosewood-900/40 bg-[#12090F] flex flex-col shrink-0">
