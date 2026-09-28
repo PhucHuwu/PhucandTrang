@@ -585,6 +585,16 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
         8. **VersionsService**: Tạo snapshot tự động khi publish, snapshot thủ công, kiểm tra ngăn chặn cross-book rollback, khôi phục nguyên vẹn cấu trúc trang về bản nháp.
         9. **PublicService**: Phục vụ `publishedSnapshot` đóng băng cô lập với draft, tính toán ETag tuần tự, compile document chuẩn tắc.
         10. **PublishValidationService**: Kiểm toán 10 blocking errors và warnings trước khi cho phép xuất bản.
-31. **Giai đoạn 31 (Prompt 37+ Texture Cache IndexedDB & Polishing)**:
+31. **Giai đoạn 31 (Đã hoàn thành - Prompt 37 Renderer & Editor Pure Functions & Regression Suite)**:
+    - Bổ sung bộ kiểm thử chuyên sâu cho toàn bộ pure functions của Studio Editor và 3D/2D Renderer (`renderer-editor.spec.ts`):
+      - **Normalized Coordinate Conversions**: Ánh xạ hai chiều không làm mất độ chính xác giữa dải tọa độ chuẩn hóa `0.0..1.0` và kích thước canvas `1024x1360px`, tính toán bake scale chuẩn xác.
+      - **ActiveArea Math**: Chuyển đổi qua lại giữa tọa độ tương đối bên trong phần tử (`computeRelativeActiveArea`) và tọa độ trên toàn trang (`computeActiveAreaPageRect`).
+      - **Image Fit Algorithms**: Tính toán `cover`, `contain` và căn chỉnh điểm neo trọng tâm `focalPoint` X/Y.
+      - **Dynamic Variables**: Phân giải chuỗi token an toàn `{{couple.he}}`, `{{couple.she}}`, `{{daysTogether}}` không dùng `eval()`, xử lý êm dịu khi gặp biến rỗng.
+      - **Snapping Math Engine**: Kiểm tra lực hút từ tính vào trục tâm trang (Center X=512, Center Y=680) và sinh đường gióng đối xứng.
+      - **Canonical Z-Index Stacking**: Đảm bảo dải thứ tự duy nhất tuần tự từ 1 đến N.
+      - **Representative Page Configs**: Kiểm tra cấu trúc chuẩn tắc của Cover, Single Hero, Quad Gallery, Video Page và Custom Freeform.
+    - Bộ test backend đạt mốc **21 Test Suites với 110/110 tests passed (100%)**.
+32. **Giai đoạn 32 (Prompt 38+ Texture Cache IndexedDB & Polishing)**:
     - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.
     - Dọn dẹp/xóa bỏ an toàn các component legacy không dùng trong `src/components/spreads` và `src/components/pages`.
