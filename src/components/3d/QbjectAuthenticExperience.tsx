@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import Flipbook from './qbject/flipbook';
 import { PageTextureGenerator } from './PageTextureGenerator';
 import { AtmosphericSystem } from './AtmosphericSystem';
+import { LazyPageTextureManager } from './LazyPageTextureManager';
 import VintageMusicPlayer from '@/components/VintageMusicPlayer';
 import { ensureCustomFontLoaded } from '@/data/fontLoader';
 import { fetchPublishedBook } from '@/services/bookApi';
@@ -31,6 +32,7 @@ export default function QbjectAuthenticExperience({
   const [bookData, setBookData] = useState<Book | null>(customBookData || null);
   const [error, setError] = useState<string | null>(null);
   const flipbookInstanceRef = useRef<Flipbook | null>(null);
+  const lazyTextureManagerRef = useRef<LazyPageTextureManager | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -61,56 +63,32 @@ export default function QbjectAuthenticExperience({
         // 2. Ensure custom font 2.otf (SVN-Housttely Signature) is loaded
         await ensureCustomFontLoaded();
         if (destroyed) return;
-        setLoadingProgress(0.12);
+        setLoadingProgress(0.15);
 
-        // 3. Render front cover
-        const coverFront = await PageTextureGenerator.createCoverTexture(
-          book.cover.front.backgroundUrl,
-          book
-        );
-        if (destroyed) return;
-        setLoadingProgress(0.16);
+        // 3. Prompt 26: Initialize Lazy Texture Manager
+        const lazyManager = new LazyPageTextureManager(book);
+        lazyTextureManagerRef.current = lazyManager;
 
-        // 4. Render all inside pages dynamically from API book.pages via Generic Page Renderer
-        const pageTextures: THREE.CanvasTexture[] = [];
-        const totalPageCount = book.pages.length;
+        const totalInsidePages = book.pages.length;
+        const totalFaces = totalInsidePages + 3; // front cover + N inside pages + 2 back covers
+        const placeholderUrl = lazyManager.getPlaceholder();
 
-        for (let i = 0; i < totalPageCount; i++) {
+        // 4. Initial Window: Generate immediate front cover & first 2 pages (Window 0..2)
+        // This cuts initial load time from seconds to a few hundred milliseconds!
+        const initialFacesCount = Math.min(totalFaces, 3);
+        const pageUrls: string[] = new Array(totalFaces).fill(placeholderUrl);
+
+        for (let i = 0; i < initialFacesCount; i++) {
           if (destroyed) return;
-          const page = book.pages[i];
-          const texture = await PageTextureGenerator.renderPageTexture(page, book);
-          pageTextures.push(texture);
-
-          // Advance loading progress smoothly across pages
-          const p = 0.16 + ((i + 1) / totalPageCount) * 0.68;
-          setLoadingProgress(parseFloat(p.toFixed(2)));
+          const url = await lazyManager.getPageTextureUrl(i);
+          pageUrls[i] = url;
+          setLoadingProgress(0.2 + ((i + 1) / initialFacesCount) * 0.65);
         }
 
-        // 5. Render back cover (inside & outside)
-        const coverBackInside = await PageTextureGenerator.createBackCoverTexture(
-          book.cover.back.insideBackgroundUrl,
-          true,
-          book
-        );
-        const coverBackOutside = await PageTextureGenerator.createBackCoverTexture(
-          book.cover.back.outsideBackgroundUrl,
-          false,
-          book
-        );
         if (destroyed) return;
-        setLoadingProgress(0.86);
+        setLoadingProgress(0.88);
 
-        // 6. Convert textures to Data URLs for 3D Flipbook engine
-        const allCanvases: HTMLCanvasElement[] = [
-          coverFront.image as HTMLCanvasElement,
-          ...pageTextures.map((t) => t.image as HTMLCanvasElement),
-          coverBackInside.image as HTMLCanvasElement,
-          coverBackOutside.image as HTMLCanvasElement,
-        ];
-
-        const pageUrls = allCanvases.map((canvas) => canvas.toDataURL('image/jpeg', 0.90));
-
-        // 7. Dynamically derive 3D raycast pageActiveAreas from book.pages elements
+        // 5. Dynamically derive 3D raycast pageActiveAreas from book.pages elements
         const pageActiveAreas: PageActiveArea[] = [];
         book.pages.forEach((page, physicalIndex) => {
           const faceIndex = deriveFaceIndex(physicalIndex);
@@ -145,7 +123,7 @@ export default function QbjectAuthenticExperience({
           });
         });
 
-        // 8. Instantiate 100% Original Flipbook from Qbject
+        // 6. Instantiate 100% Original Flipbook from Qbject with fast initial textures
         const flipbook = new Flipbook({
           containerEl: container,
           pageWidth: book.settings.dimensions.pageWidth,
@@ -171,7 +149,7 @@ export default function QbjectAuthenticExperience({
 
         flipbookInstanceRef.current = flipbook;
 
-        // 9. Attach 3D atmospheric environment (butterflies, floating petals, fairy dust)
+        // 7. Attach 3D atmospheric environment (butterflies, floating petals, fairy dust)
         if (book.settings.atmospheric?.enabled !== false) {
           const atmos = book.settings.atmospheric;
           const atmospheric = new AtmosphericSystem(
@@ -186,6 +164,13 @@ export default function QbjectAuthenticExperience({
         }
 
         setTotalPages(pageUrls.length / 2);
+
+        // Preload rest of window around page 0
+        lazyManager.updateActiveWindow(0, (faceIdx, textureUrl) => {
+          if (!destroyed && flipbook) {
+            flipbook.updateFaceTexture(faceIdx, textureUrl);
+          }
+        });
 
         let lastPage = -1;
         let readyReported = false;
@@ -202,6 +187,13 @@ export default function QbjectAuthenticExperience({
             if (current !== lastPage) {
               lastPage = current;
               setCurrentPage(current);
+
+              // Prompt 26: Trigger lazy loading for window around new currentPage
+              lazyManager.updateActiveWindow(current, (faceIdx, textureUrl) => {
+                if (!destroyed && flipbookInstanceRef.current) {
+                  flipbookInstanceRef.current.updateFaceTexture(faceIdx, textureUrl);
+                }
+              });
             }
             requestAnimationFrame(checkProgress);
           }
@@ -219,6 +211,8 @@ export default function QbjectAuthenticExperience({
 
     return () => {
       destroyed = true;
+      lazyTextureManagerRef.current?.destroy();
+      lazyTextureManagerRef.current = null;
       flipbookInstanceRef.current?.destroy();
       flipbookInstanceRef.current = null;
       if (container) {
@@ -227,41 +221,34 @@ export default function QbjectAuthenticExperience({
     };
   }, []);
 
-  useEffect(() => {
-    if (!isReady) return;
-    const timeout = window.setTimeout(() => setShowLoading(false), 750);
-    return () => window.clearTimeout(timeout);
-  }, [isReady]);
-
   return (
-    <div className="relative w-screen h-screen overflow-hidden select-none bg-black">
-      {/* Romantic Warm Loading Screen with floating book icon and glowing aura */}
-      {showLoading && !error && (
+    <div className="relative w-full h-full select-none overflow-hidden">
+      {/* Loading Progress Screen */}
+      {showLoading && (
         <div
-          className={`absolute inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-b from-[#1E1116] via-[#140B0E] to-[#0A0507] text-parchment-100 transition-opacity duration-700 ${
+          className={`absolute inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-b from-[#1C0E14] via-[#12080D] to-[#0A0507] text-parchment-100 transition-opacity duration-1000 ${
             isReady ? 'opacity-0 pointer-events-none' : 'opacity-100'
           }`}
+          onTransitionEnd={() => setShowLoading(false)}
         >
-          {/* Ambient Warm Glow Aura */}
-          <div className="absolute w-[420px] h-[420px] rounded-full bg-gradient-to-r from-rosewood-400/20 via-pink-400/25 to-champagne-400/20 blur-3xl animate-pulse-glow pointer-events-none" />
-
-          {/* Center Floating Icon & Title */}
-          <div className="relative z-10 flex flex-col items-center text-center px-6">
-            <div className="w-20 h-20 rounded-full bg-white/5 border border-pink-300/30 backdrop-blur-md flex items-center justify-center mb-6 shadow-xl animate-heart-float text-pink-200">
-              <BookOpen className="w-9 h-9 stroke-[1.5]" />
+          <div className="flex flex-col items-center max-w-sm px-6 text-center">
+            {/* Romantic Ornament */}
+            <div className="w-12 h-12 rounded-full border border-rosewood-500/30 flex items-center justify-center mb-6 animate-pulse">
+              <span className="font-serif italic text-rosewood-300 text-lg">P &amp; T</span>
             </div>
 
-            <h2
-              className="text-4xl sm:text-5xl text-[#FFF0F4] font-normal mb-8 tracking-wide drop-shadow-md"
-              style={{ fontFamily: '"SVN-Housttely Signature", "Coldwell Bridges", cursive, serif' }}
-            >
+            <h2 className="font-serif text-2xl sm:text-3xl text-parchment-100 tracking-wider mb-2 font-normal">
               Chúng Mình
             </h2>
 
-            {/* Elegant Loading Progress Line */}
-            <div className="w-48 sm:w-64 h-[2px] bg-white/10 rounded-full overflow-hidden relative mb-4">
+            <p className="font-serif italic text-xs text-rosewood-300/80 mb-8 tracking-widest uppercase">
+              Hành Trình Kỷ Niệm Tình Yêu
+            </p>
+
+            {/* Progress Bar Container */}
+            <div className="w-48 sm:w-64 h-[2px] bg-rosewood-950/80 rounded-full overflow-hidden mb-3 border border-rosewood-900/30">
               <div
-                className="absolute inset-y-0 left-0 bg-gradient-to-r from-[#E295A8] via-[#FFE5B4] to-[#F0B6C3] transition-[width] duration-300 ease-out"
+                className="h-full bg-gradient-to-r from-rosewood-400 via-rosewood-300 to-parchment-200 transition-all duration-300 ease-out shadow-sm"
                 style={{ width: `${Math.round(loadingProgress * 100)}%` }}
               />
             </div>

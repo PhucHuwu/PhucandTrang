@@ -327,6 +327,25 @@ export default class Page {
 		return lerp(this.elevationLeft, this.elevationRight, turnProgress);
 	}
 
+	public setSideTexture(side: 'front' | 'back', url: string) {
+		const materialIndex = side === 'back' ? 0 : 1;
+		const materials = this.mesh.material as THREE.MeshStandardMaterial[];
+		if (!materials || !materials[materialIndex]) return;
+
+		const currentMap = materials[materialIndex].map;
+		if (currentMap) {
+			currentMap.dispose();
+		}
+
+		const newTexture = this.textureLoader.load(url);
+		newTexture.colorSpace = THREE.SRGBColorSpace;
+		newTexture.minFilter = THREE.LinearFilter;
+		newTexture.generateMipmaps = false;
+
+		materials[materialIndex].map = newTexture;
+		materials[materialIndex].needsUpdate = true;
+	}
+
 	public getPageAreaCorners(area: PageArea, backside = false) {
 		const top = area.top;
 		const bottom = area.top + area.height;

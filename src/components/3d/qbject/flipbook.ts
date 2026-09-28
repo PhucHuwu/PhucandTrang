@@ -896,6 +896,15 @@ export default class Flipbook {
 		);
 	}
 
+	public updateFaceTexture(faceIndex: number, url: string) {
+		const pageIndex = Math.floor(faceIndex / 2);
+		const side: 'front' | 'back' = faceIndex % 2 === 0 ? 'front' : 'back';
+		const page = this.pages[pageIndex];
+		if (page) {
+			page.setSideTexture(side, url);
+		}
+	}
+
 	public async watchArea(
 		corners: THREE.Vector3[],
 		preset: "direct" | "page-zoom" | "page-unzoom" = "direct",

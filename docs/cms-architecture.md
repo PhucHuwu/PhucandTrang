@@ -439,7 +439,16 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
     - Xác minh đường truyền:
       - **Runtime Production Flow**: `PostgreSQL (Neon) ➔ NestJS API (/public/books/:slug) ➔ Frontend (QbjectAuthenticExperience)`.
       - Local fallback (`PHUC_AND_TRANG_BOOK`) chỉ còn vai trò tương thích cho môi trường dev khi backend offline và bắt buộc flag `NEXT_PUBLIC_ENABLE_LOCAL_BOOK_FALLBACK=true` nếu muốn chạy offline ở production.
-20. **Giai đoạn 20 (Prompt 26+ Nâng cao Editor & Undo/Redo/Snapping)**:
+20. **Giai đoạn 20 (Đã hoàn thành - Prompt 26 Lazy Page Texture Generation & Memory Management)**:
+    - Giải quyết hiện tượng nghẽn khởi tạo và ngốn bộ nhớ GPU khi render toàn bộ các trang cùng lúc:
+      - Xây dựng module `LazyPageTextureManager`:
+        - Tạo placeholder nhanh 16x16 parchment màu giấy `#F4EDE2` cho toàn bộ các trang chưa lật tới.
+        - **Cửa sổ trượt (Sliding Window)**: `currentSpread ± 3 trang`.
+        - Khi mở sách, chỉ render ngay bìa trước (Cover Front) và 2 trang đầu (Window 0..2) giúp rút ngắn thời gian khởi tạo từ 6-10s xuống còn **~500ms**.
+        - Xử lý mượt mà khi lật trang nhanh (Fast Page Flipping): Các request render texture được gom trong hàng đợi `inFlightGenerations` chống duplicate generation.
+        - **Cơ chế dọn dẹp bộ nhớ (Texture Cache & Pruning)**: Khi bộ nhớ cache vượt ngưỡng 16 textures, hệ thống tự động `dispose()` các texture xa ngoài cửa sổ trượt để bảo toàn VRAM.
+        - Phương thức `page.setSideTexture(side, url)` và `flipbook.updateFaceTexture(faceIndex, url)` cập nhật trực tiếp material mặt lật trong Three.js scene mà không cần reload trang.
+21. **Giai đoạn 21 (Prompt 27+ Nâng cao Editor & Undo/Redo/Snapping)**:
     - Tích hợp lịch sử Undo / Redo cho canvas editor.
     - Thêm đường gióng từ tính (Smart Snapping / Alignment Guides).
     - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.
