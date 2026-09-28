@@ -33,7 +33,7 @@ export interface MediaReferenceItem {
   description: string;
 }
 
-const ALLOWED_CLOUDINARY_FOLDERS = new Set([
+export const ALLOWED_CLOUDINARY_FOLDERS = new Set([
   'phuc_trang_memories',
   'phuc_trang_backgrounds',
   'phuc_trang_audio',
@@ -76,10 +76,12 @@ export class MediaService {
     }
 
     const requestedFolder = dto.folder;
-    const folder =
-      requestedFolder && ALLOWED_CLOUDINARY_FOLDERS.has(requestedFolder)
-        ? requestedFolder
-        : getUploadFolderForType(dto.type);
+    if (requestedFolder && !ALLOWED_CLOUDINARY_FOLDERS.has(requestedFolder)) {
+      throw new BadRequestException(
+        `Thư mục upload "${requestedFolder}" không nằm trong danh sách thư mục được cấp phép (Folder Whitelist). Các thư mục hợp lệ: ${Array.from(ALLOWED_CLOUDINARY_FOLDERS).join(', ')}`,
+      );
+    }
+    const folder = requestedFolder || getUploadFolderForType(dto.type);
 
     const resourceType = getResourceTypeForType(dto.type);
     const timestamp = Math.floor(Date.now() / 1000);

@@ -560,6 +560,18 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
         - Chỉ rõ vị trí lỗi (Cover, Trang số bao nhiêu, Loại phần tử nào).
         - Cung cấp nút **"Khắc phục" (Fix Link)** điều hướng trực tiếp tới đúng trang/phần tử lỗi.
         - Nút "Xác nhận xuất bản" bị vô hiệu hóa hoàn toàn khi còn ít nhất 1 Blocking Error.
-29. **Giai đoạn 29 (Prompt 35+ Texture Cache IndexedDB & Polishing)**:
+29. **Giai đoạn 29 (Đã hoàn thành - Prompt 35 Security Hardening & Regression Suite)**:
+    - Rà soát và gia cố toàn diện an ninh hệ thống (Security Hardening):
+      - **Chống dò mật khẩu (Brute-Force Rate Limiting)**: Giới hạn tối đa 5 lần đăng nhập sai trong 5 phút. Nếu vượt quá, tài khoản bị tạm khóa 15 phút (`429 Too Many Requests`). Đăng nhập thành công tự động xóa bộ đếm.
+      - **JWT Lifecycle & Route Guards**: Toàn bộ routes CMS yêu cầu Bearer token được kiểm chứng qua `AuthGuard('jwt')` và `RolesGuard` với phân quyền 3 cấp (VIEWER, EDITOR, ADMIN).
+      - **Admin-Only Destructive Actions**: Các thao tác hủy diệt (xóa sách, force xóa media đang dùng, rollback snapshot) bắt buộc quyền `Role.ADMIN`.
+      - **Cloudinary Folder Whitelist Enforcement**: `ALLOWED_CLOUDINARY_FOLDERS` giới hạn upload vào các thư mục hợp lệ của dự án (`phuc_trang_memories`, `phuc_trang_backgrounds`, `phuc_trang_audio`, `phuc_trang_textures`, `phuc_trang_decorations`), từ chối thẳng thừng mọi hành vi path traversal.
+      - **DTO Whitelist & Validation**: NestJS `ValidationPipe` toàn cục bật `whitelist: true, forbidNonWhitelisted: true`, chặn request chứa trường rác.
+      - **Chống Prototype Pollution**: `safeDeepMerge` chủ động bỏ qua các khóa nguy hiểm `__proto__`, `constructor`, `prototype`.
+      - **Open-Link & URL Safety**: `isValidHttpUrl()` chỉ chấp nhận giao thức an toàn `http://` và `https://`, loại bỏ `javascript:`, `data:`, `file:`, `vbscript:`.
+      - **Production Env Check**: Kiểm tra `JWT_SECRET`, `DATABASE_URL` và `CLOUDINARY_API_SECRET` khi khởi động.
+      - **CORS**: Giới hạn origin theo domain whitelist trong production.
+      - **Security Regression Suite**: Bổ sung bộ kiểm thử hồi quy bảo mật độc lập (`auth.service.spec.ts` & `security-regression.spec.ts`).
+30. **Giai đoạn 30 (Prompt 36+ Texture Cache IndexedDB & Polishing)**:
     - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.
     - Dọn dẹp/xóa bỏ an toàn các component legacy không dùng trong `src/components/spreads` và `src/components/pages`.
