@@ -602,3 +602,11 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
     - Kiểm tra bảo toàn các fallback:
       - `PHUC_AND_TRANG_BOOK` và `LOVE_STORY_DATA` được giữ nguyên làm dev/offline compatibility fallback và không bị gỡ bỏ nhầm.
     - Dọn dẹp dead code, kiểm tra tính toàn vẹn type safety, lint và build thành công 100% trên cả Backend và Frontend.
+33. **Giai đoạn 33 (Đã hoàn thành - Prompt 39 Documentation & Production Operations)**:
+    - Viết lại toàn diện tài liệu `README.md` chuẩn production:
+      - Kiến trúc hệ thống tổng quan (Diagram luồng Frontend, Backend, Neon PostgreSQL, Prisma, Cloudinary CDN).
+      - Hướng dẫn cài đặt và thiết lập biến môi trường an toàn (không ghi secret thật).
+      - Bảng ma trận phân quyền RBAC (VIEWER, EDITOR, ADMIN).
+      - Hướng dẫn vận hành Seeding: Normal Seed vs. Force Canonical Reset (`SEED_FORCE_CANONICAL_BOOK`).
+      - Quy trình kiểm toán xuất bản (Publish Validation Pipeline).
+      - Hướng dẫn sao lưu (Backup) và phục hồi (Restore) PostgreSQL.
