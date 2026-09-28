@@ -1,18 +1,14 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import {
-  getAdminBook,
-  updateAdminBook,
+  getJournal,
+  updateJournal,
   getAdminMedia,
-  createAdminElement,
-  deleteAdminElement,
-  duplicateAdminElement,
 } from '@/services/adminApi';
-import { useAdminAuth } from '@/context/AdminAuthContext';
+import { useJournal } from '@/context/JournalContext';
 import { Book, Page, PageElement, PageElementType } from '@/types/book';
 import LayersPanel from '@/components/admin/LayersPanel';
 import BackgroundEditor from '@/components/admin/BackgroundEditor';
@@ -20,7 +16,6 @@ import AdvancedTextEditor from '@/components/admin/AdvancedTextEditor';
 import AdvancedImageEditor from '@/components/admin/AdvancedImageEditor';
 import AdvancedVideoEditor from '@/components/admin/AdvancedVideoEditor';
 import InteractionEditor from '@/components/admin/InteractionEditor';
-import AutosaveIndicator from '@/components/admin/AutosaveIndicator';
 import { usePageHistory } from '@/hooks/usePageHistory';
 import {
   ArrowLeft,
@@ -38,8 +33,6 @@ import {
   Undo2,
   Redo2,
   Magnet,
-  Eye,
-  Send,
   Sliders,
   Palette,
 } from 'lucide-react';
@@ -58,14 +51,8 @@ const KonvaPageCanvas = dynamic(() => import('@/components/admin/KonvaPageCanvas
 });
 
 export default function BookCoverEditorPage() {
-  const { isViewer } = useAdminAuth();
-  const params = useParams();
-  const router = useRouter();
-  const bookId = params.bookId as string;
-
-  const [book, setBook] = useState<Book | null>(null);
+  const { journal, refreshJournal } = useJournal();
   const [activeSide, setActiveSide] = useState<CoverSide>('front');
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -147,47 +134,36 @@ export default function BookCoverEditorPage() {
     };
   }, []);
 
-  // Load initial book & media
+  // Sync virtual page when journal loads or active side changes
   useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const [bookData, mediaRes] = await Promise.all([
-          getAdminBook(bookId),
-          getAdminMedia({ type: 'VIDEO', limit: 50 }),
-        ]);
-
-        setBook(bookData);
-        setVideoMedia(mediaRes.items || []);
-
-        const initialPage = buildVirtualPage(bookData, 'front');
-        setVirtualPage(initialPage);
-        initHistory(initialPage);
-
-        if (initialPage.elements?.length > 0) {
-          setSelectedElementId(initialPage.elements[0].id);
-        }
-      } catch (err: any) {
-        alert(err?.message || 'Không thể tải dữ liệu bìa sách');
-      } finally {
-        setLoading(false);
+    if (journal) {
+      const pageData = buildVirtualPage(journal, activeSide);
+      setVirtualPage(pageData);
+      initHistory(pageData);
+      if (pageData.elements?.length > 0 && !selectedElementId) {
+        setSelectedElementId(pageData.elements[0].id);
       }
     }
-    load();
-  }, [bookId, buildVirtualPage, initHistory]);
+  }, [journal, activeSide, buildVirtualPage, initHistory]);
+
+  // Load media videos once
+  useEffect(() => {
+    async function loadMedia() {
+      try {
+        const mediaRes = await getAdminMedia({ type: 'VIDEO', limit: 50 });
+        setVideoMedia(mediaRes.items || []);
+      } catch {
+        // Ignore
+      }
+    }
+    loadMedia();
+  }, []);
 
   // Switch side handler (front, back inside, back outside)
   const handleSwitchSide = (newSide: CoverSide) => {
-    if (!book || newSide === activeSide) return;
+    if (!journal || newSide === activeSide) return;
     setActiveSide(newSide);
     setSelectedElementId(null);
-
-    const newPage = buildVirtualPage(book, newSide);
-    setVirtualPage(newPage);
-    initHistory(newPage);
-    if (newPage.elements?.length > 0) {
-      setSelectedElementId(newPage.elements[0].id);
-    }
   };
 
   // Keyboard Shortcuts: Ctrl/Cmd + Z (Undo), Ctrl/Cmd + Shift + Z (Redo)
@@ -298,7 +274,7 @@ export default function BookCoverEditorPage() {
 
   // Add Element to Cover
   const handleAddElement = (type: PageElementType) => {
-    if (isViewer || !virtualPage) return;
+    if (!virtualPage) return;
     const maxZ = (virtualPage.elements || []).reduce((max, el) => Math.max(max, el.zIndex ?? 1), 0);
     const newZ = maxZ + 1;
 
@@ -360,7 +336,7 @@ export default function BookCoverEditorPage() {
 
   // Duplicate Element
   const handleDuplicateSelected = () => {
-    if (isViewer || !selectedElementId || !virtualPage) return;
+    if (!selectedElementId || !virtualPage) return;
     const target = virtualPage.elements.find((el) => el.id === selectedElementId);
     if (!target) return;
 
@@ -388,7 +364,7 @@ export default function BookCoverEditorPage() {
 
   // Delete Element
   const handleDeleteElement = (elementId: string) => {
-    if (isViewer || !virtualPage) return;
+    if (!virtualPage) return;
     if (!confirm('Bạn có chắc chắn muốn xóa phần tử này khỏi bìa sách?')) return;
 
     setVirtualPage((prev) => {
@@ -401,15 +377,14 @@ export default function BookCoverEditorPage() {
     setSelectedElementId(null);
   };
 
-  // Save changes to Book.cover.front.elements or Book.cover.back.elements
+  // Save changes to Book.cover
   const handleSaveCover = async () => {
-    if (isViewer || !book || !virtualPage) return;
+    if (!journal || !virtualPage) return;
     setSaving(true);
     setToast(null);
 
     try {
-      const currentCover = JSON.parse(JSON.stringify(book.cover || { front: {}, back: {} }));
-
+      const currentCover = JSON.parse(JSON.stringify(journal.cover || { front: {}, back: {} }));
       const bg = virtualPage.background as any;
 
       if (activeSide === 'front') {
@@ -435,16 +410,11 @@ export default function BookCoverEditorPage() {
         };
       }
 
-      // Safe PATCH update to Book
-      const updatedBook = await updateAdminBook(
-        bookId,
-        {
-          cover: currentCover,
-        },
-        true
-      );
+      await updateJournal({
+        cover: currentCover,
+      });
 
-      setBook(updatedBook);
+      await refreshJournal();
       setToast(`Đã lưu thiết kế ${activeSide.toUpperCase()} lên cơ sở dữ liệu!`);
       setTimeout(() => setToast(null), 3000);
     } catch (err: any) {
@@ -454,11 +424,11 @@ export default function BookCoverEditorPage() {
     }
   };
 
-  if (loading || !virtualPage) {
+  if (!virtualPage) {
     return (
       <div className="py-32 flex flex-col items-center justify-center text-stone-500 text-xs">
         <div className="w-8 h-8 rounded-full border-2 border-rosewood-500 border-t-transparent animate-spin mb-3" />
-        <span>Đang nạp Cover Editor...</span>
+        <span>Đang nạp Cover Studio...</span>
       </div>
     );
   }
@@ -469,15 +439,15 @@ export default function BookCoverEditorPage() {
       <div className="h-14 bg-[#160D12] border-b border-rosewood-900/50 px-5 flex items-center justify-between shrink-0 z-30">
         <div className="flex items-center gap-3">
           <Link
-            href={`/admin/books/${bookId}/settings`}
+            href="/admin"
             className="p-1.5 rounded-lg bg-[#25151F] hover:bg-[#331C2A] text-stone-300 border border-rosewood-900/40 transition-colors"
-            title="Quay lại cài đặt sách"
+            title="Quay lại Dashboard"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div className="flex items-center gap-2">
             <h1 className="font-serif font-bold text-sm tracking-wide text-parchment-100">
-              Biên Tập Bìa Sách: {book?.title}
+              Biên Tập Bìa Nhật Ký: {journal?.title || 'Chúng Mình'}
             </h1>
             <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-rosewood-950 text-champagne-300 border border-rosewood-800/40 uppercase">
               {activeSide}
@@ -525,28 +495,26 @@ export default function BookCoverEditorPage() {
         {/* Right Action: Undo/Redo & Save Cover */}
         <div className="flex items-center gap-2">
           {/* Undo/Redo */}
-          {!isViewer && (
-            <div className="flex items-center gap-0.5 bg-[#20111A] p-1 rounded-xl border border-rosewood-900/40 text-xs">
-              <button
-                type="button"
-                onClick={() => performUndo()}
-                disabled={!canUndo}
-                className="p-1.5 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors disabled:opacity-30"
-                title="Hoàn tác (Ctrl+Z)"
-              >
-                <Undo2 className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => performRedo()}
-                disabled={!canRedo}
-                className="p-1.5 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors disabled:opacity-30"
-                title="Làm lại (Ctrl+Shift+Z)"
-              >
-                <Redo2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-0.5 bg-[#20111A] p-1 rounded-xl border border-rosewood-900/40 text-xs">
+            <button
+              type="button"
+              onClick={() => performUndo()}
+              disabled={!canUndo}
+              className="p-1.5 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors disabled:opacity-30"
+              title="Hoàn tác (Ctrl+Z)"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => performRedo()}
+              disabled={!canRedo}
+              className="p-1.5 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors disabled:opacity-30"
+              title="Làm lại (Ctrl+Shift+Z)"
+            >
+              <Redo2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
           {/* Snap toggle */}
           <button
@@ -564,17 +532,15 @@ export default function BookCoverEditorPage() {
           </button>
 
           {/* Save Button */}
-          {!isViewer && (
-            <button
-              type="button"
-              onClick={handleSaveCover}
-              disabled={saving}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-semibold shadow-lg transition active:scale-95 disabled:opacity-50"
-            >
-              <Save className="w-3.5 h-3.5" />
-              <span>{saving ? 'Đang lưu...' : 'Lưu bìa sách'}</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleSaveCover}
+            disabled={saving}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-semibold shadow-lg transition active:scale-95 disabled:opacity-50"
+          >
+            <Save className="w-3.5 h-3.5" />
+            <span>{saving ? 'Đang lưu...' : 'Lưu bìa'}</span>
+          </button>
         </div>
       </div>
 
@@ -612,98 +578,96 @@ export default function BookCoverEditorPage() {
             }}
             onDuplicateElement={handleDuplicateSelected}
             onDeleteElement={handleDeleteElement}
-            isViewer={isViewer}
+            isViewer={false}
           />
         </aside>
 
         {/* CENTER COLUMN: Visual Konva Canvas Viewport */}
         <main className="flex-1 flex flex-col bg-[#0A0407] overflow-hidden relative">
           {/* Top Quick Elements Add Bar */}
-          {!isViewer && (
-            <div className="h-10 bg-[#140B10] border-b border-rosewood-900/40 px-4 flex items-center justify-between text-xs shrink-0">
-              <div className="flex items-center gap-1.5 font-mono text-[11px] text-stone-400">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span>Bìa Canvas 1024 × 1360px</span>
-                <span className="text-stone-600">|</span>
-                <span>Tỉ lệ: {Math.round(canvasScale * 100)}%</span>
-              </div>
-
-              {/* Add Elements buttons */}
-              <div className="flex items-center gap-1 bg-[#20111A] p-0.5 rounded-lg border border-rosewood-900/40">
-                <button
-                  type="button"
-                  onClick={() => handleAddElement('TEXT')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded hover:bg-rosewood-800/60 text-parchment-200 transition"
-                  title="Thêm khối chữ"
-                >
-                  <Type className="w-3.5 h-3.5 text-champagne-300" />
-                  <span>Text</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleAddElement('IMAGE')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded hover:bg-rosewood-800/60 text-parchment-200 transition"
-                  title="Thêm ảnh"
-                >
-                  <ImageIcon className="w-3.5 h-3.5 text-pink-400" />
-                  <span>Ảnh</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleAddElement('VIDEO')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded hover:bg-rosewood-800/60 text-parchment-200 transition"
-                  title="Thêm video"
-                >
-                  <Video className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Video</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleAddElement('SHAPE')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded hover:bg-rosewood-800/60 text-parchment-200 transition"
-                  title="Thêm đường kẻ"
-                >
-                  <Square className="w-3.5 h-3.5 text-rosewood-400" />
-                  <span>Shape</span>
-                </button>
-              </div>
-
-              {/* Zoom Controls */}
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setCanvasScale((s) => Math.max(0.2, parseFloat((s - 0.05).toFixed(2))))}
-                  className="p-1 rounded bg-[#20111A] hover:bg-rosewood-800 text-stone-300"
-                  title="Thu nhỏ"
-                >
-                  <ZoomOut className="w-3.5 h-3.5" />
-                </button>
-                <span className="font-mono w-10 text-center text-[11px]">{Math.round(canvasScale * 100)}%</span>
-                <button
-                  type="button"
-                  onClick={() => setCanvasScale((s) => Math.min(1.2, parseFloat((s + 0.05).toFixed(2))))}
-                  className="p-1 rounded bg-[#20111A] hover:bg-rosewood-800 text-stone-300"
-                  title="Phóng to"
-                >
-                  <ZoomIn className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCanvasScale(0.42)}
-                  className="p-1 rounded bg-[#20111A] hover:bg-rosewood-800 text-stone-300"
-                  title="Chuẩn 42%"
-                >
-                  <Maximize2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
+          <div className="h-10 bg-[#140B10] border-b border-rosewood-900/40 px-4 flex items-center justify-between text-xs shrink-0">
+            <div className="flex items-center gap-1.5 font-mono text-[11px] text-stone-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span>Bìa Canvas 1024 × 1360px</span>
+              <span className="text-stone-600">|</span>
+              <span>Tỉ lệ: {Math.round(canvasScale * 100)}%</span>
             </div>
-          )}
+
+            {/* Add Elements buttons */}
+            <div className="flex items-center gap-1 bg-[#20111A] p-0.5 rounded-lg border border-rosewood-900/40">
+              <button
+                type="button"
+                onClick={() => handleAddElement('TEXT')}
+                className="flex items-center gap-1 px-2.5 py-1 rounded hover:bg-rosewood-800/60 text-parchment-200 transition"
+                title="Thêm khối chữ"
+              >
+                <Type className="w-3.5 h-3.5 text-champagne-300" />
+                <span>Text</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAddElement('IMAGE')}
+                className="flex items-center gap-1 px-2.5 py-1 rounded hover:bg-rosewood-800/60 text-parchment-200 transition"
+                title="Thêm ảnh"
+              >
+                <ImageIcon className="w-3.5 h-3.5 text-pink-400" />
+                <span>Ảnh</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAddElement('VIDEO')}
+                className="flex items-center gap-1 px-2.5 py-1 rounded hover:bg-rosewood-800/60 text-parchment-200 transition"
+                title="Thêm video"
+              >
+                <Video className="w-3.5 h-3.5 text-amber-400" />
+                <span>Video</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAddElement('SHAPE')}
+                className="flex items-center gap-1 px-2.5 py-1 rounded hover:bg-rosewood-800/60 text-parchment-200 transition"
+                title="Thêm đường kẻ"
+              >
+                <Square className="w-3.5 h-3.5 text-rosewood-400" />
+                <span>Shape</span>
+              </button>
+            </div>
+
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setCanvasScale((s) => Math.max(0.2, parseFloat((s - 0.05).toFixed(2))))}
+                className="p-1 rounded bg-[#20111A] hover:bg-rosewood-800 text-stone-300"
+                title="Thu nhỏ"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <span className="font-mono w-10 text-center text-[11px]">{Math.round(canvasScale * 100)}%</span>
+              <button
+                type="button"
+                onClick={() => setCanvasScale((s) => Math.min(1.2, parseFloat((s + 0.05).toFixed(2))))}
+                className="p-1 rounded bg-[#20111A] hover:bg-rosewood-800 text-stone-300"
+                title="Phóng to"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCanvasScale(0.42)}
+                className="p-1 rounded bg-[#20111A] hover:bg-rosewood-800 text-stone-300"
+                title="Chuẩn 42%"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
 
           {/* Konva Canvas Rendering Virtual Cover Page */}
           <div className="flex-1 flex items-center justify-center p-6 overflow-auto">
             <KonvaPageCanvas
               page={virtualPage}
-              book={book}
+              book={journal}
               selectedElementId={selectedElementId}
               onSelectElement={setSelectedElementId}
               onUpdateElementTransform={handleUpdateElementTransform}
@@ -773,7 +737,7 @@ export default function BookCoverEditorPage() {
                       return nextPage;
                     });
                   }}
-                  disabled={isViewer}
+                  disabled={false}
                 />
               )}
 
@@ -791,7 +755,7 @@ export default function BookCoverEditorPage() {
                   }}
                   isEditingActiveArea={editingActiveArea}
                   onEditActiveArea={() => setEditingActiveArea(!editingActiveArea)}
-                  disabled={isViewer}
+                  disabled={false}
                 />
               )}
 
@@ -803,9 +767,9 @@ export default function BookCoverEditorPage() {
                       onChange={(updated) => {
                         updateSelectedElement(updated);
                       }}
-                      book={book}
+                      book={journal}
                       page={virtualPage}
-                      disabled={isViewer}
+                      disabled={false}
                     />
                   )}
 
@@ -815,7 +779,7 @@ export default function BookCoverEditorPage() {
                       onChange={(updated) => {
                         updateSelectedElement(updated);
                       }}
-                      disabled={isViewer}
+                      disabled={false}
                     />
                   )}
 
@@ -825,7 +789,7 @@ export default function BookCoverEditorPage() {
                       onChange={(updated) => {
                         updateSelectedElement(updated);
                       }}
-                      disabled={isViewer}
+                      disabled={false}
                     />
                   )}
                 </>

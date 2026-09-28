@@ -2,69 +2,83 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getAdminBooks, getAdminMedia } from '@/services/adminApi';
-import { useAdminAuth } from '@/context/AdminAuthContext';
 import {
-  BookOpen,
+  getJournal,
+  getAdminMedia,
+  validateJournalForPublish,
+  ValidationReport,
+} from '@/services/adminApi';
+import { useJournal } from '@/context/JournalContext';
+import PublishValidationModal from '@/components/admin/PublishValidationModal';
+import VersionHistoryModal from '@/components/admin/VersionHistoryModal';
+import {
   FileText,
   ImageIcon,
   Music,
   Settings,
   Layers,
   Sparkles,
-  ExternalLink,
   Calendar,
   Heart,
   RefreshCw,
-  GitCommit,
-  ShieldAlert,
+  Eye,
+  Send,
+  History,
+  CheckCircle2,
+  Clock,
   ArrowRight,
 } from 'lucide-react';
 
 export default function AdminDashboardPage() {
-  const { isViewer, role } = useAdminAuth();
-  const [book, setBook] = useState<any | null>(null);
+  const { journal, refreshJournal } = useJournal();
   const [mediaCount, setMediaCount] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
-    setError(null);
+  // Modals state
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [validationModal, setValidationModal] = useState<{
+    bookId: string;
+    report: ValidationReport;
+  } | null>(null);
+
+  const fetchExtraStats = async () => {
     try {
-      const [booksData, mediaData] = await Promise.all([
-        getAdminBooks(),
-        getAdminMedia({ limit: 1 }),
-      ]);
-
-      if (booksData && booksData.length > 0) {
-        setBook(booksData[0]);
-      }
+      const mediaData = await getAdminMedia({ limit: 1 });
       setMediaCount(mediaData?.total || 0);
-    } catch (err: any) {
-      setError(err?.message || 'Không thể nạp dữ liệu bảng điều khiển');
-    } finally {
-      setLoading(false);
+    } catch {
+      // Ignore
     }
   };
 
   useEffect(() => {
-    fetchDashboardData();
+    fetchExtraStats();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="py-32 flex flex-col items-center justify-center text-stone-500 text-xs">
-        <div className="w-8 h-8 rounded-full border-2 border-rosewood-500 border-t-transparent animate-spin mb-3" />
-        <span>Đang nạp dữ liệu tổng quan Dashboard...</span>
-      </div>
-    );
-  }
+  const handlePublishClick = async () => {
+    if (!journal || publishing) return;
+    try {
+      setPublishing(true);
+      const report = await validateJournalForPublish();
+      setValidationModal({
+        bookId: journal.id,
+        report,
+      });
+    } catch (err: any) {
+      alert(`Lỗi kiểm tra xuất bản: ${err?.message || 'Vui lòng thử lại.'}`);
+    } finally {
+      setPublishing(false);
+    }
+  };
 
-  const pageCount = book?._count?.pages ?? (book?.pages?.length || 0);
-  const contentRevision = book?.contentRevision ?? 1;
-  const status = book?.status || 'PUBLISHED';
-  const frontCover = book?.cover?.front?.backgroundUrl;
+  const pageCount = (journal as any)?._count?.pages ?? (journal?.pages?.length || 0);
+  const publishedRevision = (journal as any)?.publishedRevision ?? 1;
+  const draftRevision = (journal as any)?.contentRevision ?? 1;
+  const status = (journal as any)?.status || 'PUBLISHED';
+  const frontCover = journal?.cover?.front?.backgroundUrl;
+  const lastPublishedStr = (journal as any)?.publishedAt
+    ? new Date((journal as any).publishedAt).toLocaleString('vi-VN')
+    : 'Chưa ghi nhận';
 
   return (
     <div className="p-8 max-w-7xl mx-auto w-full space-y-6">
@@ -73,211 +87,277 @@ export default function AdminDashboardPage() {
         <div>
           <h1 className="font-serif text-2xl font-bold text-parchment-100 flex items-center gap-2.5">
             <Sparkles className="w-6 h-6 text-champagne-300" />
-            <span>Dashboard — Bảng Điều Khiển</span>
+            <span>Nhật Ký Tình Yêu — {journal?.title || 'Chúng Mình'}</span>
           </h1>
           <p className="text-xs text-stone-400 mt-1">
-            Tổng quan nhật ký tình yêu &quot;{book?.title || 'Chúng Mình'}&quot;
+            Dành riêng cho {journal?.couple?.he || (journal as any)?.heName || 'Phúc'} &amp;{' '}
+            {journal?.couple?.she || (journal as any)?.sheName || 'Trang'} • Kỷ niệm từ{' '}
+            {journal?.couple?.anniversaryDate || (journal as any)?.anniversaryDate
+              ? new Date(journal?.couple?.anniversaryDate || (journal as any)?.anniversaryDate).toLocaleDateString('vi-VN')
+              : '20.10.2022'}
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <button
-            onClick={fetchDashboardData}
+            onClick={() => refreshJournal()}
             className="p-2.5 rounded-xl bg-[#201319] hover:bg-[#2C1923] text-parchment-300 border border-rosewood-900/40 transition-colors"
-            title="Làm mới"
+            title="Làm mới thông số"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="w-4 h-4 text-stone-400" />
           </button>
 
           <Link
-            href="/"
+            href="/admin/preview"
             target="_blank"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-medium shadow-lg transition-all active:scale-95"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 border border-amber-800/40 text-xs font-medium transition shadow-sm"
           >
-            <ExternalLink className="w-4 h-4" />
-            <span>Mở website</span>
+            <Eye className="w-4 h-4 text-amber-400" />
+            <span>Xem trước bản nháp</span>
           </Link>
+
+          <button
+            onClick={handlePublishClick}
+            disabled={publishing}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-950/50 transition active:scale-95 disabled:opacity-50"
+          >
+            <Send className="w-4 h-4" />
+            <span>{publishing ? 'Đang kiểm tra...' : 'Xuất bản (Publish)'}</span>
+          </button>
         </div>
       </div>
 
-      {error && (
-        <div className="p-4 rounded-xl bg-red-950/60 border border-red-500/40 text-red-200 text-xs">
-          {error}
-        </div>
-      )}
-
-      {/* Stats Cards Grid (Scope #9: book, page count, media count, status, contentRevision) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Card 1: Status */}
-        <div className="p-5 rounded-2xl bg-[#1A1016] border border-rosewood-900/40 shadow-xl space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-stone-400 font-mono">Trạng thái</span>
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                status === 'PUBLISHED' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
-              }`}
-            />
+      {/* KPI Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Stat 1: Status */}
+        <div className="p-5 rounded-2xl bg-[#1A1016] border border-rosewood-900/40 flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-mono text-stone-400 uppercase tracking-wider">Trạng thái phát hành</p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className={`w-2.5 h-2.5 rounded-full ${status === 'PUBLISHED' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+              <h3 className="font-serif text-lg font-bold text-parchment-100">{status}</h3>
+            </div>
+            <p className="text-[10px] text-stone-500 mt-1">Rev đã xuất bản: #{publishedRevision}</p>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span
-              className={`font-serif text-xl font-bold tracking-wide ${
-                status === 'PUBLISHED' ? 'text-emerald-300' : 'text-amber-300'
-              }`}
+          <div className="w-10 h-10 rounded-xl bg-emerald-950/60 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Stat 2: Pages */}
+        <div className="p-5 rounded-2xl bg-[#1A1016] border border-rosewood-900/40 flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-mono text-stone-400 uppercase tracking-wider">Tổng số trang</p>
+            <h3 className="font-serif text-2xl font-bold text-champagne-200 mt-1">{pageCount} trang</h3>
+            <p className="text-[10px] text-stone-500 mt-1">Trang vật lý 3D liên tục</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-rosewood-950/80 border border-rosewood-500/40 flex items-center justify-center text-rosewood-400">
+            <FileText className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Stat 3: Media */}
+        <div className="p-5 rounded-2xl bg-[#1A1016] border border-rosewood-900/40 flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-mono text-stone-400 uppercase tracking-wider">Kho ảnh &amp; video</p>
+            <h3 className="font-serif text-2xl font-bold text-champagne-200 mt-1">{mediaCount} items</h3>
+            <p className="text-[10px] text-stone-500 mt-1">Cloudinary CDN signed</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-pink-950/80 border border-pink-500/40 flex items-center justify-center text-pink-400">
+            <ImageIcon className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Stat 4: Last Published */}
+        <div className="p-5 rounded-2xl bg-[#1A1016] border border-rosewood-900/40 flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-mono text-stone-400 uppercase tracking-wider">Lần xuất bản gần nhất</p>
+            <p className="font-sans text-xs font-medium text-parchment-200 mt-1.5 line-clamp-1">{lastPublishedStr}</p>
+            <p className="text-[10px] text-stone-500 mt-1">Draft revision: #{draftRevision}</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-purple-950/80 border border-purple-500/40 flex items-center justify-center text-purple-400">
+            <Clock className="w-5 h-5" />
+          </div>
+        </div>
+      </div>
+
+      {/* Main Action Hub: 2-Columns */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: Quick Studio Cards (2 cols) */}
+        <div className="lg:col-span-2 space-y-4">
+          <h2 className="font-serif text-lg font-bold text-parchment-100 flex items-center gap-2">
+            <span>Truy Cập Nhanh Quản Trị</span>
+          </h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Card 1: Pages List */}
+            <Link
+              href="/admin/pages"
+              className="group p-5 rounded-2xl bg-[#1A1016] border border-rosewood-900/40 hover:border-rosewood-600/70 transition-all flex flex-col justify-between"
             >
-              {status}
-            </span>
+              <div>
+                <div className="w-10 h-10 rounded-xl bg-rosewood-950 border border-rosewood-500/40 flex items-center justify-center text-rosewood-400 mb-3 group-hover:scale-105 transition-transform">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <h3 className="font-serif text-base font-bold text-parchment-100 group-hover:text-champagne-300 transition-colors">
+                  Quản lý trang (Pages)
+                </h3>
+                <p className="text-xs text-stone-400 mt-1 leading-relaxed">
+                  Xem danh sách, thêm trang mới, kéo thả sắp xếp thứ tự và mở trình soạn thảo trực quan Canvas.
+                </p>
+              </div>
+              <div className="mt-4 pt-3 border-t border-rosewood-900/30 flex items-center justify-between text-xs text-champagne-300 font-medium">
+                <span>{pageCount} trang</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
+
+            {/* Card 2: Cover Studio */}
+            <Link
+              href="/admin/cover"
+              className="group p-5 rounded-2xl bg-[#1A1016] border border-rosewood-900/40 hover:border-rosewood-600/70 transition-all flex flex-col justify-between"
+            >
+              <div>
+                <div className="w-10 h-10 rounded-xl bg-pink-950 border border-pink-500/40 flex items-center justify-center text-pink-400 mb-3 group-hover:scale-105 transition-transform">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <h3 className="font-serif text-base font-bold text-parchment-100 group-hover:text-champagne-300 transition-colors">
+                  Bìa sách (Cover Studio)
+                </h3>
+                <p className="text-xs text-stone-400 mt-1 leading-relaxed">
+                  Thiết kế đồ họa chuyên sâu cho Bìa trước (Front), Mặt trong và Mặt ngoài bìa sau.
+                </p>
+              </div>
+              <div className="mt-4 pt-3 border-t border-rosewood-900/30 flex items-center justify-between text-xs text-champagne-300 font-medium">
+                <span>Mở Visual Studio</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
+
+            {/* Card 3: Media Library */}
+            <Link
+              href="/admin/media"
+              className="group p-5 rounded-2xl bg-[#1A1016] border border-rosewood-900/40 hover:border-rosewood-600/70 transition-all flex flex-col justify-between"
+            >
+              <div>
+                <div className="w-10 h-10 rounded-xl bg-amber-950 border border-amber-500/40 flex items-center justify-center text-amber-400 mb-3 group-hover:scale-105 transition-transform">
+                  <ImageIcon className="w-5 h-5" />
+                </div>
+                <h3 className="font-serif text-base font-bold text-parchment-100 group-hover:text-champagne-300 transition-colors">
+                  Thư viện Media
+                </h3>
+                <p className="text-xs text-stone-400 mt-1 leading-relaxed">
+                  Quản lý kho ảnh, video Cloudinary, kiểm tra tham chiếu an toàn trước khi xóa.
+                </p>
+              </div>
+              <div className="mt-4 pt-3 border-t border-rosewood-900/30 flex items-center justify-between text-xs text-champagne-300 font-medium">
+                <span>{mediaCount} tệp</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
+
+            {/* Card 4: Settings */}
+            <Link
+              href="/admin/settings"
+              className="group p-5 rounded-2xl bg-[#1A1016] border border-rosewood-900/40 hover:border-rosewood-600/70 transition-all flex flex-col justify-between"
+            >
+              <div>
+                <div className="w-10 h-10 rounded-xl bg-purple-950 border border-purple-500/40 flex items-center justify-center text-purple-400 mb-3 group-hover:scale-105 transition-transform">
+                  <Settings className="w-5 h-5" />
+                </div>
+                <h3 className="font-serif text-base font-bold text-parchment-100 group-hover:text-champagne-300 transition-colors">
+                  Cài đặt nhật ký (Settings)
+                </h3>
+                <p className="text-xs text-stone-400 mt-1 leading-relaxed">
+                  Tùy chỉnh thông tin cặp đôi, ngày kỷ niệm, lời ngỏ, bảng màu, typography, camera và không gian 3D.
+                </p>
+              </div>
+              <div className="mt-4 pt-3 border-t border-rosewood-900/30 flex items-center justify-between text-xs text-champagne-300 font-medium">
+                <span>7 nhóm thông số</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
           </div>
-          <p className="text-[11px] text-stone-500">Đang xuất bản công khai</p>
         </div>
 
-        {/* Card 2: Page Count */}
-        <Link
-          href="/admin/pages"
-          className="group p-5 rounded-2xl bg-[#1A1016] border border-rosewood-900/40 hover:border-rosewood-700/60 shadow-xl space-y-2 transition-all block"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-stone-400 font-mono">Tổng số trang</span>
-            <FileText className="w-4 h-4 text-rosewood-400 group-hover:scale-110 transition-transform" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-serif text-2xl font-bold text-parchment-100 group-hover:text-champagne-300 transition-colors">
-              {pageCount}
-            </span>
-            <span className="text-xs text-stone-500">trang</span>
-          </div>
-          <p className="text-[11px] text-stone-500 flex items-center gap-1 group-hover:text-rosewood-300">
-            <span>Quản lý trang</span>
-            <ArrowRight className="w-3 h-3" />
-          </p>
-        </Link>
+        {/* Right: Journal Profile & Versioning Hub */}
+        <div className="space-y-4">
+          <h2 className="font-serif text-lg font-bold text-parchment-100">
+            Thông Tin Nhật Ký
+          </h2>
 
-        {/* Card 3: Media Count */}
-        <Link
-          href="/admin/media"
-          className="group p-5 rounded-2xl bg-[#1A1016] border border-rosewood-900/40 hover:border-rosewood-700/60 shadow-xl space-y-2 transition-all block"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-stone-400 font-mono">Thư viện Media</span>
-            <ImageIcon className="w-4 h-4 text-pink-400 group-hover:scale-110 transition-transform" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-serif text-2xl font-bold text-parchment-100 group-hover:text-champagne-300 transition-colors">
-              {mediaCount}
-            </span>
-            <span className="text-xs text-stone-500">tệp tin</span>
-          </div>
-          <p className="text-[11px] text-stone-500 flex items-center gap-1 group-hover:text-pink-300">
-            <span>Mở thư viện</span>
-            <ArrowRight className="w-3 h-3" />
-          </p>
-        </Link>
-
-        {/* Card 4: Content Revision */}
-        <div className="p-5 rounded-2xl bg-[#1A1016] border border-rosewood-900/40 shadow-xl space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-stone-400 font-mono">Revision ETag</span>
-            <GitCommit className="w-4 h-4 text-champagne-400" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-serif text-2xl font-bold text-champagne-300 font-mono">
-              #{contentRevision}
-            </span>
-          </div>
-          <p className="text-[11px] text-stone-500 font-mono">v{book?.version || '2.0.0'}</p>
-        </div>
-      </div>
-
-      {/* Book Detailed Overview Card */}
-      {book && (
-        <div className="bg-[#180E14] border border-rosewood-900/40 rounded-2xl overflow-hidden shadow-2xl flex flex-col md:flex-row">
-          {/* Cover Image banner */}
-          <div className="md:w-80 h-56 md:h-auto relative bg-[#201018] shrink-0 overflow-hidden">
-            {frontCover ? (
-              <img
-                src={frontCover}
-                alt={book.title}
-                className="w-full h-full object-cover opacity-85 hover:scale-105 transition-transform duration-500"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-rosewood-800">
-                <BookOpen className="w-16 h-16" />
+          <div className="bg-[#1A1016] border border-rosewood-900/40 rounded-2xl overflow-hidden p-5 space-y-4">
+            {frontCover && (
+              <div className="w-full h-44 rounded-xl overflow-hidden border border-rosewood-900/50 relative bg-[#2A1622]">
+                <img
+                  src={frontCover}
+                  alt={journal?.title || 'Chúng Mình'}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-3">
+                  <span className="font-serif text-sm text-champagne-200 font-bold">{journal?.title}</span>
+                </div>
               </div>
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#180E14] via-transparent to-transparent md:bg-gradient-to-r md:from-transparent md:to-[#180E14]" />
-          </div>
 
-          {/* Book Content Summary */}
-          <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
-            <div>
-              <div className="flex items-center gap-2.5 mb-1">
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-rosewood-950 text-champagne-300 border border-rosewood-800/50">
-                  SLUG: {book.slug}
-                </span>
-                <span className="text-xs text-stone-500 font-mono">ID: {book.id}</span>
+            <div className="space-y-2 text-xs text-stone-300">
+              <div className="flex items-center gap-2">
+                <Heart className="w-3.5 h-3.5 text-rosewood-400 shrink-0" />
+                <span>{journal?.couple?.he || (journal as any)?.heName || 'Phúc'} &amp; {journal?.couple?.she || (journal as any)?.sheName || 'Trang'}</span>
               </div>
-
-              <h2 className="font-serif text-2xl font-bold text-parchment-100">{book.title}</h2>
-              {book.description && (
-                <p className="text-xs text-stone-400 mt-1 leading-relaxed">{book.description}</p>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 pt-4 border-t border-rosewood-900/40 text-xs text-stone-300">
-                <div className="flex items-center gap-2">
-                  <Heart className="w-4 h-4 text-rosewood-400" />
-                  <span>
-                    Chủ nhân: <strong className="text-parchment-100">{book.heName || 'Phúc'}</strong> & <strong className="text-parchment-100">{book.sheName || 'Trang'}</strong>
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-champagne-400" />
-                  <span>
-                    Ngày kỷ niệm: <strong className="text-parchment-100">{new Date(book.anniversaryDate).toLocaleDateString('vi-VN')}</strong>
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2 sm:col-span-2">
-                  <span className="text-rosewood-400 font-serif italic">&ldquo;{book.proposalQuote}&rdquo;</span>
-                </div>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-3.5 h-3.5 text-stone-500 shrink-0" />
+                <span>
+                  Bắt đầu từ:{' '}
+                  {journal?.couple?.anniversaryDate || (journal as any)?.anniversaryDate
+                    ? new Date(journal?.couple?.anniversaryDate || (journal as any)?.anniversaryDate).toLocaleDateString('vi-VN')
+                    : '20.10.2022'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Music className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>Nhạc nền: {journal?.audio?.title || (journal as any)?.backgroundMusic?.title || '(Chưa gán nhạc)'}</span>
               </div>
             </div>
 
-            {/* Quick Links */}
-            <div className="flex flex-wrap items-center gap-2.5 pt-4 border-t border-rosewood-900/40">
-              <Link
-                href="/admin/pages"
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rosewood-900/40 hover:bg-rosewood-900/70 text-champagne-300 text-xs font-medium border border-rosewood-800/50 transition-colors"
+            <div className="pt-3 border-t border-rosewood-900/40">
+              <button
+                type="button"
+                onClick={() => setShowHistoryModal(true)}
+                className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-rosewood-900/40 hover:bg-rosewood-900/70 text-champagne-300 border border-rosewood-800/40 text-xs font-medium transition"
               >
-                <FileText className="w-4 h-4" />
-                <span>Quản lý trang ({pageCount})</span>
-              </Link>
-
-              <Link
-                href="/admin/settings"
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#25151F] hover:bg-[#331C2A] text-parchment-300 text-xs font-medium border border-rosewood-900/40 transition-colors"
-              >
-                <Settings className="w-4 h-4" />
-                <span>Cài đặt sách</span>
-              </Link>
-
-              <Link
-                href="/admin/media"
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#25151F] hover:bg-[#331C2A] text-parchment-300 text-xs font-medium border border-rosewood-900/40 transition-colors"
-              >
-                <ImageIcon className="w-4 h-4" />
-                <span>Thư viện Media</span>
-              </Link>
-
-              <Link
-                href="/admin/audio"
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#25151F] hover:bg-[#331C2A] text-parchment-300 text-xs font-medium border border-rosewood-900/40 transition-colors"
-              >
-                <Music className="w-4 h-4" />
-                <span>Kho Audio</span>
-              </Link>
+                <History className="w-4 h-4 text-amber-400" />
+                <span>Lịch sử phiên bản &amp; Rollback</span>
+              </button>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Version History Modal */}
+      {journal && (
+        <VersionHistoryModal
+          bookId={journal.id}
+          bookTitle={journal.title}
+          isOpen={showHistoryModal}
+          onClose={() => setShowHistoryModal(false)}
+          onRollbackSuccess={() => {
+            refreshJournal();
+          }}
+        />
+      )}
+
+      {/* Publish Validation Modal */}
+      {validationModal && (
+        <PublishValidationModal
+          bookId={validationModal.bookId}
+          isOpen={true}
+          onClose={() => setValidationModal(null)}
+          report={validationModal.report}
+          onPublishSuccess={() => {
+            refreshJournal();
+          }}
+        />
       )}
     </div>
   );

@@ -6,7 +6,7 @@ import { AdminUser, checkAdminAuth, logoutAdmin, getCachedAdminUser } from '@/se
 
 interface AdminAuthContextType {
   user: AdminUser | null;
-  role: 'ADMIN' | 'EDITOR' | 'VIEWER' | null;
+  isAuthenticated: boolean;
   isAdmin: boolean;
   isEditor: boolean;
   isViewer: boolean;
@@ -17,9 +17,9 @@ interface AdminAuthContextType {
 
 const AdminAuthContext = createContext<AdminAuthContextType>({
   user: null,
-  role: null,
-  isAdmin: false,
-  isEditor: false,
+  isAuthenticated: false,
+  isAdmin: true,
+  isEditor: true,
   isViewer: false,
   loading: true,
   logout: async () => {},
@@ -62,19 +62,16 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/admin/login');
   };
 
-  const role = user?.role || null;
-  const isAdmin = role === 'ADMIN';
-  const isEditor = role === 'ADMIN' || role === 'EDITOR';
-  const isViewer = role === 'VIEWER';
+  const isAuthenticated = Boolean(user);
 
   return (
     <AdminAuthContext.Provider
       value={{
         user,
-        role,
-        isAdmin,
-        isEditor,
-        isViewer,
+        isAuthenticated,
+        isAdmin: true,   // Single Admin architecture: authenticated admin has full CMS access
+        isEditor: true,
+        isViewer: false,
         loading,
         logout,
         refreshUser,

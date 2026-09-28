@@ -1,6 +1,6 @@
-# 💕 Chúng Mình (Phúc & Trang) — 3D Interactive Love Journey & Headless CMS Platform
+# 💕 Chúng Mình (Phúc & Trang) — Single Love Journal & Dedicated CMS Studio
 
-Hệ thống kỷ niệm tình yêu kết hợp trải nghiệm thị giác **3D WebGL Flipbook sống động** và nền tảng quản trị nội dung chuyên nghiệp **Admin Headless CMS**, xây dựng trên kiến trúc hướng sự kiện, cô lập bản nháp/xuất bản và tự động hóa toàn diện.
+Hệ thống kỷ niệm tình yêu kết hợp trải nghiệm thị giác **3D WebGL Flipbook sống động** và nền tảng quản trị nội dung chuyên nghiệp **Single Love Journal CMS Studio**, xây dựng trên kiến trúc hướng sự kiện, cô lập bản nháp/xuất bản và tự động hóa toàn diện dành riêng cho Phúc & Trang.
 
 ---
 
@@ -10,26 +10,27 @@ Hệ thống kỷ niệm tình yêu kết hợp trải nghiệm thị giác **3D
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            FRONTEND (Next.js 15)                            │
 │                                                                             │
-│  [ Public 3D Flipbook ]                  [ Admin CMS Studio ]               │
+│  [ Public 3D Journal ]                   [ Single Journal Studio ]          │
 │  - Three.js / WebGL Realistic Engine     - React Konva Canvas 1024x1360     │
-│  - Lazy Texture Sliding Window (±3)      - Debounced Autosave (800ms)       │
-│  - Priority Media Preloader              - Undo / Redo History Stack (40)   │
-│  - Dynamic Text Variable Resolver        - Magnetic Snapping & Guides       │
-│  - Audio Engine (Web Audio API)          - Canva/Figma Layers Panel         │
-│                                          - Visual Cover Studio (Front/Back) │
+│  - Lazy Texture Sliding Window (±3)      - Direct Journal Administration    │
+│  - Priority Media Preloader              - Debounced Autosave (800ms)       │
+│  - Dynamic Text Variable Resolver        - Undo / Redo History Stack (40)   │
+│  - Audio Engine (Web Audio API)          - Magnetic Snapping & Guides       │
+│                                          - Canva/Figma Layers Panel         │
+│                                          - Visual Cover Studio (3 Sides)    │
 │                                          - BFF Proxy / HttpOnly Cookies     │
 └───────────────────────┬──────────────────────────────▲──────────────────────┘
                         │                              │
-          Public API    │ (Frozen Published Snapshot)  │ Admin REST API
-                        ▼                              │ (JWT + RBAC + BFF Proxy)
+          Public API    │ (Frozen Published Snapshot)  │ Semantic Journal REST API
+                        ▼                              │ (JWT + BFF Proxy)
 ┌──────────────────────────────────────────────────────┴──────────────────────┐
 │                            BACKEND (NestJS 10)                              │
 │                                                                             │
-│  - Modular Architecture: Auth, Books, Pages, Elements, Media, Audio,        │
-│    LayoutTemplates, Versions, Public, Validation                            │
-│  - RolesGuard: VIEWER (Read-only), EDITOR (Write), ADMIN (Destructive)      │
-│  - Brute-Force Rate Limiting (5 attempts / 5 mins -> 15 mins lockout)       │
-│  - Pre-Publish Validation Engine (Blocking Errors vs Non-blocking Warnings) │
+│  - Single Journal Controller: /api/journal (GET, PATCH, publish, preview)   │
+│  - Canonical Journal Resolver: slug = 'phuc-and-trang'                      │
+│  - Single Admin Authentication (No multi-user RBAC overhead)                │
+│  - Public Registration Completely Disabled                                  │
+│  - Pre-Publish Validation Engine (10 Blocking Errors vs Warnings)           │
 │  - Cache Invalidation & Sequential ETag Calculation                         │
 └───────────────────────┬──────────────────────────────▲──────────────────────┘
                         │                              │
@@ -50,7 +51,7 @@ Hệ thống kỷ niệm tình yêu kết hợp trải nghiệm thị giác **3D
 
 ### 1. Yêu Cầu Hệ Thống (Prerequisites)
 - **Node.js**: v20.x hoặc v22.x LTS
-- **Package Manager**: npm v10+
+- **Package Manager**: npm v10+ (Đã bao gồm `package-lock.json` cho cả Root và Backend)
 - **Database**: PostgreSQL 15+ (Khuyến nghị sử dụng Neon Serverless Postgres với SSL)
 - **Media CDN**: Tài khoản Cloudinary (Cloud Name, API Key, API Secret)
 
@@ -104,10 +105,10 @@ NEXT_PUBLIC_ENABLE_LOCAL_BOOK_FALLBACK=false
 Thực hiện tuần tự các bước sau trong terminal:
 
 ```bash
-# 1. Cài đặt toàn bộ dependencies cho Frontend & Backend
-npm install
+# 1. Cài đặt toàn bộ dependencies cho Frontend & Backend bằng package-lock
+npm ci
 cd backend
-npm install
+npm ci
 
 # 2. Sinh Prisma Client v7
 npx prisma generate --config prisma7.config.ts
@@ -134,38 +135,46 @@ npm run start
 
 ---
 
-## 🛡️ Bảng Ma Trận Phân Quyền (Admin Role Matrix)
+## 🧭 Cấu Trúc Điều Hướng Admin CMS (Single Journal Navigation)
 
-Hệ thống bảo vệ đa tầng kết hợp HttpOnly Cookie BFF Proxy, NestJS `AuthGuard('jwt')` và `RolesGuard`.
-> **Ghi chú về Rate Limiting**: Triển khai trong bộ nhớ Node.js (`in-memory rate limiting`) phù hợp hoàn hảo với kiến trúc container/single instance. Khi chạy trên môi trường đa instance hoặc Vercel Serverless Functions, khuyến nghị kích hoạt thêm Vercel WAF/Firewall hoặc tích hợp Upstash Redis để phân tán bộ đếm theo `IP + Email`.
+Sau khi đăng nhập, hệ thống điều hướng trực tiếp tới trang quản trị nhật ký duy nhất:
 
-| Thao Tác / Chức Năng | VIEWER | EDITOR | ADMIN | Ghi Chú Bảo Mật |
-| :--- | :---: | :---: | :---: | :--- |
-| **Xem Danh Sách Sách / Trang / Media** | ✅ | ✅ | ✅ | Quyền đọc toàn hệ thống |
-| **Xem Preview Bản Nháp (Draft Preview)** | ✅ | ✅ | ✅ | Cô lập hoàn toàn khỏi khách xem bên ngoài |
-| **Chỉnh Sửa Thuộc Tính / Tọa Độ / Nội Dung** | ❌ | ✅ | ✅ | Chặn ở cả UI và Backend DTO validation |
-| **Thêm / Nhân Bản Trang & Phần Tử** | ❌ | ✅ | ✅ | Tự động cập nhật `isCustomized = true` |
-| **Tải Lên Media Mới (Signed Upload)** | ❌ | ✅ | ✅ | Bắt buộc nằm trong Folder Whitelist |
-| **Tạo Snapshot Thủ Công (Create Version)** | ❌ | ✅ | ✅ | Đính kèm tag phiên bản và changelog |
-| **Xuất Bản Sách (Publish Live Site)** | ❌ | ✅ | ✅ | Bắt buộc vượt qua 10 Blocking Validation Rules |
-| **Phục Hồi Bản Nháp (Rollback Draft)** | ❌ | ❌ | ✅ | **Chỉ Admin** (Phục hồi draft, không tự publish) |
-| **Xóa Trang Nội Dung (Delete Page)** | ❌ | ❌ | ✅ | **Chỉ Admin** (Xác nhận cảnh báo cascade) |
-| **Xóa Sách (Delete Book)** | ❌ | ❌ | ✅ | **Chỉ Admin** |
-| **Force Delete Media Đang Được Dùng** | ❌ | ❌ | ✅ | **Chỉ Admin** (Mặc định bị 409 Conflict chặn) |
+```
+/admin               ➔ Tổng quan nhật ký (Dashboard, KPI thống kê, phím tắt nhanh)
+/admin/pages         ➔ Quản lý danh sách trang, kéo thả sắp xếp 3D, thêm/xóa/nhân bản
+/admin/pages/:pageId ➔ Visual Canvas Studio (React Konva 1024x1360, Autosave, Undo/Redo)
+/admin/cover         ➔ Visual Cover Studio (Bìa trước, Mặt trong, Mặt ngoài bìa sau)
+/admin/media         ➔ Thư viện ảnh/video Cloudinary, kiểm tra tham chiếu an toàn
+/admin/audio         ➔ Kho nhạc nền sách và nhạc nền từng trang
+/admin/layouts       ➔ Kho mẫu bố cục (Layout Templates) hệ thống và tùy biến
+/admin/versions      ➔ Lịch sử phiên bản snapshot và phục hồi bản nháp (Rollback Draft)
+/admin/settings      ➔ Cài đặt nhật ký (Thông tin cặp đôi, typography, 3D, atmosphere)
+/admin/preview       ➔ Chế độ xem trước bản nháp trên 3D Flipbook thực tế
+```
+
+---
+
+## 🔒 Mô Hình Xác Thực Đơn Giản & Bảo Mật (Single Admin Auth)
+
+- **Không còn sự phức tạp của RBAC đa cấp**: Loại bỏ hoàn toàn sự phân tách `VIEWER / EDITOR / ADMIN`.
+- **Tài khoản Quản trị duy nhất**: Sau khi đăng nhập thành công, Admin có toàn quyền thao tác trên toàn bộ hệ thống.
+- **Vô hiệu hóa đăng ký công khai**: Endpoint `POST /auth/register` bị tắt vĩnh viễn với mã lỗi `403 Forbidden`. Tài khoản Admin được khởi tạo an toàn qua Prisma Seed hoặc migration script.
+- **BFF Token Verification**: Endpoint `/api/admin/auth/me` gọi backend NestJS kiểm chứng chữ ký JWT thực tế, không tin tưởng cookie client không mã hóa.
+- **Brute-Force Rate Limiting**: Tự động khóa 15 phút nếu nhập sai mật khẩu quá 5 lần trong 5 phút.
 
 ---
 
 ## 🔄 Cơ Chế Seeding: Normal Seed vs. Force Canonical Seed
 
-Tệp khởi tạo `backend/prisma/seed.ts` hỗ trợ 2 chế độ vận hành độc lập điều khiển qua biến môi trường `SEED_FORCE_CANONICAL_BOOK`:
+Tệp khởi tạo `backend/prisma/seed.ts` đảm bảo luôn chỉ tồn tại một cuốn nhật ký chuẩn tắc duy nhất:
 
 1. **Non-Destructive Seed (`SEED_FORCE_CANONICAL_BOOK=false` - Mặc Định)**:
-   - Kiểm tra nếu tài khoản Admin, sách mẫu, layout templates hoặc audio tracks đã tồn tại thì **giữ nguyên vẹn 100% dữ liệu đang có**.
+   - Kiểm tra nếu tài khoản Admin, nhật ký chuẩn tắc (`phuc-and-trang`), layout templates hoặc audio tracks đã tồn tại thì **giữ nguyên vẹn 100% dữ liệu đang có**.
    - Tuyệt đối không xóa hay ghi đè lên các trang đang biên tập của người dùng.
    - An toàn để chạy trong CI/CD pipeline tự động.
 
 2. **Force Canonical Reset (`SEED_FORCE_CANONICAL_BOOK=true`)**:
-   - Dùng khi cần khôi phục toàn bộ cuốn sách về trạng thái gốc của Phúc & Trang.
+   - Dùng khi cần khôi phục cuốn nhật ký về trạng thái gốc của Phúc & Trang.
    - Xóa các trang hiện tại và nạp lại chuẩn tắc 21 trang mẫu với đầy đủ layout presets, hình ảnh Cloudinary, video clips kỷ niệm, nhạc nền và các tọa độ tương đối.
    - Biên dịch và đóng băng ngay một bản `publishedSnapshot` (Revision #1) sẵn sàng phục vụ độc giả công khai.
 
@@ -175,7 +184,7 @@ Tệp khởi tạo `backend/prisma/seed.ts` hỗ trợ 2 chế độ vận hành
 
 ### Quy Trình Xuất Bản (Edit Draft ➔ Preview ➔ Publish)
 1. **Live Relational Data = Draft**: Toàn bộ thao tác chỉnh sửa trong Visual Editor nằm trong các bảng quan hệ PostgreSQL (`books`, `pages`, `page_elements`).
-2. **Preview Mode (`/admin/books/:id/preview`)**: Quản trị viên kiểm tra trực tiếp bản nháp trên 3D Flipbook thực tế mà không ảnh hưởng tới khách xem bên ngoài.
+2. **Preview Mode (`/admin/preview`)**: Quản trị viên kiểm tra trực tiếp bản nháp trên 3D Flipbook thực tế mà không ảnh hưởng tới khách xem bên ngoài.
 3. **Pre-Publish Validation Engine**:
    - Hệ thống tự động kiểm tra 10 quy tắc chặn nghiêm ngặt:
      - `MISSING_COVER`: Thiếu ảnh nền bìa trước.
@@ -191,9 +200,9 @@ Tệp khởi tạo `backend/prisma/seed.ts` hỗ trợ 2 chế độ vận hành
    - Nếu còn ít nhất 1 Blocking Error, hệ thống trả về HTTP `400 BadRequestException` và khóa nút Publish trên UI, hiển thị liên kết sửa nhanh (**Fix Link**).
 4. **Publish Execution**:
    - Biên dịch toàn bộ tài liệu thành `CompiledBookDocument`.
-   - Lưu trữ vào `Book.publishedSnapshot`, tăng `publishedRevision` và `contentRevision`.
+   - Lưu trữ vào `Book.publishedSnapshot`, tăng `publishedRevision` và `contentRevision` đúng 1 lần duy nhất.
    - Tự động ghi lại một bản snapshot lịch sử vào `BookVersion`.
-   - Xóa cache bộ nhớ (`PublicCacheService.touchBook`).
+   - Xóa cache bộ nhớ (`PublicCacheService.invalidateBookCache`).
 
 ---
 
@@ -225,19 +234,11 @@ pg_restore -d "YOUR_TARGET_DATABASE_URL" -v "phuc_and_trang_backup_YYYYMMDD_HHMM
 
 ## 🧪 Kiểm Thử Hệ Thống (Automated Test Suites)
 
-Hệ thống sở hữu bộ kiểm thử tự động gồm **21 Test Suites với 110 Unit Tests** bao phủ 100% logic trọng yếu:
+Hệ thống sở hữu bộ kiểm thử tự động gồm **23 Test Suites với 117 Unit Tests** bao phủ 100% logic trọng yếu:
 
 ```bash
 cd backend
 npm test
-```
-
-Kết quả:
-```text
-Test Suites: 21 passed, 21 total
-Tests:       110 passed, 110 total
-Snapshots:   0 total
-Time:        ~11s
 ```
 
 ---

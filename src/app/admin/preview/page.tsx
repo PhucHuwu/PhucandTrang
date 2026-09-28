@@ -1,17 +1,20 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import QbjectAuthenticExperience from '@/components/3d/QbjectAuthenticExperience';
-import { previewAdminBookDraft, publishAdminBook, checkAdminAuth } from '@/services/adminApi';
+import {
+  getJournal,
+  previewJournalDraft,
+  publishJournal,
+  checkAdminAuth,
+} from '@/services/adminApi';
 import { Book } from '@/types/book';
 import { PHUC_AND_TRANG_BOOK } from '@/data/bookData';
 import { ArrowLeft, Send, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 
-export default function AdminBookPreviewPage() {
-  const params = useParams();
+export default function AdminPreviewDraftDirectPage() {
   const router = useRouter();
-  const bookId = params.bookId as string;
 
   const [draftBook, setDraftBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,10 +30,10 @@ export default function AdminBookPreviewPage() {
         setLoading(true);
         setError(null);
 
-        // Ensure user is authenticated admin/editor
+        // Verify authenticated admin session
         await checkAdminAuth();
 
-        const previewRes = await previewAdminBookDraft(bookId);
+        const previewRes = await previewJournalDraft();
         if (unmounted) return;
 
         const doc = previewRes.document;
@@ -67,26 +70,24 @@ export default function AdminBookPreviewPage() {
       }
     }
 
-    if (bookId) {
-      loadDraft();
-    }
+    loadDraft();
 
     return () => {
       unmounted = true;
     };
-  }, [bookId]);
+  }, []);
 
   const handlePublish = async () => {
-    if (!bookId || publishing) return;
+    if (publishing) return;
     const confirmPub = window.confirm(
       'Bạn có chắc chắn muốn xuất bản (Publish) toàn bộ bản nháp hiện tại lên website công khai?\n\n' +
-      'Bản snapshot mới sẽ được biên dịch và phục vụ ngay lập tức cho tất cả khách xem.'
+      'Bản snapshot mới sẽ được biên dịch và phục vụ ngay lập tức cho độc giả.'
     );
     if (!confirmPub) return;
 
     try {
       setPublishing(true);
-      const res = await publishAdminBook(bookId);
+      const res = await publishJournal();
       setPublishSuccess(res.message || 'Đã xuất bản thành công!');
       setTimeout(() => {
         setPublishSuccess(null);

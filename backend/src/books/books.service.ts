@@ -12,6 +12,7 @@ import { PublicCacheService } from '../public/public-cache.service';
 import { PublicService } from '../public/public.service';
 import { PublishValidationService } from './publish-validation.service';
 import { safeDeepMerge } from '../utils/safe-merge';
+import { CANONICAL_JOURNAL_SLUG, LEGACY_JOURNAL_SLUG } from '../../../shared/journalConfig';
 
 @Injectable()
 export class BooksService {
@@ -21,6 +22,72 @@ export class BooksService {
     private publicService: PublicService,
     private publishValidationService: PublishValidationService,
   ) {}
+
+  /**
+   * Resolves the canonical single Love Journal for Phúc & Trang.
+   * Auto-resolves by slug = 'phuc-and-trang', fallback to first book if not yet renamed.
+   */
+  async getCanonicalJournal() {
+    let journal = await this.prisma.book.findFirst({
+      where: {
+        OR: [
+          { slug: CANONICAL_JOURNAL_SLUG },
+          { slug: LEGACY_JOURNAL_SLUG },
+        ],
+      },
+      include: {
+        backgroundMusic: true,
+        _count: { select: { pages: true } },
+        pages: {
+          orderBy: { order: 'asc' },
+          include: {
+            elements: { orderBy: { zIndex: 'asc' } },
+            layoutTemplate: true,
+            audioTrack: true,
+          },
+        },
+        versions: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { version: true },
+        },
+      },
+    });
+
+    if (!journal) {
+      journal = await this.prisma.book.findFirst({
+        orderBy: { createdAt: 'asc' },
+        include: {
+          backgroundMusic: true,
+          _count: { select: { pages: true } },
+          pages: {
+            orderBy: { order: 'asc' },
+            include: {
+              elements: { orderBy: { zIndex: 'asc' } },
+              layoutTemplate: true,
+              audioTrack: true,
+            },
+          },
+          versions: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { version: true },
+          },
+        },
+      });
+    }
+
+    if (!journal) {
+      throw new NotFoundException('Không tìm thấy cuốn nhật ký tình yêu Phúc & Trang trong cơ sở dữ liệu.');
+    }
+
+    return journal;
+  }
+
+  async getCanonicalJournalId(): Promise<string> {
+    const journal = await this.getCanonicalJournal();
+    return journal.id;
+  }
 
   async findAll() {
     return this.prisma.book.findMany({

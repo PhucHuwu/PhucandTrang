@@ -53,6 +53,15 @@ export class PublicController {
   }
 
   /**
+   * Semantic Public Journal Endpoint: GET /api/public/journal
+   * Directly returns the primary published Love Journal for Phúc & Trang.
+   */
+  @Get('journal')
+  async getPublishedJournal(@Req() req: Request, @Res() res: Response) {
+    return this.getMasterBook(req, res);
+  }
+
+  /**
    * Convenience default endpoint: GET /api/public/book (returns master published book)
    */
   @Get('book')

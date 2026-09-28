@@ -6,12 +6,14 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   FileText,
+  Layers,
   Image as ImageIcon,
   Music,
   LayoutGrid,
+  History,
   Settings,
-  BookOpen,
   Sparkles,
+  ExternalLink,
 } from 'lucide-react';
 
 export default function AdminSidebar() {
@@ -19,40 +21,52 @@ export default function AdminSidebar() {
 
   const navItems = [
     {
-      label: 'Dashboard',
+      label: 'Tổng quan (Dashboard)',
       href: '/admin',
       icon: LayoutDashboard,
       match: pathname === '/admin',
     },
     {
-      label: 'Pages',
+      label: 'Trang nhật ký (Pages)',
       href: '/admin/pages',
       icon: FileText,
-      match: pathname.startsWith('/admin/pages') || (pathname.includes('/books/') && pathname.includes('/pages')),
+      match: pathname.startsWith('/admin/pages'),
     },
     {
-      label: 'Media',
+      label: 'Bìa sách (Cover Studio)',
+      href: '/admin/cover',
+      icon: Layers,
+      match: pathname.startsWith('/admin/cover'),
+    },
+    {
+      label: 'Thư viện ảnh/video (Media)',
       href: '/admin/media',
       icon: ImageIcon,
       match: pathname.startsWith('/admin/media'),
     },
     {
-      label: 'Audio',
+      label: 'Kho nhạc nền (Audio)',
       href: '/admin/audio',
       icon: Music,
       match: pathname.startsWith('/admin/audio'),
     },
     {
-      label: 'Layouts',
+      label: 'Mẫu bố cục (Layouts)',
       href: '/admin/layouts',
       icon: LayoutGrid,
       match: pathname.startsWith('/admin/layouts') || pathname.startsWith('/admin/layout-templates'),
     },
     {
-      label: 'Book Settings',
+      label: 'Lịch sử phiên bản (Versions)',
+      href: '/admin/versions',
+      icon: History,
+      match: pathname.startsWith('/admin/versions'),
+    },
+    {
+      label: 'Cài đặt nhật ký (Settings)',
       href: '/admin/settings',
       icon: Settings,
-      match: pathname.startsWith('/admin/settings') || (pathname.includes('/books/') && pathname.includes('/settings')),
+      match: pathname.startsWith('/admin/settings'),
     },
   ];
 
@@ -68,12 +82,12 @@ export default function AdminSidebar() {
             <h1 className="font-serif font-bold text-base text-parchment-100 tracking-wide">
               Chúng Mình CMS
             </h1>
-            <p className="text-[11px] text-rosewood-300/70">Quản trị nhật ký tình yêu</p>
+            <p className="text-[11px] text-rosewood-300/70">Nhật ký tình yêu Phúc &amp; Trang</p>
           </div>
         </div>
 
         {/* Navigation Items */}
-        <nav className="p-3 space-y-1.5">
+        <nav className="p-3 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.match;
@@ -97,7 +111,7 @@ export default function AdminSidebar() {
 
       {/* Footer Branding Info */}
       <div className="p-4 border-t border-rosewood-900/40 bg-[#140A0F] text-[11px] font-mono text-stone-500 text-center">
-        <span>Admin CMS v2.0 • Phúc & Trang</span>
+        <span>Single Love Journal CMS • Phúc &amp; Trang</span>
       </div>
     </aside>
   );

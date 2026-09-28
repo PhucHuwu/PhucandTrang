@@ -3,35 +3,34 @@
 import React from 'react';
 import Link from 'next/link';
 import { useAdminAuth } from '@/context/AdminAuthContext';
-import { LogOut, ExternalLink, Shield, ShieldAlert, Eye, User } from 'lucide-react';
+import { LogOut, ExternalLink, ShieldCheck, Eye } from 'lucide-react';
 
 export default function AdminHeader() {
-  const { user, role, isAdmin, isEditor, isViewer, logout } = useAdminAuth();
+  const { user, logout } = useAdminAuth();
 
   return (
     <header className="h-16 bg-[#160D12] border-b border-rosewood-900/40 px-6 flex items-center justify-between shrink-0 select-none z-20">
-      {/* Left: Role Info / Viewer Banner */}
+      {/* Left: Single Admin Badge */}
       <div className="flex items-center gap-3">
-        {isViewer ? (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-950/70 border border-amber-500/50 text-amber-200 text-xs font-medium animate-pulse">
-            <Eye className="w-3.5 h-3.5 text-amber-400" />
-            <span>Chế độ Chỉ Xem (VIEWER) — Thao tác chỉnh sửa bị khóa</span>
-          </div>
-        ) : isAdmin ? (
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-rosewood-950/80 border border-rosewood-500/50 text-champagne-300 text-xs font-mono font-semibold">
-            <ShieldAlert className="w-3.5 h-3.5 text-rosewood-400" />
-            <span>Quyền Quản Trị Cao Nhất (ADMIN)</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-950/80 border border-sky-500/50 text-sky-200 text-xs font-mono font-semibold">
-            <Shield className="w-3.5 h-3.5 text-sky-400" />
-            <span>Quyền Biên Tập Viên (EDITOR)</span>
-          </div>
-        )}
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-rosewood-950/80 border border-rosewood-500/50 text-champagne-300 text-xs font-mono font-semibold">
+          <ShieldCheck className="w-3.5 h-3.5 text-rosewood-400" />
+          <span>Quản Trị Viên (Admin)</span>
+        </div>
       </div>
 
-      {/* Right: User profile, Public site preview, Logout */}
-      <div className="flex items-center gap-4">
+      {/* Right: User profile, Preview Draft, Public site link, Logout */}
+      <div className="flex items-center gap-3 sm:gap-4">
+        {/* Preview Draft Link */}
+        <Link
+          href="/admin/preview"
+          target="_blank"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 hover:text-amber-200 text-xs font-medium border border-amber-800/40 transition-colors shadow-sm"
+          title="Xem trước bản nháp trên 3D Flipbook thực tế"
+        >
+          <Eye className="w-3.5 h-3.5 text-amber-400" />
+          <span className="hidden sm:inline">Preview Draft</span>
+        </Link>
+
         {/* Live Public Website Link */}
         <Link
           href="/"

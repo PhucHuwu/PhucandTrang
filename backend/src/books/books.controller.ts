@@ -11,31 +11,24 @@ import {
   Request,
 } from '@nestjs/common';
 import { BooksService } from './books.service';
-import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { AuthGuard } from '@nestjs/passport';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
-import { Role, BookStatus } from '@prisma/client';
 
-@UseGuards(AuthGuard('jwt'), RolesGuard)
+@UseGuards(AuthGuard('jwt'))
 @Controller('books')
 export class BooksController {
   constructor(private booksService: BooksService) {}
 
-  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
   @Get()
   async findAll() {
     return this.booksService.findAll();
   }
 
-  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.booksService.findOne(id);
   }
 
-  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
   @Get('slug/:slug')
   async findBySlug(@Param('slug') slug: string) {
     return this.booksService.findBySlug(slug);
@@ -44,7 +37,6 @@ export class BooksController {
   /**
    * Prompt 34: Run pre-publish validation report without altering database
    */
-  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
   @Get(':id/validate-publish')
   async validateForPublish(@Param('id') id: string) {
     return this.booksService.validateForPublish(id);
@@ -53,22 +45,14 @@ export class BooksController {
   /**
    * Prompt 23: Previews current editing draft without affecting public viewers
    */
-  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
   @Get(':id/preview')
   async previewDraft(@Param('id') id: string) {
     return this.booksService.previewDraft(id);
   }
 
-  @Roles(Role.ADMIN, Role.EDITOR)
-  @Post()
-  async create(@Body() dto: CreateBookDto, @Request() req: any) {
-    return this.booksService.create(dto, req.user?.id);
-  }
-
   /**
    * Prompt 23, 24 & 34: Publishes current draft to live public site with validation check
    */
-  @Roles(Role.ADMIN, Role.EDITOR)
   @Post(':id/publish')
   async publishBook(
     @Param('id') id: string,
@@ -78,27 +62,18 @@ export class BooksController {
     return this.booksService.publishBook(id, body?.changelog, req.user?.id);
   }
 
-  @Roles(Role.ADMIN)
   @Post(':id/archive')
   async archiveBook(@Param('id') id: string) {
-    return this.booksService.updateStatus(id, Role.ADMIN ? BookStatus.ARCHIVED : BookStatus.ARCHIVED);
+    return this.booksService.updateStatus(id, 'ARCHIVED' as any);
   }
 
-  @Roles(Role.ADMIN, Role.EDITOR)
   @Put(':id')
   async update(@Param('id') id: string, @Body() dto: UpdateBookDto) {
     return this.booksService.update(id, dto, false);
   }
 
-  @Roles(Role.ADMIN, Role.EDITOR)
   @Patch(':id')
   async patch(@Param('id') id: string, @Body() dto: UpdateBookDto) {
     return this.booksService.update(id, dto, true);
-  }
-
-  @Roles(Role.ADMIN)
-  @Delete(':id')
-  async remove(@Param('id') id: string) {
-    return this.booksService.remove(id);
   }
 }

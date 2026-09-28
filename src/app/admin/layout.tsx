@@ -3,6 +3,7 @@
 import React from 'react';
 import { usePathname } from 'next/navigation';
 import { AdminAuthProvider } from '@/context/AdminAuthContext';
+import { JournalProvider } from '@/context/JournalContext';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 
@@ -21,15 +22,17 @@ export default function AdminLayout({
           {children}
         </main>
       ) : (
-        <div className="flex h-screen bg-[#0E070A] text-parchment-100 overflow-hidden font-sans">
-          <AdminSidebar />
-          <div className="flex-1 flex flex-col h-screen overflow-hidden bg-[#12090D]">
-            <AdminHeader />
-            <main className="flex-1 overflow-y-auto">
-              {children}
-            </main>
+        <JournalProvider>
+          <div className="flex h-screen bg-[#0E070A] text-parchment-100 overflow-hidden font-sans">
+            <AdminSidebar />
+            <div className="flex-1 flex flex-col h-screen overflow-hidden bg-[#12090D]">
+              <AdminHeader />
+              <main className="flex-1 overflow-y-auto">
+                {children}
+              </main>
+            </div>
           </div>
-        </div>
+        </JournalProvider>
       )}
     </AdminAuthProvider>
   );

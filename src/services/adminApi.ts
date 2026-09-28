@@ -1,50 +1,51 @@
-import { Media, MediaType } from '@/types/book';
+import { CANONICAL_JOURNAL_SLUG, LEGACY_JOURNAL_SLUG } from '../../shared/journalConfig';
 
 export interface AdminUser {
   id: string;
   email: string;
   name: string;
-  role: 'ADMIN' | 'EDITOR' | 'VIEWER';
+  role: string;
 }
 
-const USER_SESSION_KEY = 'phuc_trang_admin_user_session';
+let cachedUser: AdminUser | null = null;
 
 export function getCachedAdminUser(): AdminUser | null {
-  if (typeof window === 'undefined') return null;
-  const raw = sessionStorage.getItem(USER_SESSION_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
+  if (cachedUser) return cachedUser;
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('pt_admin_user');
+    if (stored) {
+      try {
+        cachedUser = JSON.parse(stored);
+      } catch {
+        // Fallback
+      }
+    }
   }
+  return cachedUser;
 }
 
-export function setCachedAdminUser(user: AdminUser | null): void {
-  if (typeof window === 'undefined') return;
-  if (user) {
-    sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(user));
-  } else {
-    sessionStorage.removeItem(USER_SESSION_KEY);
+export function setCachedAdminUser(user: AdminUser | null) {
+  cachedUser = user;
+  if (typeof window !== 'undefined') {
+    if (user) {
+      localStorage.setItem('pt_admin_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('pt_admin_user');
+    }
   }
 }
 
 /**
- * Universal authenticated fetch helper for Admin API requests.
- * Routes through Next.js BFF proxy `/api/admin/proxy/...` which uses HttpOnly cookies.
- * Does NOT store JWT in localStorage!
+ * Universal fetcher for Admin APIs through Next.js BFF proxy.
  */
-export async function adminFetch<T = any>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function adminFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
   const proxyUrl = `/api/admin/proxy/${cleanEndpoint}`;
 
-  const headers = new Headers(options.headers || {});
-  if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
-    headers.set('Content-Type', 'application/json');
-  }
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
 
   const res = await fetch(proxyUrl, {
     ...options,
@@ -60,7 +61,7 @@ export async function adminFetch<T = any>(
   }
 
   if (res.status === 403) {
-    throw new Error('Bạn không có quyền thực hiện thao tác này (Yêu cầu quyền EDITOR hoặc ADMIN).');
+    throw new Error('Bạn không có quyền thực hiện thao tác này.');
   }
 
   let data: any = null;
@@ -128,36 +129,8 @@ export async function checkAdminAuth(): Promise<{ authenticated: boolean; user: 
 }
 
 // ==========================================
-// 2. BOOKS API
+// 2. SINGLE JOURNAL CMS API
 // ==========================================
-
-export async function getAdminBooks(): Promise<any[]> {
-  return adminFetch<any[]>('books');
-}
-
-export async function getAdminBook(id: string): Promise<any> {
-  return adminFetch<any>(`books/${id}`);
-}
-
-export async function createAdminBook(data: any): Promise<any> {
-  return adminFetch<any>('books', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-}
-
-export async function updateAdminBook(id: string, data: any, isPatch = true): Promise<any> {
-  return adminFetch<any>(`books/${id}`, {
-    method: isPatch ? 'PATCH' : 'PUT',
-    body: JSON.stringify(data),
-  });
-}
-
-export async function deleteAdminBook(id: string): Promise<any> {
-  return adminFetch<any>(`books/${id}`, {
-    method: 'DELETE',
-  });
-}
 
 export interface ValidationIssue {
   id: string;
@@ -183,11 +156,32 @@ export interface ValidationReport {
   issues: ValidationIssue[];
 }
 
-export async function validateAdminBookForPublish(id: string): Promise<ValidationReport> {
-  return adminFetch<ValidationReport>(`books/${id}/validate-publish`);
+export async function getJournal(): Promise<any> {
+  return adminFetch<any>('journal');
 }
 
-export async function publishAdminBook(id: string, changelog?: string): Promise<{
+export async function updateJournal(data: any): Promise<any> {
+  return adminFetch<any>('journal', {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function previewJournalDraft(): Promise<{
+  isDraftPreview: boolean;
+  document: any;
+}> {
+  return adminFetch<{
+    isDraftPreview: boolean;
+    document: any;
+  }>('journal/preview');
+}
+
+export async function validateJournalForPublish(): Promise<ValidationReport> {
+  return adminFetch<ValidationReport>('journal/validate-publish');
+}
+
+export async function publishJournal(changelog?: string): Promise<{
   success: boolean;
   message: string;
   publishedRevision: number;
@@ -202,28 +196,29 @@ export async function publishAdminBook(id: string, changelog?: string): Promise<
     publishedAt: string;
     validationReport?: ValidationReport;
     book: any;
-  }>(`books/${id}/publish`, {
+  }>('journal/publish', {
     method: 'POST',
     body: JSON.stringify({ changelog }),
   });
 }
 
-export async function previewAdminBookDraft(id: string): Promise<{
-  isDraftPreview: boolean;
-  document: any;
-}> {
-  return adminFetch<{
-    isDraftPreview: boolean;
-    document: any;
-  }>(`books/${id}/preview`);
-}
+// Backward compatibility alias methods
+export const getAdminBook = getJournal;
+export const updateAdminBook = (_id: string, data: any, _isPatch = true) => updateJournal(data);
+export const previewAdminBookDraft = (_id?: string) => previewJournalDraft();
+export const validateAdminBookForPublish = (_id?: string) => validateJournalForPublish();
+export const publishAdminBook = (_id?: string, changelog?: string) => publishJournal(changelog);
 
 // ==========================================
 // 3. PAGES API
 // ==========================================
 
-export async function getAdminPages(bookId: string): Promise<any[]> {
-  return adminFetch<any[]>(`pages/book/${bookId}`);
+export async function getAdminPages(bookId?: string): Promise<any[]> {
+  if (bookId) {
+    return adminFetch<any[]>(`pages/book/${bookId}`);
+  }
+  const journal = await getJournal();
+  return adminFetch<any[]>(`pages/book/${journal.id}`);
 }
 
 export async function getAdminPage(pageId: string): Promise<any> {
@@ -251,30 +246,22 @@ export async function duplicateAdminPage(pageId: string, insertAfter = false, ta
   });
 }
 
-export async function reorderAdminPages(bookId: string, items: Array<{ id: string }>): Promise<any> {
-  return adminFetch<any>(`pages/book/${bookId}/reorder`, {
-    method: 'PUT',
-    body: JSON.stringify({ items }),
-  });
-}
-
 export async function deleteAdminPage(pageId: string): Promise<any> {
   return adminFetch<any>(`pages/${pageId}`, {
     method: 'DELETE',
   });
 }
 
+export async function reorderAdminPages(bookId: string, items: Array<{ id: string; targetOrder?: number }>): Promise<any> {
+  return adminFetch<any>(`pages/book/${bookId}/reorder`, {
+    method: 'POST',
+    body: JSON.stringify({ items }),
+  });
+}
+
 // ==========================================
 // 4. PAGE ELEMENTS API
 // ==========================================
-
-export async function getAdminPageElements(pageId: string): Promise<any[]> {
-  return adminFetch<any[]>(`pages/${pageId}/elements`);
-}
-
-export async function getAdminElement(id: string): Promise<any> {
-  return adminFetch<any>(`page-elements/${id}`);
-}
 
 export async function createAdminElement(data: any): Promise<any> {
   return adminFetch<any>('page-elements', {
@@ -283,43 +270,115 @@ export async function createAdminElement(data: any): Promise<any> {
   });
 }
 
-export async function updateAdminElement(id: string, data: any, isPatch = true): Promise<any> {
-  return adminFetch<any>(`page-elements/${id}`, {
+export async function updateAdminElement(elementId: string, data: any, isPatch = true): Promise<any> {
+  return adminFetch<any>(`page-elements/${elementId}`, {
     method: isPatch ? 'PATCH' : 'PUT',
     body: JSON.stringify(data),
   });
 }
 
-export async function duplicateAdminElement(id: string, offsetX = 0.02, offsetY = 0.02): Promise<any> {
-  return adminFetch<any>(`page-elements/${id}/duplicate`, {
+export async function batchUpdateElements(pageId: string, elements: any[]): Promise<any> {
+  return adminFetch<any>(`page-elements/page/${pageId}/batch`, {
+    method: 'POST',
+    body: JSON.stringify({ elements }),
+  });
+}
+
+export async function duplicateAdminElement(elementId: string, offsetX = 0.02, offsetY = 0.02): Promise<any> {
+  return adminFetch<any>(`page-elements/${elementId}/duplicate`, {
     method: 'POST',
     body: JSON.stringify({ offsetX, offsetY }),
   });
 }
 
-export async function deleteAdminElement(id: string): Promise<any> {
-  return adminFetch<any>(`page-elements/${id}`, {
+export async function deleteAdminElement(elementId: string): Promise<any> {
+  return adminFetch<any>(`page-elements/${elementId}`, {
     method: 'DELETE',
   });
 }
 
-export async function batchUpdateElements(pageId: string, elements: any[]): Promise<any> {
-  return adminFetch<any>(`pages/${pageId}/elements/batch`, {
-    method: 'PATCH',
-    body: JSON.stringify({ elements }),
+// ==========================================
+// 5. MEDIA LIBRARY & SIGNED UPLOAD API
+// ==========================================
+
+export async function getSignedUploadConfig(paramsOrType: any): Promise<{
+  cloudName: string;
+  apiKey: string;
+  timestamp: number;
+  signature: string;
+  folder: string;
+  resourceType: string;
+  uploadUrl: string;
+  params: Record<string, any>;
+}> {
+  const body = typeof paramsOrType === 'string' ? { type: paramsOrType.toUpperCase() } : paramsOrType;
+  return adminFetch<any>('media/signature', {
+    method: 'POST',
+    body: JSON.stringify(body),
   });
 }
 
+export const requestSignedUpload = getSignedUploadConfig;
+
+export async function getAdminMedia(params?: {
+  page?: number;
+  limit?: number;
+  type?: string;
+  search?: string;
+}): Promise<{
+  items: any[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}> {
+  const query = new URLSearchParams();
+  if (params?.page) query.set('page', String(params.page));
+  if (params?.limit) query.set('limit', String(params.limit));
+  if (params?.type) query.set('type', params.type);
+  if (params?.search) query.set('search', params.search);
+
+  const endpoint = `media${query.toString() ? `?${query.toString()}` : ''}`;
+  return adminFetch<any>(endpoint);
+}
+
+export async function createAdminMedia(data: any): Promise<any> {
+  return adminFetch<any>('media', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export const saveUploadedMediaMetadata = createAdminMedia;
+
+export async function deleteAdminMedia(id: string, force = false): Promise<any> {
+  return adminFetch<any>(`media/${id}${force ? '?force=true' : ''}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function checkMediaReferences(id: string): Promise<{
+  media: any;
+  references: Array<{
+    targetType: string;
+    field: string;
+    description: string;
+    pageId?: string;
+    elementId?: string;
+  }>;
+  isInUse: boolean;
+}> {
+  return adminFetch<any>(`media/${id}/references`);
+}
+
+export const getAdminMediaReferences = checkMediaReferences;
+
 // ==========================================
-// 5. LAYOUT TEMPLATES API
+// 6. LAYOUT TEMPLATES API
 // ==========================================
 
 export async function getAdminLayoutTemplates(): Promise<any[]> {
   return adminFetch<any[]>('layout-templates');
-}
-
-export async function getAdminLayoutTemplate(id: string): Promise<any> {
-  return adminFetch<any>(`layout-templates/${id}`);
 }
 
 export async function createAdminLayoutTemplate(data: any): Promise<any> {
@@ -336,79 +395,17 @@ export async function updateAdminLayoutTemplate(id: string, data: any): Promise<
   });
 }
 
-export async function duplicateAdminLayoutTemplate(id: string, newId: string, newName?: string): Promise<any> {
-  return adminFetch<any>(`layout-templates/${id}/duplicate`, {
-    method: 'POST',
-    body: JSON.stringify({ newId, newName }),
-  });
-}
-
 export async function deleteAdminLayoutTemplate(id: string): Promise<any> {
   return adminFetch<any>(`layout-templates/${id}`, {
     method: 'DELETE',
   });
 }
 
-// ==========================================
-// 6. MEDIA LIBRARY API
-// ==========================================
-
-export async function getAdminMedia(params: {
-  type?: MediaType;
-  search?: string;
-  provider?: string;
-  page?: number;
-  limit?: number;
-} = {}): Promise<{ items: Media[]; total: number; page: number; totalPages: number }> {
-  const query = new URLSearchParams();
-  if (params.type) query.set('type', params.type);
-  if (params.search) query.set('search', params.search);
-  if (params.provider) query.set('provider', params.provider);
-  if (params.page) query.set('page', params.page.toString());
-  if (params.limit) query.set('limit', params.limit.toString());
-
-  return adminFetch(`media?${query.toString()}`);
-}
-
-export async function getAdminMediaOne(id: string): Promise<Media> {
-  return adminFetch<Media>(`media/${id}`);
-}
-
-export async function getAdminMediaReferences(id: string): Promise<{
-  media: Media;
-  references: any[];
-  isInUse: boolean;
-}> {
-  return adminFetch(`media/${id}/references`);
-}
-
-export async function deleteAdminMedia(id: string, force = false): Promise<any> {
-  return adminFetch(`media/${id}${force ? '?force=true' : ''}`, {
-    method: 'DELETE',
-  });
-}
-
-export async function requestSignedUpload(type?: MediaType, folder?: string): Promise<any> {
-  return adminFetch('media/signature', {
+export async function duplicateAdminLayoutTemplate(id: string, nameOrId?: string, name?: string): Promise<any> {
+  const finalName = name || nameOrId;
+  return adminFetch<any>(`layout-templates/${id}/duplicate`, {
     method: 'POST',
-    body: JSON.stringify({ type, folder }),
-  });
-}
-
-export async function saveUploadedMediaMetadata(data: {
-  type: MediaType;
-  url: string;
-  publicId?: string;
-  width?: number;
-  height?: number;
-  mimeType?: string;
-  size?: number;
-  alt?: string;
-  metadata?: Record<string, any>;
-}): Promise<Media> {
-  return adminFetch<Media>('media', {
-    method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify({ name: finalName }),
   });
 }
 
@@ -464,8 +461,12 @@ export interface BookVersionItem {
   snapshot?: any;
 }
 
-export async function getAdminVersions(bookId: string): Promise<BookVersionItem[]> {
-  return adminFetch<BookVersionItem[]>(`versions/book/${bookId}`);
+export async function getAdminVersions(bookId?: string): Promise<BookVersionItem[]> {
+  if (bookId) {
+    return adminFetch<BookVersionItem[]>(`versions/book/${bookId}`);
+  }
+  const journal = await getJournal();
+  return adminFetch<BookVersionItem[]>(`versions/book/${journal.id}`);
 }
 
 export async function getAdminVersion(id: string): Promise<BookVersionItem> {
