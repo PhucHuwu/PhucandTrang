@@ -57,10 +57,4 @@ export class UpdateBookDto {
   @IsString()
   @IsOptional()
   backgroundMusicId?: string | null;
-
-  /** @deprecated Use backgroundMusicId instead */
-  @ValidateIf((_obj, value) => value !== null && value !== undefined)
-  @IsString()
-  @IsOptional()
-  audioTrackId?: string | null;
 }

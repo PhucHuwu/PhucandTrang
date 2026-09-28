@@ -595,6 +595,10 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
       - **Canonical Z-Index Stacking**: Đảm bảo dải thứ tự duy nhất tuần tự từ 1 đến N.
       - **Representative Page Configs**: Kiểm tra cấu trúc chuẩn tắc của Cover, Single Hero, Quad Gallery, Video Page và Custom Freeform.
     - Bộ test backend đạt mốc **21 Test Suites với 110/110 tests passed (100%)**.
-32. **Giai đoạn 32 (Prompt 38+ Texture Cache IndexedDB & Polishing)**:
-    - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.
-    - Dọn dẹp/xóa bỏ an toàn các component legacy không dùng trong `src/components/spreads` và `src/components/pages`.
+32. **Giai đoạn 32 (Đã hoàn thành - Prompt 38 Legacy Cleanup & Canonical Unification)**:
+    - Loại bỏ hoàn toàn các trường alias cũ không còn client nào sử dụng:
+      - Loại bỏ `audioTrackId` alias trong `CreateBookDto` và `UpdateBookDto` (chỉ dùng duy nhất canonical `backgroundMusicId`).
+      - Giữ nguyên `page.audioTrackId` cho cấp trang (Page Audio) vì có mục đích riêng biệt với `book.backgroundMusicId`.
+    - Kiểm tra bảo toàn các fallback:
+      - `PHUC_AND_TRANG_BOOK` và `LOVE_STORY_DATA` được giữ nguyên làm dev/offline compatibility fallback và không bị gỡ bỏ nhầm.
+    - Dọn dẹp dead code, kiểm tra tính toàn vẹn type safety, lint và build thành công 100% trên cả Backend và Frontend.
