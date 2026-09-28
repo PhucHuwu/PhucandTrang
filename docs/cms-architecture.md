@@ -572,6 +572,19 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
       - **Production Env Check**: Kiểm tra `JWT_SECRET`, `DATABASE_URL` và `CLOUDINARY_API_SECRET` khi khởi động.
       - **CORS**: Giới hạn origin theo domain whitelist trong production.
       - **Security Regression Suite**: Bổ sung bộ kiểm thử hồi quy bảo mật độc lập (`auth.service.spec.ts` & `security-regression.spec.ts`).
-30. **Giai đoạn 30 (Prompt 36+ Texture Cache IndexedDB & Polishing)**:
+30. **Giai đoạn 30 (Đã hoàn thành - Prompt 36 Backend Test Suite Expansion)**:
+    - Mở rộng toàn diện bộ kiểm thử tự động của Backend NestJS lên **20 Test Suites (95 Tests passed 100%)**:
+      - Bao phủ trọn vẹn toàn bộ 10 core services:
+        1. **AuthService**: Đăng nhập, băm mật khẩu bcrypt, phát sinh JWT token, kiểm soát brute-force rate limiting 429 sau 5 lần nhập sai.
+        2. **BooksService**: CRUD, phân giải slug, safe deep merge partial updates, nullable semantics (`backgroundMusicId = null`), tự động tăng `contentRevision`, invalidation cache.
+        3. **PagesService**: Quy tắc chuẩn hóa Option B (`order` 0..N-1 độc lập `pageNumber`), tự động suy diễn `side` (Chẵn = LEFT, Lẻ = RIGHT), reorder atomic transactions, duplicate page.
+        4. **PageElementsService**: Canonical `mediaId` và `posterMediaId`, ép kiểu `zIndex` mức gốc, cấm dùng `transform.zIndex`.
+        5. **MediaService**: Signed direct upload Cloudinary, folder whitelist enforcement, kiểm tra quan hệ tham chiếu `checkReferences()` trước khi xóa.
+        6. **AudioService**: Đăng ký track mới, resolve mediaId URL, đồng bộ BigInt size an toàn, kích hoạt `touchAffectedBooks` xóa cache các sách liên quan.
+        7. **LayoutTemplatesService**: Quản lý template hệ thống (`isSystem: true` được bảo vệ) và template tùy biến của người dùng (`isSystem: false`).
+        8. **VersionsService**: Tạo snapshot tự động khi publish, snapshot thủ công, kiểm tra ngăn chặn cross-book rollback, khôi phục nguyên vẹn cấu trúc trang về bản nháp.
+        9. **PublicService**: Phục vụ `publishedSnapshot` đóng băng cô lập với draft, tính toán ETag tuần tự, compile document chuẩn tắc.
+        10. **PublishValidationService**: Kiểm toán 10 blocking errors và warnings trước khi cho phép xuất bản.
+31. **Giai đoạn 31 (Prompt 37+ Texture Cache IndexedDB & Polishing)**:
     - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.
     - Dọn dẹp/xóa bỏ an toàn các component legacy không dùng trong `src/components/spreads` và `src/components/pages`.
