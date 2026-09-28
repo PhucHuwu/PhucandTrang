@@ -517,6 +517,18 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
         - Nút bấm `Snap: BẬT / TẮT` (`Magnet`) trên Quick Action Bar.
         - **Phím Shift Modifier**: Giữ phím `Shift` trong khi kéo thả chuột để tạm thời vô hiệu hóa lực hút từ tính mà không cần bấm tắt nút Snap.
       - **Bảo toàn Coordinate Contract**: Snapping chỉ can thiệp vào tọa độ pixel tức thời trong khi kéo thả trên Konva Canvas, sau khi nhả chuột (`onDragEnd`), tọa độ vẫn được chuẩn hóa về dải tỷ lệ thập phân `0.0..1.0` truyền thống.
-26. **Giai đoạn 26 (Prompt 32+ Texture Cache IndexedDB & Polishing)**:
+26. **Giai đoạn 26 (Đã hoàn thành - Prompt 32 Book Settings Admin UI)**:
+    - Hoàn thiện toàn diện giao diện Cài đặt Sách (`/admin/books/:bookId/settings`):
+      - Phân chia 7 Tabs mạch lạc, trực quan:
+        1. **General**: Tiêu đề sách, đường dẫn slug, trạng thái (DRAFT/PUBLISHED/ARCHIVED), tên Bạn trai (He) & Bạn gái (She), ngày kỷ niệm (`anniversaryDate`), câu ngỏ lời (`proposalQuote`), mô tả.
+        2. **Theme**: Bảng màu sắc không gian sách (màu giấy lật `paperColor`, màu chữ `textColor`, màu điểm nhấn `accentColor`, màu vàng ánh kim `champagneGold`, mép trang 3D `edgeColor`, màu bàn đọc `deskColor`).
+        3. **Typography**: Phông tiêu đề bìa (`titleFont`), phông nội dung (`bodyFont`), phông viết tay (`handwritingFont`), cỡ chữ cơ bản (`baseFontSize`).
+        4. **3D & Camera**: Kích thước vật lý trang 3D (`pageWidth`, `pageHeight`, `pageThickness`, `coverThickness`), độ phân giải Canvas Resolution (`1024 x 1360px`), góc nhìn Camera (`fov`, `distance`).
+        5. **Atmosphere**: Bật/tắt hiệu ứng lãng mạn không gian 3D, số lượng cánh bướm (`butterflyCount`), số lượng cánh hoa hồng rơi (`petalCount`), số hạt bụi tiên (`dustCount`).
+        6. **Audio**: Chọn nhạc nền chính cho toàn cuốn sách từ thư viện `AudioTrack` (hỗ trợ bỏ gán / tắt âm thanh qua `backgroundMusicId = null`).
+        7. **Cover**: Cấu hình URL ảnh nền và tiêu đề cho Bìa trước, Mặt trong và Mặt ngoài bìa sau.
+      - **Safe PATCH Semantics**: Gửi payload PATCH partial JSON đối tượng `settings` mà không ghi đè mất các nhánh con chưa chỉnh sửa.
+      - **Reset to Defaults Confirmation**: Hỗ trợ nút khôi phục giá trị mặc định cho từng tab chuyên biệt (`Reset Mặc Định`) kèm hộp thoại xác nhận.
+27. **Giai đoạn 27 (Prompt 33+ Nâng cao Editor & Cache / Clean up)**:
     - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.
     - Dọn dẹp/xóa bỏ an toàn các component legacy không dùng trong `src/components/spreads` và `src/components/pages`.

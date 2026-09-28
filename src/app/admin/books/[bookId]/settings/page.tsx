@@ -19,7 +19,55 @@ import {
   Camera,
   Layers,
   BookOpen,
+  Type,
+  Box,
+  RotateCcw,
+  CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
+
+export type SettingsTab = 'general' | 'theme' | 'typography' | '3d' | 'atmosphere' | 'audio' | 'cover';
+
+const DEFAULT_SETTINGS = {
+  dimensions: {
+    pageWidth: 764,
+    pageHeight: 1080,
+    pageThickness: 1,
+    coverThickness: 5,
+    pageRootThickness: 4,
+    coverMarginX: 8,
+    coverMarginY: 10,
+    canvasResolution: { width: 1024, height: 1360 },
+  },
+  camera: {
+    fov: 14,
+    distance: 5200,
+    near: 1200,
+    far: 9000,
+  },
+  theme: {
+    edgeColor: 0xb1a283,
+    paperColor: '#F9F5EC',
+    textColor: '#292522',
+    accentColor: '#94384F',
+    champagneGold: '#FFE5B4',
+    deskColor: 0x1f1218,
+  },
+  typography: {
+    titleFont: 'SVN-Housttely Signature',
+    bodyFont: 'Cormorant Garamond',
+    handwritingFont: 'Dancing Script',
+    headingFont: 'Montserrat',
+    baseFontSize: 22,
+    baseLineHeight: 1.5,
+  },
+  atmospheric: {
+    enabled: true,
+    butterflyCount: 12,
+    petalCount: 34,
+    dustCount: 90,
+  },
+};
 
 export default function BookSettingsPage() {
   const { isViewer } = useAdminAuth();
@@ -30,10 +78,10 @@ export default function BookSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [audioTracks, setAudioTracks] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'general' | 'audio' | 'dimensions' | 'theme' | 'atmosphere' | 'cover'>('general');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [toast, setToast] = useState<string | null>(null);
 
-  // Form states
+  // 1. General Info states
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
   const [status, setStatus] = useState('PUBLISHED');
@@ -42,43 +90,24 @@ export default function BookSettingsPage() {
   const [sheName, setSheName] = useState('Trang');
   const [anniversaryDate, setAnniversaryDate] = useState('2022-10-20');
   const [proposalQuote, setProposalQuote] = useState('Thế cậu đồng ý làm bạn gái tớ không?');
+
+  // 2. Audio state
   const [backgroundMusicId, setBackgroundMusicId] = useState<string | null>(null);
 
-  // Settings states
-  const [dimensions, setDimensions] = useState({
-    pageWidth: 764,
-    pageHeight: 1080,
-    pageThickness: 1,
-    coverThickness: 5,
-    pageRootThickness: 4,
-    coverMarginX: 8,
-    coverMarginY: 10,
-    canvasResolution: { width: 1024, height: 1360 },
-  });
+  // 3. 3D & Dimensions states
+  const [dimensions, setDimensions] = useState(DEFAULT_SETTINGS.dimensions);
+  const [camera, setCamera] = useState(DEFAULT_SETTINGS.camera);
 
-  const [camera, setCamera] = useState({
-    fov: 14,
-    distance: 5200,
-    near: 1200,
-    far: 9000,
-  });
+  // 4. Theme Colors state
+  const [theme, setTheme] = useState(DEFAULT_SETTINGS.theme);
 
-  const [theme, setTheme] = useState({
-    edgeColor: 0xb1a283,
-    paperColor: '#F9F5EC',
-    textColor: '#292522',
-    accentColor: '#94384F',
-    champagneGold: '#FFE5B4',
-    deskColor: 0x1F1218,
-  });
+  // 5. Typography state
+  const [typography, setTypography] = useState(DEFAULT_SETTINGS.typography);
 
-  const [atmospheric, setAtmospheric] = useState({
-    enabled: true,
-    butterflyCount: 12,
-    petalCount: 34,
-    dustCount: 90,
-  });
+  // 6. Atmospheric state
+  const [atmospheric, setAtmospheric] = useState(DEFAULT_SETTINGS.atmospheric);
 
+  // 7. Cover state
   const [cover, setCover] = useState<any>({
     front: {
       backgroundUrl: '',
@@ -116,10 +145,11 @@ export default function BookSettingsPage() {
         setBackgroundMusicId(bookData.backgroundMusicId || null);
 
         if (bookData.settings) {
-          if (bookData.settings.dimensions) setDimensions(bookData.settings.dimensions);
-          if (bookData.settings.camera) setCamera(bookData.settings.camera);
-          if (bookData.settings.theme) setTheme(bookData.settings.theme);
-          if (bookData.settings.atmospheric) setAtmospheric(bookData.settings.atmospheric);
+          if (bookData.settings.dimensions) setDimensions({ ...DEFAULT_SETTINGS.dimensions, ...bookData.settings.dimensions });
+          if (bookData.settings.camera) setCamera({ ...DEFAULT_SETTINGS.camera, ...bookData.settings.camera });
+          if (bookData.settings.theme) setTheme({ ...DEFAULT_SETTINGS.theme, ...bookData.settings.theme });
+          if (bookData.settings.typography) setTypography({ ...DEFAULT_SETTINGS.typography, ...bookData.settings.typography });
+          if (bookData.settings.atmospheric) setAtmospheric({ ...DEFAULT_SETTINGS.atmospheric, ...bookData.settings.atmospheric });
         }
 
         if (bookData.cover) {
@@ -134,6 +164,7 @@ export default function BookSettingsPage() {
     loadData();
   }, [bookId]);
 
+  // Safe PATCH semantics: preserves partial JSON hierarchies
   const handleSave = async () => {
     if (isViewer) {
       alert('Tài khoản quyền VIEWER chỉ có quyền xem, không thể sửa đổi cấu hình sách.');
@@ -142,32 +173,55 @@ export default function BookSettingsPage() {
     setSaving(true);
     setToast(null);
     try {
-      await updateAdminBook(bookId, {
-        title,
-        slug,
-        status,
-        description,
-        heName,
-        sheName,
-        anniversaryDate: `${anniversaryDate}T00:00:00Z`,
-        proposalQuote,
-        backgroundMusicId,
-        settings: {
-          dimensions,
-          camera,
-          theme,
-          atmospheric,
+      await updateAdminBook(
+        bookId,
+        {
+          title,
+          slug,
+          status,
+          description,
+          heName,
+          sheName,
+          anniversaryDate: `${anniversaryDate}T00:00:00Z`,
+          proposalQuote,
+          backgroundMusicId,
+          settings: {
+            dimensions,
+            camera,
+            theme,
+            typography,
+            atmospheric,
+          },
+          cover,
         },
-        cover,
-      });
+        true // isPatch = true
+      );
 
-      setToast('Đã lưu cấu hình sách thành công!');
+      setToast('Đã lưu cấu hình sách an toàn (Safe PATCH)!');
       setTimeout(() => setToast(null), 3000);
     } catch (err: any) {
       alert(err?.message || 'Lỗi lưu cấu hình sách');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleResetDefaults = (tab: SettingsTab) => {
+    const confirmReset = window.confirm(`Bạn có chắc chắn muốn khôi phục các giá trị mặc định cho tab "${tab.toUpperCase()}"?`);
+    if (!confirmReset) return;
+
+    if (tab === '3d') {
+      setDimensions(DEFAULT_SETTINGS.dimensions);
+      setCamera(DEFAULT_SETTINGS.camera);
+    } else if (tab === 'theme') {
+      setTheme(DEFAULT_SETTINGS.theme);
+    } else if (tab === 'typography') {
+      setTypography(DEFAULT_SETTINGS.typography);
+    } else if (tab === 'atmosphere') {
+      setAtmospheric(DEFAULT_SETTINGS.atmospheric);
+    }
+    setToast(`Đã reset cài đặt ${tab} về mặc định! Hãy bấm Lưu để ghi nhận.`);
+    setTimeout(() => setToast(null), 3000);
   };
 
   if (loading) {
@@ -212,8 +266,9 @@ export default function BookSettingsPage() {
       </div>
 
       {toast && (
-        <div className="p-3.5 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-emerald-200 text-xs text-center animate-fade-in">
-          {toast}
+        <div className="p-3.5 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-emerald-200 text-xs text-center animate-fade-in flex items-center justify-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{toast}</span>
         </div>
       )}
 
@@ -222,79 +277,78 @@ export default function BookSettingsPage() {
         <button
           type="button"
           onClick={() => setActiveTab('general')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
-            activeTab === 'general'
-              ? 'bg-rosewood-600 text-white shadow font-semibold'
-              : 'text-stone-400 hover:text-white hover:bg-[#261620]'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all ${
+            activeTab === 'general' ? 'bg-rosewood-600 text-white shadow font-semibold' : 'text-stone-400 hover:text-white hover:bg-[#261620]'
           }`}
         >
           <BookOpen className="w-3.5 h-3.5" />
-          <span>Thông tin chung</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('audio')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
-            activeTab === 'audio'
-              ? 'bg-rosewood-600 text-white shadow font-semibold'
-              : 'text-stone-400 hover:text-white hover:bg-[#261620]'
-          }`}
-        >
-          <Music className="w-3.5 h-3.5" />
-          <span>Nhạc nền (Audio)</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('dimensions')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
-            activeTab === 'dimensions'
-              ? 'bg-rosewood-600 text-white shadow font-semibold'
-              : 'text-stone-400 hover:text-white hover:bg-[#261620]'
-          }`}
-        >
-          <Camera className="w-3.5 h-3.5" />
-          <span>Kích thước & Camera 3D</span>
+          <span>General</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('theme')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
-            activeTab === 'theme'
-              ? 'bg-rosewood-600 text-white shadow font-semibold'
-              : 'text-stone-400 hover:text-white hover:bg-[#261620]'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all ${
+            activeTab === 'theme' ? 'bg-rosewood-600 text-white shadow font-semibold' : 'text-stone-400 hover:text-white hover:bg-[#261620]'
           }`}
         >
           <Palette className="w-3.5 h-3.5" />
-          <span>Bảng màu giao diện</span>
+          <span>Theme</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('typography')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all ${
+            activeTab === 'typography' ? 'bg-rosewood-600 text-white shadow font-semibold' : 'text-stone-400 hover:text-white hover:bg-[#261620]'
+          }`}
+        >
+          <Type className="w-3.5 h-3.5" />
+          <span>Typography</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('3d')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all ${
+            activeTab === '3d' ? 'bg-rosewood-600 text-white shadow font-semibold' : 'text-stone-400 hover:text-white hover:bg-[#261620]'
+          }`}
+        >
+          <Box className="w-3.5 h-3.5" />
+          <span>3D &amp; Camera</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('atmosphere')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
-            activeTab === 'atmosphere'
-              ? 'bg-rosewood-600 text-white shadow font-semibold'
-              : 'text-stone-400 hover:text-white hover:bg-[#261620]'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all ${
+            activeTab === 'atmosphere' ? 'bg-rosewood-600 text-white shadow font-semibold' : 'text-stone-400 hover:text-white hover:bg-[#261620]'
           }`}
         >
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Hiệu ứng không gian</span>
+          <span>Atmosphere</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('audio')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all ${
+            activeTab === 'audio' ? 'bg-rosewood-600 text-white shadow font-semibold' : 'text-stone-400 hover:text-white hover:bg-[#261620]'
+          }`}
+        >
+          <Music className="w-3.5 h-3.5" />
+          <span>Audio</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('cover')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
-            activeTab === 'cover'
-              ? 'bg-rosewood-600 text-white shadow font-semibold'
-              : 'text-stone-400 hover:text-white hover:bg-[#261620]'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all ${
+            activeTab === 'cover' ? 'bg-rosewood-600 text-white shadow font-semibold' : 'text-stone-400 hover:text-white hover:bg-[#261620]'
           }`}
         >
           <Layers className="w-3.5 h-3.5" />
-          <span>Bìa trước & sau</span>
+          <span>Cover</span>
         </button>
       </div>
 
@@ -347,7 +401,7 @@ export default function BookSettingsPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1.5">Tên bạn nam (he)</label>
+              <label className="block text-xs font-medium text-stone-300 mb-1.5">Tên Bạn Trai (He)</label>
               <input
                 type="text"
                 value={heName}
@@ -357,7 +411,7 @@ export default function BookSettingsPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1.5">Tên bạn nữ (she)</label>
+              <label className="block text-xs font-medium text-stone-300 mb-1.5">Tên Bạn Gái (She)</label>
               <input
                 type="text"
                 value={sheName}
@@ -367,7 +421,7 @@ export default function BookSettingsPage() {
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-stone-300 mb-1.5">Câu tỏ tình / Trích dẫn tình yêu</label>
+              <label className="block text-xs font-medium text-stone-300 mb-1.5">Câu ngỏ lời tình yêu (Proposal Quote)</label>
               <input
                 type="text"
                 value={proposalQuote}
@@ -377,9 +431,9 @@ export default function BookSettingsPage() {
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-stone-300 mb-1.5">Mô tả ngắn</label>
+              <label className="block text-xs font-medium text-stone-300 mb-1.5">Mô tả cuốn sách</label>
               <textarea
-                rows={2}
+                rows={3}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white focus:outline-none focus:border-rosewood-500"
@@ -388,178 +442,280 @@ export default function BookSettingsPage() {
           </div>
         )}
 
-        {/* 2. Audio Tab */}
-        {activeTab === 'audio' && (
-          <div className="space-y-4 max-w-xl">
-            <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1.5">
-                Nhạc nền mặc định của cuốn sách
-              </label>
-              <select
-                value={backgroundMusicId || ''}
-                onChange={(e) => setBackgroundMusicId(e.target.value ? e.target.value : null)}
-                className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white focus:outline-none focus:border-rosewood-500"
-              >
-                <option value="">(Không bật nhạc nền - Null)</option>
-                {audioTracks.map((track) => (
-                  <option key={track.id} value={track.id}>
-                    {track.title} {track.artist ? `— ${track.artist}` : ''}
-                  </option>
-                ))}
-              </select>
-              <p className="text-[11px] text-stone-400 mt-1.5 leading-relaxed">
-                Khi chọn &quot;Không bật nhạc nền&quot;, máy nghe nhạc đĩa than sẽ tự động ẩn và không phát nhạc khi mở sách.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* 3. Dimensions Tab */}
-        {activeTab === 'dimensions' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1">Chiều rộng trang 3D (pageWidth)</label>
-              <input
-                type="number"
-                value={dimensions.pageWidth}
-                onChange={(e) => setDimensions({ ...dimensions, pageWidth: parseInt(e.target.value, 10) || 764 })}
-                className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1">Chiều cao trang 3D (pageHeight)</label>
-              <input
-                type="number"
-                value={dimensions.pageHeight}
-                onChange={(e) => setDimensions({ ...dimensions, pageHeight: parseInt(e.target.value, 10) || 1080 })}
-                className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1">Độ phân giải Canvas Width (px)</label>
-              <input
-                type="number"
-                value={dimensions.canvasResolution?.width || 1024}
-                onChange={(e) =>
-                  setDimensions({
-                    ...dimensions,
-                    canvasResolution: { ...dimensions.canvasResolution, width: parseInt(e.target.value, 10) || 1024 },
-                  })
-                }
-                className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1">Độ phân giải Canvas Height (px)</label>
-              <input
-                type="number"
-                value={dimensions.canvasResolution?.height || 1360}
-                onChange={(e) =>
-                  setDimensions({
-                    ...dimensions,
-                    canvasResolution: { ...dimensions.canvasResolution, height: parseInt(e.target.value, 10) || 1360 },
-                  })
-                }
-                className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1">Khoảng cách Camera (distance)</label>
-              <input
-                type="number"
-                value={camera.distance}
-                onChange={(e) => setCamera({ ...camera, distance: parseInt(e.target.value, 10) || 5200 })}
-                className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1">Góc nhìn Camera (fov)</label>
-              <input
-                type="number"
-                value={camera.fov}
-                onChange={(e) => setCamera({ ...camera, fov: parseInt(e.target.value, 10) || 14 })}
-                className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* 4. Theme Tab */}
+        {/* 2. Theme Tab */}
         {activeTab === 'theme' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1">Màu giấy trang (paperColor)</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={theme.paperColor || '#F9F5EC'}
-                  onChange={(e) => setTheme({ ...theme, paperColor: e.target.value })}
-                  className="w-9 h-9 rounded bg-transparent border-0 cursor-pointer"
-                />
+          <div className="space-y-6">
+            <div className="flex items-center justify-between pb-3 border-b border-rosewood-900/40">
+              <span className="text-xs font-semibold text-champagne-300 uppercase tracking-wider">
+                Bảng màu sắc không gian sách
+              </span>
+              <button
+                type="button"
+                onClick={() => handleResetDefaults('theme')}
+                className="flex items-center gap-1 text-[11px] text-stone-400 hover:text-white"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset Mặc Định</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Màu giấy lật (Paper Color)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={theme.paperColor || '#F9F5EC'}
+                    onChange={(e) => setTheme({ ...theme, paperColor: e.target.value })}
+                    className="w-9 h-9 rounded-lg bg-transparent border border-rosewood-800 cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={theme.paperColor || '#F9F5EC'}
+                    onChange={(e) => setTheme({ ...theme, paperColor: e.target.value })}
+                    className="flex-1 px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Màu chữ mặc định (Text Color)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={theme.textColor || '#292522'}
+                    onChange={(e) => setTheme({ ...theme, textColor: e.target.value })}
+                    className="w-9 h-9 rounded-lg bg-transparent border border-rosewood-800 cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={theme.textColor || '#292522'}
+                    onChange={(e) => setTheme({ ...theme, textColor: e.target.value })}
+                    className="flex-1 px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Màu điểm nhấn (Accent Color)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={theme.accentColor || '#94384F'}
+                    onChange={(e) => setTheme({ ...theme, accentColor: e.target.value })}
+                    className="w-9 h-9 rounded-lg bg-transparent border border-rosewood-800 cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={theme.accentColor || '#94384F'}
+                    onChange={(e) => setTheme({ ...theme, accentColor: e.target.value })}
+                    className="flex-1 px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Màu vàng ánh kim (Champagne Gold)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={theme.champagneGold || '#FFE5B4'}
+                    onChange={(e) => setTheme({ ...theme, champagneGold: e.target.value })}
+                    className="w-9 h-9 rounded-lg bg-transparent border border-rosewood-800 cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={theme.champagneGold || '#FFE5B4'}
+                    onChange={(e) => setTheme({ ...theme, champagneGold: e.target.value })}
+                    className="flex-1 px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Mép trang 3D (Edge Color Hex)</label>
                 <input
                   type="text"
-                  value={theme.paperColor || '#F9F5EC'}
-                  onChange={(e) => setTheme({ ...theme, paperColor: e.target.value })}
-                  className="flex-1 px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                  value={`0x${(theme.edgeColor || 0xb1a283).toString(16)}`}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 16);
+                    if (!isNaN(parsed)) setTheme({ ...theme, edgeColor: parsed });
+                  }}
+                  className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Màu bàn đọc 3D (Desk Color Hex)</label>
+                <input
+                  type="text"
+                  value={`0x${(theme.deskColor || 0x1f1218).toString(16)}`}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 16);
+                    if (!isNaN(parsed)) setTheme({ ...theme, deskColor: parsed });
+                  }}
+                  className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
                 />
               </div>
             </div>
+          </div>
+        )}
 
-            <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1">Màu nhấn chủ đạo (accentColor)</label>
-              <div className="flex items-center gap-2">
+        {/* 3. Typography Tab */}
+        {activeTab === 'typography' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between pb-3 border-b border-rosewood-900/40">
+              <span className="text-xs font-semibold text-champagne-300 uppercase tracking-wider">
+                Cấu hình phông chữ hệ thống
+              </span>
+              <button
+                type="button"
+                onClick={() => handleResetDefaults('typography')}
+                className="flex items-center gap-1 text-[11px] text-stone-400 hover:text-white"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset Mặc Định</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Phông tiêu đề bìa (Title Font)</label>
+                <select
+                  value={typography.titleFont || 'SVN-Housttely Signature'}
+                  onChange={(e) => setTypography({ ...typography, titleFont: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white focus:outline-none"
+                >
+                  <option value="SVN-Housttely Signature">SVN-Housttely Signature (Chữ ký nghệ thuật)</option>
+                  <option value="Dancing Script">Dancing Script (Thư pháp bay bổng)</option>
+                  <option value="Cormorant Garamond">Cormorant Garamond (Cổ điển sang trọng)</option>
+                  <option value="Playfair Display">Playfair Display (Trang nhã)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Phông nội dung chính (Body Font)</label>
+                <select
+                  value={typography.bodyFont || 'Cormorant Garamond'}
+                  onChange={(e) => setTypography({ ...typography, bodyFont: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white focus:outline-none"
+                >
+                  <option value="Cormorant Garamond">Cormorant Garamond (Serif cổ điển)</option>
+                  <option value="Montserrat">Montserrat (Hiện đại)</option>
+                  <option value="Playfair Display">Playfair Display</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Phông viết tay (Handwriting Font)</label>
+                <select
+                  value={typography.handwritingFont || 'Dancing Script'}
+                  onChange={(e) => setTypography({ ...typography, handwritingFont: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white focus:outline-none"
+                >
+                  <option value="Dancing Script">Dancing Script</option>
+                  <option value="SVN-Housttely Signature">SVN-Housttely Signature</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Cỡ chữ cơ bản (Base Font Size px)</label>
                 <input
-                  type="color"
-                  value={theme.accentColor || '#94384F'}
-                  onChange={(e) => setTheme({ ...theme, accentColor: e.target.value })}
-                  className="w-9 h-9 rounded bg-transparent border-0 cursor-pointer"
-                />
-                <input
-                  type="text"
-                  value={theme.accentColor || '#94384F'}
-                  onChange={(e) => setTheme({ ...theme, accentColor: e.target.value })}
-                  className="flex-1 px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                  type="number"
+                  value={typography.baseFontSize || 22}
+                  onChange={(e) => setTypography({ ...typography, baseFontSize: Number(e.target.value) })}
+                  className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white focus:outline-none"
                 />
               </div>
             </div>
+          </div>
+        )}
 
-            <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1">Màu chữ chính (textColor)</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={theme.textColor || '#292522'}
-                  onChange={(e) => setTheme({ ...theme, textColor: e.target.value })}
-                  className="w-9 h-9 rounded bg-transparent border-0 cursor-pointer"
-                />
-                <input
-                  type="text"
-                  value={theme.textColor || '#292522'}
-                  onChange={(e) => setTheme({ ...theme, textColor: e.target.value })}
-                  className="flex-1 px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
-                />
-              </div>
+        {/* 4. 3D & Camera Tab */}
+        {activeTab === '3d' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between pb-3 border-b border-rosewood-900/40">
+              <span className="text-xs font-semibold text-champagne-300 uppercase tracking-wider">
+                Kích thước vật lý &amp; Camera 3D
+              </span>
+              <button
+                type="button"
+                onClick={() => handleResetDefaults('3d')}
+                className="flex items-center gap-1 text-[11px] text-stone-400 hover:text-white"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset Mặc Định</span>
+              </button>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1">Màu vàng sâm panh (champagneGold)</label>
-              <div className="flex items-center gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Chiều rộng trang 3D (pageWidth)</label>
                 <input
-                  type="color"
-                  value={theme.champagneGold || '#FFE5B4'}
-                  onChange={(e) => setTheme({ ...theme, champagneGold: e.target.value })}
-                  className="w-9 h-9 rounded bg-transparent border-0 cursor-pointer"
+                  type="number"
+                  value={dimensions.pageWidth}
+                  onChange={(e) => setDimensions({ ...dimensions, pageWidth: Number(e.target.value) })}
+                  className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Chiều cao trang 3D (pageHeight)</label>
                 <input
-                  type="text"
-                  value={theme.champagneGold || '#FFE5B4'}
-                  onChange={(e) => setTheme({ ...theme, champagneGold: e.target.value })}
-                  className="flex-1 px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                  type="number"
+                  value={dimensions.pageHeight}
+                  onChange={(e) => setDimensions({ ...dimensions, pageHeight: Number(e.target.value) })}
+                  className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Độ dày bìa sách (coverThickness)</label>
+                <input
+                  type="number"
+                  value={dimensions.coverThickness}
+                  onChange={(e) => setDimensions({ ...dimensions, coverThickness: Number(e.target.value) })}
+                  className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Độ phân giải Canvas Width (px)</label>
+                <input
+                  type="number"
+                  value={dimensions.canvasResolution?.width || 1024}
+                  onChange={(e) => setDimensions({ ...dimensions, canvasResolution: { ...dimensions.canvasResolution, width: Number(e.target.value) } })}
+                  className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Độ phân giải Canvas Height (px)</label>
+                <input
+                  type="number"
+                  value={dimensions.canvasResolution?.height || 1360}
+                  onChange={(e) => setDimensions({ ...dimensions, canvasResolution: { ...dimensions.canvasResolution, height: Number(e.target.value) } })}
+                  className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Khoảng cách Camera (distance)</label>
+                <input
+                  type="number"
+                  value={camera.distance}
+                  onChange={(e) => setCamera({ ...camera, distance: Number(e.target.value) })}
+                  className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Góc nhìn Camera (FOV độ)</label>
+                <input
+                  type="number"
+                  value={camera.fov}
+                  onChange={(e) => setCamera({ ...camera, fov: Number(e.target.value) })}
+                  className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
                 />
               </div>
             </div>
@@ -568,83 +724,135 @@ export default function BookSettingsPage() {
 
         {/* 5. Atmosphere Tab */}
         {activeTab === 'atmosphere' && (
-          <div className="space-y-4 max-w-lg">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between pb-3 border-b border-rosewood-900/40">
+              <span className="text-xs font-semibold text-champagne-300 uppercase tracking-wider">
+                Hiệu ứng lãng mạn trong không gian 3D
+              </span>
+              <button
+                type="button"
+                onClick={() => handleResetDefaults('atmosphere')}
+                className="flex items-center gap-1 text-[11px] text-stone-400 hover:text-white"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset Mặc Định</span>
+              </button>
+            </div>
+
             <div className="flex items-center gap-3">
               <input
                 type="checkbox"
-                id="atmosEnabled"
+                id="atmos-enabled"
                 checked={atmospheric.enabled}
                 onChange={(e) => setAtmospheric({ ...atmospheric, enabled: e.target.checked })}
                 className="w-4 h-4 rounded text-rosewood-600 focus:ring-rosewood-500 bg-[#25151F] border-rosewood-800"
               />
-              <label htmlFor="atmosEnabled" className="text-xs font-medium text-stone-200">
-                Bật hiệu ứng không gian 3D (Đàn bướm, cánh hoa đào, bụi sáng)
+              <label htmlFor="atmos-enabled" className="text-xs font-medium text-white cursor-pointer">
+                Bật hiệu ứng không gian 3D (Cánh bướm, cánh hoa hồng rơi, bụi tiên phát sáng)
               </label>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1">Số lượng bướm bay (butterflyCount)</label>
-              <input
-                type="number"
-                value={atmospheric.butterflyCount}
-                onChange={(e) => setAtmospheric({ ...atmospheric, butterflyCount: parseInt(e.target.value, 10) || 12 })}
-                className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
-              />
-            </div>
+            {atmospheric.enabled && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-3">
+                <div>
+                  <label className="block text-xs font-medium text-stone-300 mb-1.5">Số lượng bướm bay (butterflyCount)</label>
+                  <input
+                    type="number"
+                    value={atmospheric.butterflyCount}
+                    onChange={(e) => setAtmospheric({ ...atmospheric, butterflyCount: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                  />
+                </div>
 
-            <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1">Số lượng cánh hoa rơi (petalCount)</label>
-              <input
-                type="number"
-                value={atmospheric.petalCount}
-                onChange={(e) => setAtmospheric({ ...atmospheric, petalCount: parseInt(e.target.value, 10) || 34 })}
-                className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
-              />
-            </div>
+                <div>
+                  <label className="block text-xs font-medium text-stone-300 mb-1.5">Số lượng cánh hoa rơi (petalCount)</label>
+                  <input
+                    type="number"
+                    value={atmospheric.petalCount}
+                    onChange={(e) => setAtmospheric({ ...atmospheric, petalCount: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                  />
+                </div>
 
+                <div>
+                  <label className="block text-xs font-medium text-stone-300 mb-1.5">Số lượng hạt bụi tiên (dustCount)</label>
+                  <input
+                    type="number"
+                    value={atmospheric.dustCount}
+                    onChange={(e) => setAtmospheric({ ...atmospheric, dustCount: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 6. Audio Tab */}
+        {activeTab === 'audio' && (
+          <div className="space-y-6">
             <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1">Số lượng bụi sáng lung linh (dustCount)</label>
-              <input
-                type="number"
-                value={atmospheric.dustCount}
-                onChange={(e) => setAtmospheric({ ...atmospheric, dustCount: parseInt(e.target.value, 10) || 90 })}
-                className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
-              />
+              <label className="block text-xs font-medium text-stone-300 mb-1.5">Nhạc nền chính của cuốn sách</label>
+              <select
+                value={backgroundMusicId || ''}
+                onChange={(e) => setBackgroundMusicId(e.target.value ? e.target.value : null)}
+                className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white focus:outline-none"
+              >
+                <option value="">(Không dùng nhạc nền — Tắt âm thanh)</option>
+                {audioTracks.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title} — {t.artist}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-stone-500 mt-2">
+                Nhạc nền sẽ tự động phát sau khi người dùng bắt đầu lật mở bìa sách đầu tiên.
+              </p>
             </div>
           </div>
         )}
 
-        {/* 6. Cover Tab */}
+        {/* 7. Cover Tab */}
         {activeTab === 'cover' && (
-          <div className="space-y-5">
-            <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1">Ảnh nền bìa trước (front.backgroundUrl)</label>
-              <input
-                type="text"
-                value={cover.front?.backgroundUrl || ''}
-                onChange={(e) => setCover({ ...cover, front: { ...cover.front, backgroundUrl: e.target.value } })}
-                className="w-full px-3.5 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <label className="block text-xs font-medium text-stone-300 mb-1">Ảnh mặt trong bìa sau (insideBackgroundUrl)</label>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Ảnh nền Bìa trước (Front Cover URL)</label>
                 <input
                   type="text"
-                  value={cover.back?.insideBackgroundUrl || ''}
-                  onChange={(e) => setCover({ ...cover, back: { ...cover.back, insideBackgroundUrl: e.target.value } })}
-                  className="w-full px-3.5 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                  value={cover.front?.backgroundUrl || ''}
+                  onChange={(e) => setCover({ ...cover, front: { ...cover.front, backgroundUrl: e.target.value } })}
+                  className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-stone-300 mb-1">Ảnh mặt ngoài bìa sau (outsideBackgroundUrl)</label>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Tiêu đề trên bìa</label>
+                <input
+                  type="text"
+                  value={cover.front?.title || ''}
+                  onChange={(e) => setCover({ ...cover, front: { ...cover.front, title: e.target.value } })}
+                  className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Ảnh nền Mặt trong Bìa sau (Inside Back Cover)</label>
+                <input
+                  type="text"
+                  value={cover.back?.insideBackgroundUrl || ''}
+                  onChange={(e) => setCover({ ...cover, back: { ...cover.back, insideBackgroundUrl: e.target.value } })}
+                  className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-stone-300 mb-1.5">Ảnh nền Mặt ngoài Bìa sau (Outside Back Cover)</label>
                 <input
                   type="text"
                   value={cover.back?.outsideBackgroundUrl || ''}
                   onChange={(e) => setCover({ ...cover, back: { ...cover.back, outsideBackgroundUrl: e.target.value } })}
-                  className="w-full px-3.5 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
+                  className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
                 />
               </div>
             </div>
