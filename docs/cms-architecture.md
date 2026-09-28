@@ -463,7 +463,22 @@ Qua rà soát toàn bộ dự án, ứng dụng hiện tại chỉ chạy duy nh
         - Khử trùng lặp (`preloadedUrls: Set<string>`).
         - Hủy tải an toàn qua `AbortController` khi chuyển trang hoặc unmount.
         - Không làm chậm tiến trình first meaningful render (hoạt động ngầm với concurrency = 4).
-22. **Giai đoạn 22 (Prompt 28+ Nâng cao Editor & Undo/Redo/Snapping)**:
+22. **Giai đoạn 22 (Đã hoàn thành - Prompt 28 Editor Autosave & Unsaved Changes Guard)**:
+    - Xây dựng giải pháp tự động lưu (Autosave Engine) cho Visual Page Editor:
+      - Custom Hook `useAutosavePage`:
+        - Theo dõi toàn bộ thay đổi trên trang (Background, Metadata, Elements data/transform/style/interaction).
+        - **Debounce 800ms**: Gom các thao tác kéo thả/gõ phím liên tục, loại bỏ hoàn toàn tình trạng spam HTTP requests.
+        - **PATCH Only Changed Data**: Chỉ lưu những phần tử và metadata có biến động.
+        - **Latest State Wins & Anti-Stale Response**: Sử dụng `saveSequenceRef` để ngăn phản hồi mạng chậm ghi đè lên trạng thái mới hơn.
+        - **Structural Safety**: Thao tác xóa phần tử (`deleteAdminElement`) vẫn giữ xác nhận thủ công, không tự ý xóa ngầm.
+      - **Autosave Status Indicator (`AutosaveIndicator.tsx`)**:
+        - `Saved` (Màu xanh ngọc + timestamp thời gian lưu).
+        - `Saving...` (Màu xanh dương + spinner animate).
+        - `Unsaved` (Màu hổ phách + pulsing dot).
+        - `Error` (Màu đỏ + thông báo lỗi kèm nút "Thử lại" manual retry).
+      - **Bảo Vệ Rời Trang (`beforeunload`)**:
+        - Bắt sự kiện trình duyệt khi người dùng định đóng tab hoặc chuyển URL khi còn dữ liệu `unsaved` hoặc đang `saving`.
+23. **Giai đoạn 23 (Prompt 29+ Nâng cao Editor & Undo/Redo/Snapping)**:
     - Tích hợp lịch sử Undo / Redo cho canvas editor.
     - Thêm đường gióng từ tính (Smart Snapping / Alignment Guides).
     - Lưu trữ cache texture bằng IndexedDB để người dùng mở sách lần thứ 2 không phải render lại Canvas từ đầu.

@@ -62,6 +62,8 @@ import {
 } from 'lucide-react';
 import { publishAdminBook } from '@/services/adminApi';
 import VersionHistoryModal from '@/components/admin/VersionHistoryModal';
+import { useAutosavePage } from '@/hooks/useAutosavePage';
+import AutosaveIndicator from '@/components/admin/AutosaveIndicator';
 
 // Dynamic import KonvaPageCanvas with ssr: false because Konva requires DOM window & canvas
 const KonvaPageCanvas = dynamic(() => import('@/components/admin/KonvaPageCanvas'), {
@@ -101,6 +103,19 @@ export default function VisualPageEditorPage() {
   // Active Inspector Tab: 'element' | 'background' (Prompt 18)
   const [inspectorTab, setInspectorTab] = useState<'element' | 'interaction' | 'background'>('element');
   const [editingActiveArea, setEditingActiveArea] = useState(false);
+
+  // Prompt 28: Autosave integration with debounce and state tracking
+  const {
+    status: autosaveStatus,
+    lastSavedTime,
+    errorMessage: autosaveError,
+    retrySave,
+    forceSave,
+  } = useAutosavePage(page, {
+    pageId,
+    isViewer,
+    debounceMs: 800,
+  });
 
   // Load initial page, all book pages, and book settings
   useEffect(() => {
@@ -540,8 +555,16 @@ export default function VisualPageEditorPage() {
           </div>
         )}
 
-        {/* Right Action: Preview & Publish & Save Buttons */}
+        {/* Right Action: Autosave Indicator, Preview & Publish & Save Buttons */}
         <div className="flex items-center gap-2">
+          {/* Prompt 28: Autosave Status Indicator */}
+          <AutosaveIndicator
+            status={autosaveStatus}
+            lastSavedTime={lastSavedTime}
+            errorMessage={autosaveError}
+            onRetry={retrySave}
+          />
+
           {toast && (
             <span className="text-xs text-emerald-400 font-mono flex items-center gap-1 animate-fade-in mr-2">
               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -587,12 +610,18 @@ export default function VisualPageEditorPage() {
 
               <button
                 type="button"
-                onClick={handleSave}
-                disabled={saving}
+                onClick={async () => {
+                  setSaving(true);
+                  await forceSave();
+                  setSaving(false);
+                  setToast('Đã lưu trang thành công!');
+                  setTimeout(() => setToast(null), 2500);
+                }}
+                disabled={saving || autosaveStatus === 'saving'}
                 className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-semibold shadow-lg shadow-rosewood-950/50 transition-all active:scale-95 disabled:opacity-50"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>{saving ? 'Đang lưu...' : 'Lưu trang'}</span>
+                <span>{saving || autosaveStatus === 'saving' ? 'Đang lưu...' : 'Lưu trang'}</span>
               </button>
             </>
           )}
