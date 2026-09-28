@@ -199,7 +199,7 @@ export class PublishValidationService {
             code: 'INVALID_LAYOUT',
             message: `Trang ${p.pageNumber} sử dụng Layout Template ID không tồn tại ("${p.layoutTemplateId}").`,
             location: { type: 'PAGE', pageId: p.id, pageNumber: p.pageNumber, pageOrder: p.order },
-            fixLink: `/admin/books/${book.id}/pages/${p.id}`,
+            fixLink: `/admin/pages/${p.id}`,
           });
         }
       }
@@ -213,7 +213,7 @@ export class PublishValidationService {
             code: 'DELETED_AUDIO_REFERENCE',
             message: `Nhạc nền riêng của Trang ${p.pageNumber} (ID "${p.audioTrackId}") đã bị xóa.`,
             location: { type: 'PAGE', pageId: p.id, pageNumber: p.pageNumber, pageOrder: p.order },
-            fixLink: `/admin/books/${book.id}/pages/${p.id}`,
+            fixLink: `/admin/pages/${p.id}`,
           });
         }
       }
@@ -235,7 +235,7 @@ export class PublishValidationService {
           code: 'EMPTY_PAGE',
           message: `Trang ${p.pageNumber} hiện đang để trống (0 phần tử nội dung).`,
           location: { type: 'PAGE', pageId: p.id, pageNumber: p.pageNumber, pageOrder: p.order },
-          fixLink: `/admin/books/${book.id}/pages/${p.id}`,
+          fixLink: `/admin/pages/${p.id}`,
         });
       }
 
@@ -271,7 +271,7 @@ export class PublishValidationService {
             code: 'MALFORMED_ELEMENT_TRANSFORM',
             message: `Phần tử ${el.type} trên Trang ${p.pageNumber} có thông số transform không hợp lệ (x=${trans.x}, y=${trans.y}, w=${trans.width}, h=${trans.height}).`,
             location: elementLocation,
-            fixLink: `/admin/books/${book.id}/pages/${p.id}`,
+            fixLink: `/admin/pages/${p.id}`,
           });
         }
 
@@ -284,7 +284,7 @@ export class PublishValidationService {
               code: 'MISSING_REQUIRED_MEDIA',
               message: `Phần tử IMAGE trên Trang ${p.pageNumber} chưa có ảnh hoặc mediaId.`,
               location: elementLocation,
-              fixLink: `/admin/books/${book.id}/pages/${p.id}`,
+              fixLink: `/admin/pages/${p.id}`,
             });
           }
 
@@ -298,7 +298,7 @@ export class PublishValidationService {
               code: 'NO_ALT_TEXT',
               message: `Phần tử IMAGE trên Trang ${p.pageNumber} chưa có văn bản thay thế (alt text).`,
               location: elementLocation,
-              fixLink: `/admin/books/${book.id}/pages/${p.id}`,
+              fixLink: `/admin/pages/${p.id}`,
             });
           }
         }
@@ -312,7 +312,7 @@ export class PublishValidationService {
               code: 'MISSING_REQUIRED_MEDIA',
               message: `Phần tử VIDEO trên Trang ${p.pageNumber} chưa có video URL hoặc mediaId.`,
               location: elementLocation,
-              fixLink: `/admin/books/${book.id}/pages/${p.id}`,
+              fixLink: `/admin/pages/${p.id}`,
             });
           }
 
@@ -327,7 +327,7 @@ export class PublishValidationService {
               code: 'INVALID_VIDEO_POSTER',
               message: `Phần tử VIDEO trên Trang ${p.pageNumber} chưa cấu hình ảnh poster đại diện.`,
               location: elementLocation,
-              fixLink: `/admin/books/${book.id}/pages/${p.id}`,
+              fixLink: `/admin/pages/${p.id}`,
             });
           }
         }
@@ -335,15 +335,15 @@ export class PublishValidationService {
         // 4. Element Interaction Target Validation
         const interaction = el.interaction as any;
         if (interaction && interaction.enabled && interaction.action && interaction.action !== 'none') {
-          const validTarget = validateInteractionTarget(interaction.action, interaction.target);
-          if (!validTarget) {
+          const targetError = validateInteractionTarget(interaction.action, interaction.target);
+          if (targetError) {
             issues.push({
               id: `err-invalid-target-${el.id}`,
               severity: 'ERROR',
               code: 'INVALID_INTERACTION_TARGET',
-              message: `Tương tác "${interaction.action}" của phần tử trên Trang ${p.pageNumber} có target không hợp lệ ("${interaction.target || ''}").`,
+              message: `Tương tác "${interaction.action}" của phần tử trên Trang ${p.pageNumber} có target không hợp lệ ("${interaction.target || ''}"): ${targetError}`,
               location: elementLocation,
-              fixLink: `/admin/books/${book.id}/pages/${p.id}`,
+              fixLink: `/admin/pages/${p.id}`,
             });
           }
         }
