@@ -130,6 +130,13 @@ export default function QbjectAuthenticExperience({
         });
 
         // 6. Instantiate 100% Original Flipbook from Qbject with fast initial textures & custom camera settings
+        const rawDeskColor = (book.settings.theme as any)?.deskColor;
+        const deskColorHex = typeof rawDeskColor === 'string'
+          ? parseInt(rawDeskColor.replace('#', ''), 16)
+          : typeof rawDeskColor === 'number'
+          ? rawDeskColor
+          : undefined;
+
         const flipbook = new Flipbook({
           containerEl: container,
           pageWidth: book.settings.dimensions.pageWidth,
@@ -156,6 +163,16 @@ export default function QbjectAuthenticExperience({
             desk: '',
           },
         });
+
+        // Apply theme desk color to 3D desk plane if customized
+        if (deskColorHex !== undefined) {
+          const deskMesh = (flipbook as any).scene?.children?.find(
+            (c: any) => c.geometry?.type === 'PlaneGeometry' && c.material
+          );
+          if (deskMesh?.material) {
+            deskMesh.material.color = new THREE.Color(deskColorHex);
+          }
+        }
 
         flipbookInstanceRef.current = flipbook;
 

@@ -39,7 +39,13 @@ export function useAutosavePage(
   // Serialize comparable state (background, metadata, elements data/transform/style)
   const serializePageState = (p: Page | null): string => {
     if (!p) return '';
+    const pAny = p as any;
     return JSON.stringify({
+      title: p.title,
+      chapter: p.chapter,
+      quote: p.quote,
+      handwriting: p.handwriting,
+      audioTrackId: pAny.audioTrackId,
       background: p.background,
       isCustomized: p.isCustomized,
       layoutTemplateId: p.layoutTemplateId,
@@ -79,12 +85,18 @@ export function useAutosavePage(
 
       try {
         const serialized = serializePageState(targetPage);
+        const pAny = targetPage as any;
 
-        // 1. PATCH page metadata & background
+        // 1. PATCH page metadata & background & page-level audio
         const pageUpdatePayload: Record<string, any> = {
           background: targetPage.background,
           isCustomized: targetPage.isCustomized,
         };
+        if (targetPage.title !== undefined) pageUpdatePayload.title = targetPage.title;
+        if (targetPage.chapter !== undefined) pageUpdatePayload.chapter = targetPage.chapter;
+        if (targetPage.quote !== undefined) pageUpdatePayload.quote = targetPage.quote;
+        if (targetPage.handwriting !== undefined) pageUpdatePayload.handwriting = targetPage.handwriting;
+        if ('audioTrackId' in pAny) pageUpdatePayload.audioTrackId = pAny.audioTrackId;
         if (targetPage.layoutTemplateId) pageUpdatePayload.layoutTemplateId = targetPage.layoutTemplateId;
         if (targetPage.sourceTemplateId) pageUpdatePayload.sourceTemplateId = targetPage.sourceTemplateId;
         if (targetPage.layoutMode) pageUpdatePayload.layoutMode = targetPage.layoutMode;

@@ -211,7 +211,7 @@ export class PageTextureGenerator {
 
     // 6. Render Elements in zIndex order
     for (const el of sortedElements) {
-      this.renderElement(ctx, el, imageCache, varContext, canvasW, canvasH);
+      this.renderElement(ctx, el, imageCache, varContext, canvasW, canvasH, bookContext);
     }
 
     // 7. Draw Page Number Footer if positive inside page and not explicitly disabled
@@ -360,7 +360,8 @@ export class PageTextureGenerator {
     imageCache: Map<string, HTMLImageElement>,
     varContext?: VariableContext,
     canvasW: number = DEFAULT_CANVAS_WIDTH,
-    canvasH: number = DEFAULT_CANVAS_HEIGHT
+    canvasH: number = DEFAULT_CANVAS_HEIGHT,
+    bookContext?: Partial<Book>
   ) {
     const t = el.transform;
 
@@ -398,7 +399,7 @@ export class PageTextureGenerator {
     // Dispatch by element type
     switch (el.type) {
       case 'TEXT':
-        this.renderTextElement(ctx, el as TextElement, boxW, boxH, varContext);
+        this.renderTextElement(ctx, el as TextElement, boxW, boxH, varContext, bookContext);
         break;
       case 'IMAGE':
         this.renderImageElement(ctx, el as ImageElement, boxW, boxH, imageCache, varContext);
@@ -432,34 +433,41 @@ export class PageTextureGenerator {
     el: TextElement,
     boxW: number,
     boxH: number,
-    varContext?: VariableContext
+    varContext?: VariableContext,
+    bookContext?: Partial<Book>
   ) {
     const s = el.style || {};
     const d = el.data;
 
+    const typo = bookContext?.settings?.typography;
+
     const fontFamily =
       s.fontFamily ||
       (d.variant === 'handwriting'
-        ? '"Dancing Script", cursive'
+        ? (typo?.handwritingFont ? `"${typo.handwritingFont}", cursive` : '"Dancing Script", cursive')
         : d.variant === 'quote'
-        ? '"Dancing Script", "Playfair Display", Georgia, cursive'
+        ? (typo?.handwritingFont ? `"${typo.handwritingFont}", "Playfair Display", Georgia, cursive` : '"Dancing Script", "Playfair Display", Georgia, cursive')
         : d.variant === 'chapter-label'
-        ? 'Montserrat, sans-serif'
-        : '"Cormorant Garamond", Georgia, serif');
+        ? (typo?.sansFont || 'Montserrat, sans-serif')
+        : d.variant === 'title'
+        ? (typo?.titleFont || '"Cormorant Garamond", Georgia, serif')
+        : (typo?.bodyFont || '"Cormorant Garamond", Georgia, serif'));
+
+    const baseFontSize = (typo as any)?.baseFontSize || 22;
 
     const fontSize =
       s.fontSize ||
       (d.variant === 'title'
-        ? 38
+        ? Math.round(baseFontSize * 1.72)
         : d.variant === 'chapter-label'
-        ? 20
+        ? Math.round(baseFontSize * 0.9)
         : d.variant === 'quote'
-        ? 26
+        ? Math.round(baseFontSize * 1.18)
         : d.variant === 'handwriting'
-        ? 32
+        ? Math.round(baseFontSize * 1.45)
         : d.variant === 'caption'
-        ? 19
-        : 22);
+        ? Math.round(baseFontSize * 0.86)
+        : baseFontSize);
 
     const fontWeight =
       s.fontWeight ||
@@ -475,19 +483,22 @@ export class PageTextureGenerator {
         ? 'italic'
         : 'normal');
 
+    const themeColor = bookContext?.settings?.theme?.textColor;
+    const accentColor = bookContext?.settings?.theme?.accentColor;
+
     const color =
       s.color ||
       (d.variant === 'chapter-label'
-        ? '#C99A9A'
+        ? (accentColor || '#C99A9A')
         : d.variant === 'title'
-        ? '#292522'
+        ? (themeColor || '#292522')
         : d.variant === 'quote'
         ? '#94384F'
         : d.variant === 'handwriting'
         ? '#38161E'
         : d.variant === 'caption'
         ? '#4A1523'
-        : '#474039');
+        : (themeColor || '#474039'));
 
     ctx.fillStyle = color;
     ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;

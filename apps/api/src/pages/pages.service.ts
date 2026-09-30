@@ -252,8 +252,9 @@ export class PagesService {
       }
     }
 
+    // Safe merge for partial JSON objects if PATCH (cleanly accept updated background without stale field resurrection)
     const background = isPatch && dto.background
-      ? safeDeepMerge(page.background as any, dto.background)
+      ? (dto.background.type || dto.background.imageUrl || dto.background.color ? dto.background : safeDeepMerge(page.background as any, dto.background))
       : dto.background;
 
     const updated = await this.prisma.page.update({

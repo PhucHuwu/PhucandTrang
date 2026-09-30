@@ -28,6 +28,7 @@ import BackgroundEditor from '@/components/admin/BackgroundEditor';
 import AdvancedTextEditor from '@/components/admin/AdvancedTextEditor';
 import AdvancedImageEditor from '@/components/admin/AdvancedImageEditor';
 import AdvancedVideoEditor from '@/components/admin/AdvancedVideoEditor';
+import AdvancedShapeEditor from '@/components/admin/AdvancedShapeEditor';
 import InteractionEditor from '@/components/admin/InteractionEditor';
 import {
   applyLayoutTemplate,
@@ -1026,6 +1027,16 @@ export default function VisualPageEditorDirectPage() {
                       element={selectedElement}
                       onChange={(updated) => {
                         updateSelectedElement(updated);
+                      }}
+                      disabled={false}
+                    />
+                  )}
+
+                  {selectedElement.type === 'SHAPE' && (
+                    <AdvancedShapeEditor
+                      element={selectedElement as any}
+                      onChange={(updated) => {
+                        updateSelectedElement(updated as any);
                       }}
                       disabled={false}
                     />
