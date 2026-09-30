@@ -102,6 +102,12 @@ CORS_ORIGINS=https://your-domain.com,https://your-app.vercel.app
 # Seeding Control
 # true: Khởi tạo/ghi đè chuẩn tắc 21 trang mẫu; false: Chỉ thêm nếu DB rỗng
 SEED_FORCE_CANONICAL_BOOK=false
+
+# Single Admin Provisioning & Seeding Credentials (Bắt buộc khi chạy seed)
+SEED_ADMIN_EMAIL=admin@phucandtrang.love
+SEED_ADMIN_PASSWORD=your_strong_admin_password_here
+# Hoặc trên môi trường local development:
+# DEV_ADMIN_PASSWORD=your_local_dev_password
 ```
 
 #### Frontend (`.env.local` hoặc Vercel Environment Variables)

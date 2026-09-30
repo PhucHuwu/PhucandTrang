@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { AdminUser, checkAdminAuth, logoutAdmin, getCachedAdminUser } from '@/services/adminApi';
+import { AdminUser, checkAdminAuth, logoutAdmin } from '@/services/adminApi';
 
 interface AdminAuthContextType {
   user: AdminUser | null;
@@ -29,7 +29,7 @@ const AdminAuthContext = createContext<AdminAuthContextType>({
 export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<AdminUser | null>(getCachedAdminUser());
+  const [user, setUser] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   const isLoginPage = pathname === '/admin/login';

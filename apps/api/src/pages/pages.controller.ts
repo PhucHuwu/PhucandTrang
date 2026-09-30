@@ -15,58 +15,50 @@ import { UpdatePageDto } from './dto/update-page.dto';
 import { ReorderPagesDto } from './dto/reorder-pages.dto';
 import { DuplicatePageDto } from './dto/duplicate-page.dto';
 import { AuthGuard } from '@nestjs/passport';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
-import { Role } from '@prisma/client';
 
-@UseGuards(AuthGuard('jwt'), RolesGuard)
+@UseGuards(AuthGuard('jwt'))
 @Controller('pages')
 export class PagesController {
   constructor(private pagesService: PagesService) {}
 
-  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
   @Get('book/:bookId')
   async findByBook(@Param('bookId') bookId: string) {
     return this.pagesService.findByBook(bookId);
   }
 
-  @Roles(Role.ADMIN, Role.EDITOR, Role.VIEWER)
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.pagesService.findOne(id);
   }
 
-  @Roles(Role.ADMIN, Role.EDITOR)
   @Post()
   async create(@Body() dto: CreatePageDto) {
     return this.pagesService.create(dto);
   }
 
-  @Roles(Role.ADMIN, Role.EDITOR)
   @Put(':id')
   async update(@Param('id') id: string, @Body() dto: UpdatePageDto) {
     return this.pagesService.update(id, dto, false);
   }
 
-  @Roles(Role.ADMIN, Role.EDITOR)
   @Patch(':id')
   async patch(@Param('id') id: string, @Body() dto: UpdatePageDto) {
     return this.pagesService.update(id, dto, true);
   }
 
-  @Roles(Role.ADMIN, Role.EDITOR)
   @Post(':id/duplicate')
   async duplicate(@Param('id') id: string, @Body() dto: DuplicatePageDto) {
     return this.pagesService.duplicate(id, dto);
   }
 
-  @Roles(Role.ADMIN, Role.EDITOR)
   @Put('book/:bookId/reorder')
-  async reorder(@Param('bookId') bookId: string, @Body() dto: ReorderPagesDto) {
+  async reorder(
+    @Param('bookId') bookId: string,
+    @Body() dto: ReorderPagesDto,
+  ) {
     return this.pagesService.reorder(bookId, dto);
   }
 
-  @Roles(Role.ADMIN)
   @Delete(':id')
   async remove(@Param('id') id: string) {
     return this.pagesService.remove(id);

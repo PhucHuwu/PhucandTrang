@@ -8,7 +8,7 @@ export type AutosaveStatus = 'saved' | 'saving' | 'unsaved' | 'error';
 
 interface UseAutosavePageOptions {
   pageId: string;
-  isViewer: boolean;
+  isViewer?: boolean;
   debounceMs?: number;
 }
 
@@ -16,7 +16,7 @@ export function useAutosavePage(
   page: Page | null,
   options: UseAutosavePageOptions
 ) {
-  const { pageId, isViewer, debounceMs = 800 } = options;
+  const { pageId, isViewer = false, debounceMs = 800 } = options;
 
   const [status, setStatus] = useState<AutosaveStatus>('saved');
   const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);

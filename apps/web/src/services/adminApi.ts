@@ -5,34 +5,6 @@ export interface AdminUser {
   role: string;
 }
 
-let cachedUser: AdminUser | null = null;
-
-export function getCachedAdminUser(): AdminUser | null {
-  if (cachedUser) return cachedUser;
-  if (typeof window !== 'undefined') {
-    const stored = localStorage.getItem('pt_admin_user');
-    if (stored) {
-      try {
-        cachedUser = JSON.parse(stored);
-      } catch {
-        // Fallback
-      }
-    }
-  }
-  return cachedUser;
-}
-
-export function setCachedAdminUser(user: AdminUser | null) {
-  cachedUser = user;
-  if (typeof window !== 'undefined') {
-    if (user) {
-      localStorage.setItem('pt_admin_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('pt_admin_user');
-    }
-  }
-}
-
 /**
  * Universal fetcher for Admin APIs through Next.js BFF proxy.
  */
@@ -51,7 +23,6 @@ async function adminFetch<T>(endpoint: string, options: RequestInit = {}): Promi
   });
 
   if (res.status === 401) {
-    setCachedAdminUser(null);
     if (typeof window !== 'undefined' && !window.location.pathname.includes('/admin/login')) {
       window.location.href = '/admin/login?error=unauthorized';
     }
@@ -86,10 +57,8 @@ async function adminFetch<T>(endpoint: string, options: RequestInit = {}): Promi
 // ==========================================
 
 export async function loginAdmin(
-  passOrEmail: string,
-  optionalPass?: string
+  pass: string
 ): Promise<{ user: AdminUser }> {
-  const pass = optionalPass !== undefined ? optionalPass : passOrEmail;
   const res = await fetch('/api/admin/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -101,7 +70,6 @@ export async function loginAdmin(
     throw new Error(data.message || 'Đăng nhập không thành công');
   }
 
-  setCachedAdminUser(data.user);
   return data;
 }
 
@@ -109,7 +77,6 @@ export async function logoutAdmin(): Promise<void> {
   try {
     await fetch('/api/admin/auth/logout', { method: 'POST' });
   } finally {
-    setCachedAdminUser(null);
     if (typeof window !== 'undefined') {
       window.location.href = '/admin/login';
     }
@@ -119,12 +86,9 @@ export async function logoutAdmin(): Promise<void> {
 export async function checkAdminAuth(): Promise<{ authenticated: boolean; user: AdminUser }> {
   const res = await fetch('/api/admin/auth/me');
   if (!res.ok) {
-    setCachedAdminUser(null);
     throw new Error('Chưa đăng nhập');
   }
-  const data = await res.json();
-  setCachedAdminUser(data.user);
-  return data;
+  return res.json();
 }
 
 // ==========================================

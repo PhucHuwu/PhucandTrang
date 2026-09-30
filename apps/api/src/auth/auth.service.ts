@@ -74,15 +74,27 @@ export class AuthService {
   }
 
   async validateUser(pass: string): Promise<any> {
-    // Single Admin CMS: Authenticate directly against the single administrator account
-    let user = await this.prisma.user.findFirst({
-      where: { role: Role.ADMIN },
-      orderBy: { createdAt: 'asc' },
+    const canonicalAdminEmail =
+      process.env.ADMIN_EMAIL ||
+      process.env.SEED_ADMIN_EMAIL ||
+      'admin@phucandtrang.love';
+
+    // 1. Look up deterministic canonical administrator account by email
+    let user = await this.prisma.user.findUnique({
+      where: { email: canonicalAdminEmail },
     });
+
+    // 2. Fallback to latest admin account if canonical email is not found
+    if (!user) {
+      user = await this.prisma.user.findFirst({
+        where: { role: Role.ADMIN },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
 
     if (!user) {
       user = await this.prisma.user.findFirst({
-        orderBy: { createdAt: 'asc' },
+        orderBy: { createdAt: 'desc' },
       });
     }
 

@@ -47,17 +47,6 @@ export async function POST(request: Request) {
       maxAge: 7 * 24 * 60 * 60, // 7 days
     });
 
-    // Publicly readable user cookie for client UI state
-    cookieStore.set({
-      name: 'admin_user',
-      value: JSON.stringify(user),
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 7 * 24 * 60 * 60,
-    });
-
     return NextResponse.json({
       success: true,
       user,

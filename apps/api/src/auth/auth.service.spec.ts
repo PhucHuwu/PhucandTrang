@@ -34,6 +34,7 @@ describe('AuthService Security Hardening (Prompt 35 & Single Password Login)', (
   });
 
   it('should lock account after 5 consecutive failed login attempts (Brute-Force Protection)', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
     prisma.user.findFirst.mockResolvedValue(null);
 
     const loginDto = { pass: 'wrong-pass' };
@@ -64,6 +65,7 @@ describe('AuthService Security Hardening (Prompt 35 & Single Password Login)', (
       role: 'ADMIN',
     };
 
+    prisma.user.findUnique.mockResolvedValue(mockAdminUser);
     prisma.user.findFirst.mockResolvedValue(mockAdminUser);
 
     const res = await service.login({ pass: 'Phuc3724@' });
