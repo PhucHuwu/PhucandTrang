@@ -38,9 +38,9 @@ async function main() {
   const forceCanonicalReset = process.env.SEED_FORCE_CANONICAL_BOOK === 'true';
 
   // 1. Seed Admin User
-  const adminEmail = process.env.SEED_ADMIN_EMAIL;
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
   const enableDevSeed = process.env.ENABLE_DEV_SEED === 'true' || !isProduction;
+  const adminEmail = process.env.SEED_ADMIN_EMAIL || (enableDevSeed ? 'admin@phucandtrang.love' : undefined);
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || process.env.DEV_ADMIN_PASSWORD;
 
   let admin: any = null;
 
@@ -64,30 +64,9 @@ async function main() {
       });
       console.log(`✅ Admin user seeded: ${admin.email}`);
     }
-  } else if (enableDevSeed) {
-    const devEmail = 'admin@phucandtrang.love';
-    const existing = await prisma.user.findUnique({ where: { email: devEmail } });
-    const passwordHash = await bcrypt.hash('Phuc3724@', 10);
-    if (existing) {
-      admin = await prisma.user.update({
-        where: { email: devEmail },
-        data: { passwordHash, role: Role.ADMIN },
-      });
-      console.log(`✅ Dev admin user password updated: ${admin.email}`);
-    } else {
-      admin = await prisma.user.create({
-        data: {
-          email: devEmail,
-          passwordHash,
-          name: 'Phúc & Trang Admin',
-          role: Role.ADMIN,
-        },
-      });
-      console.log(`✅ Dev admin user seeded: ${admin.email}`);
-    }
   } else {
     throw new Error(
-      'FATAL: SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD environment variables are required for production seeding!',
+      'FATAL: SEED_ADMIN_PASSWORD or DEV_ADMIN_PASSWORD environment variable is required for seeding!',
     );
   }
 

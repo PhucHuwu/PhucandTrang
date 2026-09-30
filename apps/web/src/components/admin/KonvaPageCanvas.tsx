@@ -21,10 +21,12 @@ import {
   canvasToNormalizedTransform,
   computeActiveAreaPageRect,
   computeRelativeActiveArea,
-} from '@/utils/coordinateConversion';
-import { computeImageFit } from '@/utils/imageFitting';
-import { TextVariableResolver } from '@/utils/textVariableResolver';
-import { computeSnapping, SnapGuideLine, BoxRect } from '@phucandtrang/shared';
+  computeImageFit,
+  TextVariableResolver,
+  computeSnapping,
+  SnapGuideLine,
+  BoxRect,
+} from '@phucandtrang/shared';
 
 interface KonvaPageCanvasProps {
   page: Page;

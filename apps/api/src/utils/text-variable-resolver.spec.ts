@@ -3,7 +3,7 @@ import {
   calculateDaysTogether,
   formatLoveDate,
   safeGetPath,
-} from './text-variable-resolver';
+} from '@phucandtrang/shared';
 
 describe('TextVariableResolver (Prompt 13 - Dynamic Text Variables)', () => {
   const mockContext = TextVariableResolver.createContext({

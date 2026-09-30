@@ -3,7 +3,7 @@ import {
   normalizedToCanvasTransform,
   canvasToNormalizedTransform,
   computeRelativeActiveArea,
-} from './coordinate-conversion';
+} from '@phucandtrang/shared';
 
 describe('Video ActiveArea Coordinate Conversion (Req 5)', () => {
   it('should use entire element transform if relativeActiveArea is not provided', () => {

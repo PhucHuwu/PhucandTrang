@@ -12,7 +12,7 @@
     "dev:web": "npm run dev --workspace=@phucandtrang/web",
     "dev:api": "npm run start:dev --workspace=@phucandtrang/api",
     "build:web": "npm run build --workspace=@phucandtrang/web",
-    "build:api": "npm run build:shared && npm run build --workspace=@phucandtrang/api",
+    "build:api": "npm run build --workspace=@phucandtrang/api",
     "build": "npm run build:shared && npm run build:api && npm run build:web",
     "test:api": "npm run prisma:generate && npm run test --workspace=@phucandtrang/api",
     "prisma:validate": "npm exec --workspace=@phucandtrang/api -- prisma validate --config prisma7.config.ts",

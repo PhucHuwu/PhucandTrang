@@ -11,7 +11,7 @@ import { ReorderPagesDto } from './dto/reorder-pages.dto';
 import { DuplicatePageDto } from './dto/duplicate-page.dto';
 import { PublicCacheService } from '../public/public-cache.service';
 import { derivePageSideEnum } from '../utils/page-utils';
-import { safeDeepMerge } from '../utils/safe-merge';
+import { safeDeepMerge } from '@phucandtrang/shared';
 
 @Injectable()
 export class PagesService {

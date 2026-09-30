@@ -16,8 +16,8 @@ import {
 import {
   TextVariableResolver,
   VariableContext,
-} from '@/utils/textVariableResolver';
-import { computeImageFit } from '@/utils/imageFitting';
+  computeImageFit,
+} from '@phucandtrang/shared';
 
 // Re-export types for consumers
 export type { PageMediaItem, PageLayoutType };

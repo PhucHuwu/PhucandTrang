@@ -11,8 +11,7 @@ import { UpdateBookDto } from './dto/update-book.dto';
 import { PublicCacheService } from '../public/public-cache.service';
 import { PublicService } from '../public/public.service';
 import { PublishValidationService } from './publish-validation.service';
-import { safeDeepMerge } from '../utils/safe-merge';
-import { CANONICAL_JOURNAL_SLUG, LEGACY_JOURNAL_SLUG } from '@phucandtrang/shared';
+import { safeDeepMerge, CANONICAL_JOURNAL_SLUG, LEGACY_JOURNAL_SLUG } from '@phucandtrang/shared';
 
 @Injectable()
 export class BooksService {

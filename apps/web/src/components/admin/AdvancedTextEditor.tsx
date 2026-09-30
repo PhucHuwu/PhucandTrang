@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { TextElement, TextElementData, ElementStyle, Book, Page } from '@/types/book';
-import { TextVariableResolver } from '@/utils/textVariableResolver';
+import { TextVariableResolver } from '@phucandtrang/shared';
 import {
   Type,
   AlignLeft,

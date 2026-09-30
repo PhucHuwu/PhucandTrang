@@ -6,7 +6,7 @@ import { BatchUpdateElementsDto } from './dto/batch-update-elements.dto';
 import { ReorderElementsDto } from './dto/reorder-elements.dto';
 import { DuplicateElementDto } from './dto/duplicate-element.dto';
 import { PublicCacheService } from '../public/public-cache.service';
-import { safeDeepMerge } from '../utils/safe-merge';
+import { safeDeepMerge } from '@phucandtrang/shared';
 
 @Injectable()
 export class PageElementsService {

@@ -1,4 +1,4 @@
-import { computeImageFit } from './image-fitting';
+import { computeImageFit } from '@phucandtrang/shared';
 
 describe('Image & Background Fitting Calculation (Req 9 & 10)', () => {
   it('should compute contain fit without cropping source', () => {

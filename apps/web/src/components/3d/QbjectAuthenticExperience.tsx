@@ -12,8 +12,7 @@ import { ensureCustomFontLoaded } from '@/data/fontLoader';
 import { fetchPublishedBook } from '@/services/bookApi';
 import { Book } from '@/types/book';
 import { BookOpen, RefreshCw } from 'lucide-react';
-import { deriveFaceIndex } from '@/utils/pageUtils';
-import { computeActiveAreaPageRect } from '@/utils/coordinateConversion';
+import { deriveFaceIndex, computeActiveAreaPageRect } from '@phucandtrang/shared';
 
 interface QbjectAuthenticExperienceProps {
   customBookData?: Book;

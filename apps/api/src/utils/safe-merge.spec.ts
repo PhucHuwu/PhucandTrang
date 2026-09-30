@@ -1,4 +1,4 @@
-import { safeDeepMerge } from './safe-merge';
+import { safeDeepMerge } from '@phucandtrang/shared';
 
 describe('Safe Deep Merge Utility (Req 23)', () => {
   it('should deeply merge objects without overwriting existing sibling fields', () => {

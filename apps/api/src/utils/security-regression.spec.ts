@@ -1,5 +1,4 @@
-import { safeDeepMerge } from './safe-merge';
-import { isValidHttpUrl, validateInteractionTarget } from '@phucandtrang/shared';
+import { safeDeepMerge, isValidHttpUrl, validateInteractionTarget } from '@phucandtrang/shared';
 import { ALLOWED_CLOUDINARY_FOLDERS } from '../media/media.service';
 
 describe('Security Hardening Regression Tests (Prompt 35)', () => {
