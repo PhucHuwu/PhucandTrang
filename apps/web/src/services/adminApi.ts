@@ -217,7 +217,7 @@ export async function deleteAdminPage(pageId: string): Promise<any> {
 
 export async function reorderAdminPages(bookId: string, items: Array<{ id: string; targetOrder?: number }>): Promise<any> {
   return adminFetch<any>(`pages/book/${bookId}/reorder`, {
-    method: 'POST',
+    method: 'PUT',
     body: JSON.stringify({ items }),
   });
 }
@@ -240,9 +240,20 @@ export async function updateAdminElement(elementId: string, data: any, isPatch =
   });
 }
 
-export async function batchUpdateElements(pageId: string, elements: any[]): Promise<any> {
-  return adminFetch<any>(`page-elements/page/${pageId}/batch`, {
+export async function applyAdminLayout(
+  pageId: string,
+  layoutTemplateId: string,
+  elements: any[]
+): Promise<any> {
+  return adminFetch<any>(`pages/${pageId}/apply-layout`, {
     method: 'POST',
+    body: JSON.stringify({ layoutTemplateId, elements }),
+  });
+}
+
+export async function batchUpdateElements(pageId: string, elements: any[]): Promise<any> {
+  return adminFetch<any>(`pages/${pageId}/elements/batch`, {
+    method: 'PATCH',
     body: JSON.stringify({ elements }),
   });
 }
@@ -364,11 +375,10 @@ export async function deleteAdminLayoutTemplate(id: string): Promise<any> {
   });
 }
 
-export async function duplicateAdminLayoutTemplate(id: string, nameOrId?: string, name?: string): Promise<any> {
-  const finalName = name || nameOrId;
+export async function duplicateAdminLayoutTemplate(id: string, newId: string, newName?: string): Promise<any> {
   return adminFetch<any>(`layout-templates/${id}/duplicate`, {
     method: 'POST',
-    body: JSON.stringify({ name: finalName }),
+    body: JSON.stringify({ newId, newName }),
   });
 }
 

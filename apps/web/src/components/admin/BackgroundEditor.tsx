@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { PageBackground, LinearGradientConfig, GradientStop } from '@/types/book';
+import MediaPickerModal from '@/components/admin/MediaPickerModal';
+import { safeParseFloat, safeParseInt } from '@phucandtrang/shared';
 import {
   Palette,
   Image as ImageIcon,
@@ -11,6 +13,7 @@ import {
   Trash2,
   Eye,
   SlidersHorizontal,
+  FolderOpen,
 } from 'lucide-react';
 
 interface BackgroundEditorProps {
@@ -24,6 +27,7 @@ export default function BackgroundEditor({
   onChange,
   disabled = false,
 }: BackgroundEditorProps) {
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
   const currentType = background.type || 'color';
 
   // Helper to update background fields cleanly
@@ -205,19 +209,55 @@ export default function BackgroundEditor({
       {/* 3. IMAGE Configuration: Media picker, objectFit (cover/contain/fill), focalPoint X/Y, opacity */}
       {currentType === 'image' && (
         <div className="p-3.5 rounded-xl bg-[#1C0F17] border border-rosewood-900/40 space-y-3.5">
-          <div>
-            <label className="block text-[11px] text-stone-300 font-medium mb-1">
-              Đường dẫn ảnh nền (Image URL)
-            </label>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="block text-[11px] text-stone-300 font-medium">
+                Ảnh nền trang (Background Image)
+              </label>
+              {!disabled && (
+                <button
+                  type="button"
+                  onClick={() => setShowMediaPicker(true)}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rosewood-900/60 hover:bg-rosewood-800 text-champagne-300 hover:text-white border border-rosewood-700/50 text-[10px] font-medium transition"
+                  title="Chọn ảnh từ Thư viện Media"
+                >
+                  <FolderOpen className="w-3 h-3" />
+                  <span>Chọn từ Thư viện</span>
+                </button>
+              )}
+            </div>
+
             <input
               type="text"
               disabled={disabled}
               value={background.imageUrl || ''}
-              onChange={(e) => updateField({ imageUrl: e.target.value })}
+              onChange={(e) => {
+                const newUrl = e.target.value;
+                updateField({
+                  imageUrl: newUrl,
+                  mediaId: background.mediaId && newUrl !== background.imageUrl ? undefined : background.mediaId,
+                });
+              }}
               placeholder="https://res.cloudinary.com/..."
               className="w-full px-3 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white font-mono text-xs"
             />
           </div>
+
+          {/* Media Picker Modal */}
+          {showMediaPicker && (
+            <MediaPickerModal
+              isOpen={showMediaPicker}
+              onClose={() => setShowMediaPicker(false)}
+              filterType="IMAGE"
+              onSelect={(selected) => {
+                updateField({
+                  imageUrl: selected.url,
+                  mediaId: selected.mediaId,
+                });
+                setShowMediaPicker(false);
+              }}
+            />
+          )}
 
           <div className="grid grid-cols-2 gap-2.5">
             <div>
@@ -243,7 +283,7 @@ export default function BackgroundEditor({
                 max="1"
                 disabled={disabled}
                 value={background.opacity ?? 1.0}
-                onChange={(e) => updateField({ opacity: parseFloat(e.target.value) || 1.0 })}
+                onChange={(e) => updateField({ opacity: safeParseFloat(e.target.value, 1.0) })}
                 className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white font-mono text-xs"
               />
             </div>
@@ -271,7 +311,7 @@ export default function BackgroundEditor({
                   onChange={(e) =>
                     updateField({
                       focalPoint: {
-                        x: parseFloat(e.target.value) || 0.5,
+                        x: safeParseFloat(e.target.value, 0.5),
                         y: background.focalPoint?.y ?? 0.5,
                       },
                     })
@@ -293,7 +333,7 @@ export default function BackgroundEditor({
                     updateField({
                       focalPoint: {
                         x: background.focalPoint?.x ?? 0.5,
-                        y: parseFloat(e.target.value) || 0.5,
+                        y: safeParseFloat(e.target.value, 0.5),
                       },
                     })
                   }
@@ -320,7 +360,7 @@ export default function BackgroundEditor({
             step="5"
             disabled={disabled}
             value={background.gradient?.angle ?? 180}
-            onChange={(e) => handleGradientAngleChange(parseInt(e.target.value, 10) || 180)}
+            onChange={(e) => handleGradientAngleChange(safeParseInt(e.target.value, 180))}
             className="w-full accent-rosewood-500 cursor-pointer"
           />
 
@@ -367,7 +407,7 @@ export default function BackgroundEditor({
                       step="0.01"
                       disabled={disabled}
                       value={stop.offset}
-                      onChange={(e) => handleUpdateStop(idx, { offset: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) => handleUpdateStop(idx, { offset: safeParseFloat(e.target.value, 0) })}
                       className="flex-1 accent-rosewood-500 cursor-pointer"
                     />
                   </div>
@@ -434,7 +474,7 @@ export default function BackgroundEditor({
                     updateField({
                       headerFade: {
                         ...(background.headerFade || { enabled: true, startOpacity: 0.92, endOpacity: 0 }),
-                        height: parseFloat(e.target.value) || 0.345,
+                        height: safeParseFloat(e.target.value, 0.345),
                       },
                     })
                   }
@@ -455,7 +495,7 @@ export default function BackgroundEditor({
                     updateField({
                       headerFade: {
                         ...(background.headerFade || { enabled: true, height: 0.345, endOpacity: 0 }),
-                        startOpacity: parseFloat(e.target.value) || 0.92,
+                        startOpacity: safeParseFloat(e.target.value, 0.92),
                       },
                     })
                   }
@@ -506,7 +546,7 @@ export default function BackgroundEditor({
                     updateField({
                       gutterFade: {
                         ...(background.gutterFade || { enabled: true, opacity: 0.28 }),
-                        width: parseFloat(e.target.value) || 0.14,
+                        width: safeParseFloat(e.target.value, 0.14),
                       },
                     })
                   }
@@ -527,7 +567,7 @@ export default function BackgroundEditor({
                     updateField({
                       gutterFade: {
                         ...(background.gutterFade || { enabled: true, width: 0.14 }),
-                        opacity: parseFloat(e.target.value) || 0.28,
+                        opacity: safeParseFloat(e.target.value, 0.28),
                       },
                     })
                   }

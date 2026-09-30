@@ -8,6 +8,7 @@ import {
   updateAdminAudioTrack,
   deleteAdminAudioTrack,
 } from '@/services/adminApi';
+import { safeParseFloat } from '@phucandtrang/shared';
 import { useAdminAuth } from '@/context/AdminAuthContext';
 import {
   Music,
@@ -296,7 +297,7 @@ export default function AdminAudioPage() {
                     min="0"
                     max="1"
                     value={volume}
-                    onChange={(e) => setVolume(parseFloat(e.target.value) || 0.8)}
+                    onChange={(e) => setVolume(safeParseFloat(e.target.value, 0.8))}
                     className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-white font-mono"
                   />
                 </div>
@@ -308,7 +309,7 @@ export default function AdminAudioPage() {
                     step="0.5"
                     min="0"
                     value={startAt}
-                    onChange={(e) => setStartAt(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => setStartAt(safeParseFloat(e.target.value, 0))}
                     className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-white font-mono"
                   />
                 </div>
@@ -322,7 +323,7 @@ export default function AdminAudioPage() {
                     step="0.5"
                     min="0"
                     value={fadeIn}
-                    onChange={(e) => setFadeIn(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => setFadeIn(safeParseFloat(e.target.value, 0))}
                     className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-white font-mono"
                   />
                 </div>
@@ -334,7 +335,7 @@ export default function AdminAudioPage() {
                     step="0.5"
                     min="0"
                     value={fadeOut}
-                    onChange={(e) => setFadeOut(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => setFadeOut(safeParseFloat(e.target.value, 0))}
                     className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-white font-mono"
                   />
                 </div>

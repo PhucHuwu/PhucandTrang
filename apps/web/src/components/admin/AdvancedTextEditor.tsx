@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { TextElement, TextElementData, ElementStyle, Book, Page } from '@/types/book';
-import { TextVariableResolver } from '@phucandtrang/shared';
+import { TextVariableResolver, safeParseFloat, safeParseInt } from '@phucandtrang/shared';
 import {
   Type,
   AlignLeft,
@@ -344,7 +344,7 @@ export default function AdvancedTextEditor({
               onChange={(e) =>
                 onChange((el) => ({
                   ...el,
-                  style: { ...el.style, lineHeight: parseInt(e.target.value, 10) || undefined },
+                  style: { ...el.style, lineHeight: safeParseInt(e.target.value, 24) },
                 }))
               }
               className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white font-mono text-xs"
@@ -361,11 +361,11 @@ export default function AdvancedTextEditor({
               min="-2"
               max="20"
               disabled={disabled}
-              value={s.letterSpacing || 0}
+              value={s.letterSpacing ?? 0}
               onChange={(e) =>
                 onChange((el) => ({
                   ...el,
-                  style: { ...el.style, letterSpacing: parseFloat(e.target.value) || 0 },
+                  style: { ...el.style, letterSpacing: safeParseFloat(e.target.value, 0) },
                 }))
               }
               className="w-full px-2.5 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white font-mono text-xs"
@@ -389,7 +389,7 @@ export default function AdvancedTextEditor({
             onChange={(e) =>
               onChange((el) => ({
                 ...el,
-                opacity: parseFloat(e.target.value) || 1,
+                opacity: safeParseFloat(e.target.value, 1),
               }))
             }
             className="w-full accent-rosewood-500 cursor-pointer"
@@ -415,7 +415,7 @@ export default function AdvancedTextEditor({
             onChange={(e) =>
               onChange((el) => ({
                 ...el,
-                transform: { ...el.transform, rotation: parseFloat(e.target.value) || 0 },
+                transform: { ...el.transform, rotation: safeParseFloat(e.target.value, 0) },
               }))
             }
             className="w-full accent-rosewood-500 cursor-pointer"
@@ -459,13 +459,13 @@ export default function AdvancedTextEditor({
                   min="0"
                   max="50"
                   disabled={disabled}
-                  value={s.shadow.blur || 0}
+                  value={s.shadow.blur ?? 0}
                   onChange={(e) =>
                     onChange((el) => ({
                       ...el,
                       style: {
                         ...el.style,
-                        shadow: { ...el.style!.shadow!, blur: parseInt(e.target.value, 10) || 0 },
+                        shadow: { ...el.style!.shadow!, blur: safeParseInt(e.target.value, 0) },
                       },
                     }))
                   }
@@ -480,13 +480,13 @@ export default function AdvancedTextEditor({
                   min="-30"
                   max="30"
                   disabled={disabled}
-                  value={s.shadow.offsetX || 0}
+                  value={s.shadow.offsetX ?? 0}
                   onChange={(e) =>
                     onChange((el) => ({
                       ...el,
                       style: {
                         ...el.style,
-                        shadow: { ...el.style!.shadow!, offsetX: parseInt(e.target.value, 10) || 0 },
+                        shadow: { ...el.style!.shadow!, offsetX: safeParseInt(e.target.value, 0) },
                       },
                     }))
                   }
@@ -501,13 +501,13 @@ export default function AdvancedTextEditor({
                   min="-30"
                   max="30"
                   disabled={disabled}
-                  value={s.shadow.offsetY || 0}
+                  value={s.shadow.offsetY ?? 0}
                   onChange={(e) =>
                     onChange((el) => ({
                       ...el,
                       style: {
                         ...el.style,
-                        shadow: { ...el.style!.shadow!, offsetY: parseInt(e.target.value, 10) || 0 },
+                        shadow: { ...el.style!.shadow!, offsetY: safeParseInt(e.target.value, 0) },
                       },
                     }))
                   }

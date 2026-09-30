@@ -6,6 +6,7 @@ import {
   ELEMENT_INTERACTION_ACTIONS,
   ElementInteractionAction,
   validateInteractionTarget,
+  safeParseFloat,
 } from '@phucandtrang/shared';
 import {
   MousePointer,
@@ -281,7 +282,7 @@ export default function InteractionEditor({
                   update({
                     activeArea: {
                       ...area,
-                      [key]: parseFloat(e.target.value) || (key === 'width' || key === 'height' ? 0.001 : 0),
+                      [key]: safeParseFloat(e.target.value, key === 'width' || key === 'height' ? 0.001 : 0),
                     },
                   })
                 }

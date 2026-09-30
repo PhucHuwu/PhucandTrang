@@ -791,65 +791,23 @@ export default function JournalSettingsDirectPage() {
         {/* 7. Cover Tab */}
         {activeTab === 'cover' && (
           <div className="space-y-6">
-            <div className="p-4 rounded-xl bg-gradient-to-r from-rosewood-950/60 to-[#2A1120] border border-rosewood-800/60 flex items-center justify-between">
+            <div className="p-5 rounded-2xl bg-gradient-to-r from-rosewood-950/60 to-[#2A1120] border border-rosewood-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="text-sm font-serif font-bold text-champagne-300">
+                <h3 className="text-base font-serif font-bold text-champagne-300">
                   Visual Cover Studio
                 </h3>
-                <p className="text-xs text-stone-400 mt-0.5">
-                  Thiết kế đồ họa trực quan cho Bìa trước, Mặt trong và Mặt ngoài bìa sau.
+                <p className="text-xs text-stone-400 mt-1 max-w-lg leading-relaxed">
+                  Thiết kế đồ họa trực quan chuẩn xác cho Bìa trước, Mặt trong và Mặt ngoài bìa sau (Canvas 1024×1360px, hỗ trợ Text, Image, Video, Shapes, Background effects).
                 </p>
               </div>
 
               <Link
                 href="/admin/cover"
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rosewood-600 hover:bg-rosewood-500 text-white text-xs font-semibold shadow-lg shadow-rosewood-950/50 transition active:scale-95"
+                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-rosewood-600 hover:bg-rosewood-500 text-white text-xs font-semibold shadow-lg shadow-rosewood-950/50 transition active:scale-95 shrink-0"
               >
                 <Layers className="w-4 h-4" />
                 <span>Mở Visual Cover Studio</span>
               </Link>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
-              <div>
-                <label className="block text-xs font-medium text-stone-300 mb-1.5">Ảnh nền Bìa trước (Front Cover URL)</label>
-                <input
-                  type="text"
-                  value={cover.front?.backgroundUrl || ''}
-                  onChange={(e) => setCover({ ...cover, front: { ...cover.front, backgroundUrl: e.target.value } })}
-                  className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-stone-300 mb-1.5">Tiêu đề trên bìa</label>
-                <input
-                  type="text"
-                  value={cover.front?.title || ''}
-                  onChange={(e) => setCover({ ...cover, front: { ...cover.front, title: e.target.value } })}
-                  className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-stone-300 mb-1.5">Ảnh nền Mặt trong Bìa sau (Inside Back Cover)</label>
-                <input
-                  type="text"
-                  value={cover.back?.insideBackgroundUrl || ''}
-                  onChange={(e) => setCover({ ...cover, back: { ...cover.back, insideBackgroundUrl: e.target.value } })}
-                  className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-stone-300 mb-1.5">Ảnh nền Mặt ngoài Bìa sau (Outside Back Cover)</label>
-                <input
-                  type="text"
-                  value={cover.back?.outsideBackgroundUrl || ''}
-                  onChange={(e) => setCover({ ...cover, back: { ...cover.back, outsideBackgroundUrl: e.target.value } })}
-                  className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono"
-                />
-              </div>
             </div>
           </div>
         )}

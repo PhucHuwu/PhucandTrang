@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ImageElement, ImageElementData, ElementStyle } from '@/types/book';
 import MediaPickerModal from '@/components/admin/MediaPickerModal';
+import { safeParseFloat } from '@phucandtrang/shared';
 import {
   Image as ImageIcon,
   Sliders,
@@ -171,7 +172,7 @@ export default function AdvancedImageEditor({
                       data: {
                         ...el.data,
                         focalPoint: {
-                          x: parseFloat(e.target.value) || 0.5,
+                          x: safeParseFloat(e.target.value, 0.5),
                           y: (el.data as any)?.focalPoint?.y ?? 0.5,
                         },
                       },
@@ -197,7 +198,7 @@ export default function AdvancedImageEditor({
                         ...el.data,
                         focalPoint: {
                           x: (el.data as any)?.focalPoint?.x ?? 0.5,
-                          y: parseFloat(e.target.value) || 0.5,
+                          y: safeParseFloat(e.target.value, 0.5),
                         },
                       },
                     }))
@@ -268,7 +269,7 @@ export default function AdvancedImageEditor({
             onChange={(e) =>
               onChange((el) => ({
                 ...el,
-                opacity: parseFloat(e.target.value) || 1,
+                opacity: safeParseFloat(e.target.value, 1),
               }))
             }
             className="w-full accent-rosewood-500 cursor-pointer"
@@ -294,7 +295,7 @@ export default function AdvancedImageEditor({
             onChange={(e) =>
               onChange((el) => ({
                 ...el,
-                transform: { ...el.transform, rotation: parseFloat(e.target.value) || 0 },
+                transform: { ...el.transform, rotation: safeParseFloat(e.target.value, 0) },
               }))
             }
             className="w-full accent-rosewood-500 cursor-pointer"
@@ -317,7 +318,7 @@ export default function AdvancedImageEditor({
             onChange={(e) =>
               onChange((el) => ({
                 ...el,
-                transform: { ...el.transform, scale: parseFloat(e.target.value) || 1 },
+                transform: { ...el.transform, scale: safeParseFloat(e.target.value, 1) },
               }))
             }
             className="w-full accent-rosewood-500 cursor-pointer"

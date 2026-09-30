@@ -94,25 +94,35 @@ export default function BookCoverEditorPage() {
 
   // Construct virtual Page model from current Book.cover side
   const buildVirtualPage = useCallback((b: Book, side: CoverSide): Page => {
-    const cover = b.cover || { front: {}, back: {} };
+    const cover = (b.cover as any) || { front: {}, back: {} };
 
-    let bgUrl = '';
-    let bgMediaId: string | undefined;
+    let targetSideObj: any;
     let elements: PageElement[] = [];
 
     if (side === 'front') {
-      bgUrl = cover.front?.backgroundUrl || '';
-      bgMediaId = cover.front?.mediaId;
-      elements = cover.front?.elements || [];
+      targetSideObj = cover.front || {};
+      elements = targetSideObj.elements || [];
     } else if (side === 'back-inside') {
-      bgUrl = cover.back?.insideBackgroundUrl || '';
-      bgMediaId = cover.back?.insideMediaId;
+      targetSideObj = cover.back?.insideBackground || cover.back || {};
       elements = cover.back?.insideElements || [];
     } else {
-      bgUrl = cover.back?.outsideBackgroundUrl || '';
-      bgMediaId = cover.back?.outsideMediaId;
+      targetSideObj = cover.back?.outsideBackground || cover.back || {};
       elements = cover.back?.elements || [];
     }
+
+    const bgUrl =
+      side === 'front'
+        ? targetSideObj.backgroundUrl || targetSideObj.imageUrl || ''
+        : side === 'back-inside'
+        ? targetSideObj.insideBackgroundUrl || targetSideObj.imageUrl || ''
+        : targetSideObj.outsideBackgroundUrl || targetSideObj.imageUrl || '';
+
+    const bgMediaId =
+      side === 'front'
+        ? targetSideObj.mediaId
+        : side === 'back-inside'
+        ? targetSideObj.insideMediaId || targetSideObj.mediaId
+        : targetSideObj.outsideMediaId || targetSideObj.mediaId;
 
     return {
       id: `cover-${side}`,
@@ -124,11 +134,16 @@ export default function BookCoverEditorPage() {
       layoutMode: 'FREEFORM',
       isCustomized: true,
       background: {
-        type: bgUrl ? 'image' : 'color',
+        type: targetSideObj.type || (bgUrl ? 'image' : 'color'),
         imageUrl: bgUrl,
         mediaId: bgMediaId,
-        color: '#1A0E15',
-        opacity: 1,
+        color: targetSideObj.color || '#1A0E15',
+        opacity: targetSideObj.opacity !== undefined ? targetSideObj.opacity : 1,
+        objectFit: targetSideObj.objectFit || 'cover',
+        focalPoint: targetSideObj.focalPoint || { x: 0.5, y: 0.5 },
+        gradient: targetSideObj.gradient,
+        headerFade: targetSideObj.headerFade,
+        gutterFade: targetSideObj.gutterFade,
       },
       elements: JSON.parse(JSON.stringify(elements)),
     };
@@ -390,6 +405,7 @@ export default function BookCoverEditorPage() {
       if (activeSide === 'front') {
         currentCover.front = {
           ...currentCover.front,
+          ...bg,
           backgroundUrl: bg?.imageUrl || currentCover.front?.backgroundUrl || '',
           mediaId: bg?.mediaId || currentCover.front?.mediaId,
           elements: virtualPage.elements,
@@ -399,6 +415,7 @@ export default function BookCoverEditorPage() {
           ...currentCover.back,
           insideBackgroundUrl: bg?.imageUrl || currentCover.back?.insideBackgroundUrl || '',
           insideMediaId: bg?.mediaId || currentCover.back?.insideMediaId,
+          insideBackground: bg,
           insideElements: virtualPage.elements,
         };
       } else {
@@ -406,6 +423,7 @@ export default function BookCoverEditorPage() {
           ...currentCover.back,
           outsideBackgroundUrl: bg?.imageUrl || currentCover.back?.outsideBackgroundUrl || '',
           outsideMediaId: bg?.mediaId || currentCover.back?.outsideMediaId,
+          outsideBackground: bg,
           elements: virtualPage.elements,
         };
       }

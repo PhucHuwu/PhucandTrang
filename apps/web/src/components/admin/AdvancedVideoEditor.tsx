@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { VideoElement, VideoElementData, ElementStyle } from '@/types/book';
 import MediaPickerModal from '@/components/admin/MediaPickerModal';
+import { safeParseFloat } from '@phucandtrang/shared';
 import {
   Video,
   Image as ImageIcon,
@@ -93,16 +94,24 @@ export default function AdvancedVideoEditor({
             type="text"
             disabled={disabled}
             value={d.src || ''}
-            onChange={(e) =>
-              onChange((el) => ({
-                ...el,
-                data: { ...el.data, src: e.target.value },
-                interaction: {
-                  ...(el.interaction || { enabled: true, action: 'open-video' }),
-                  target: e.target.value,
-                },
-              }))
-            }
+            onChange={(e) => {
+              const newUrl = e.target.value;
+              onChange((el) => {
+                const updatedData = { ...el.data, src: newUrl };
+                // If user changes URL manually and it differs from canonical media URL, clear stale mediaId
+                if (el.data.mediaId && newUrl !== el.data.src) {
+                  delete updatedData.mediaId;
+                }
+                return {
+                  ...el,
+                  data: updatedData,
+                  interaction: {
+                    ...(el.interaction || { enabled: true, action: 'open-video' }),
+                    target: newUrl,
+                  },
+                };
+              });
+            }}
             placeholder="https://res.cloudinary.com/.../video.mp4"
             className="w-full px-3 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white font-mono text-xs placeholder-stone-600"
           />
@@ -305,7 +314,7 @@ export default function AdvancedVideoEditor({
             onChange={(e) =>
               onChange((el) => ({
                 ...el,
-                opacity: parseFloat(e.target.value) || 1,
+                opacity: safeParseFloat(e.target.value, 1),
               }))
             }
             className="w-full accent-rosewood-500 cursor-pointer"
@@ -331,7 +340,7 @@ export default function AdvancedVideoEditor({
             onChange={(e) =>
               onChange((el) => ({
                 ...el,
-                transform: { ...el.transform, rotation: parseFloat(e.target.value) || 0 },
+                transform: { ...el.transform, rotation: safeParseFloat(e.target.value, 0) },
               }))
             }
             className="w-full accent-rosewood-500 cursor-pointer"

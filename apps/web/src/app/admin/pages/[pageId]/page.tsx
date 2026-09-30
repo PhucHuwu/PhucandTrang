@@ -8,6 +8,7 @@ import {
   getAdminPage,
   getJournal,
   getAdminPages,
+  applyAdminLayout,
   batchUpdateElements,
   createAdminElement,
   deleteAdminElement,
@@ -64,6 +65,7 @@ import {
   Undo2,
   Redo2,
   Magnet,
+  Music,
 } from 'lucide-react';
 import VersionHistoryModal from '@/components/admin/VersionHistoryModal';
 import PublishValidationModal from '@/components/admin/PublishValidationModal';
@@ -110,7 +112,7 @@ export default function VisualPageEditorDirectPage() {
   const [showSaveAsLayout, setShowSaveAsLayout] = useState(false);
 
   // Active Inspector Tab
-  const [inspectorTab, setInspectorTab] = useState<'element' | 'interaction' | 'background'>('element');
+  const [inspectorTab, setInspectorTab] = useState<'element' | 'interaction' | 'background' | 'metadata'>('element');
   const [editingActiveArea, setEditingActiveArea] = useState(false);
 
   // Snapping Toggle
@@ -274,17 +276,7 @@ export default function VisualPageEditorDirectPage() {
         extractedContent
       );
 
-      const updatedMetadata = {
-        layoutTemplateId: templateDef.id,
-        layoutMode: 'PRESET',
-        sourceTemplateId: templateDef.id,
-        isCustomized: false,
-      };
-
-      await updateAdminPage(pageId, updatedMetadata, true);
-
       const elementsToSave = newlyArrangedPage.elements.map((el) => ({
-        id: el.id,
         type: el.type,
         slot: el.slot,
         zIndex: el.zIndex,
@@ -298,9 +290,9 @@ export default function VisualPageEditorDirectPage() {
         interaction: el.interaction,
       }));
 
-      await batchUpdateElements(pageId, elementsToSave);
+      // Atomic Apply Layout (single transaction replaces elements & sets isCustomized=false)
+      const refreshedPage = await applyAdminLayout(pageId, templateDef.id, elementsToSave);
 
-      const refreshedPage = await getAdminPage(pageId);
       setPage(refreshedPage);
       recordHistory(refreshedPage, `Áp dụng bố cục ${templateDef.name}`);
       if (refreshedPage.elements?.length > 0) {
@@ -663,10 +655,15 @@ export default function VisualPageEditorDirectPage() {
             type="button"
             onClick={async () => {
               setSaving(true);
-              await forceSave();
-              setSaving(false);
-              setToast('Đã lưu trang thành công!');
-              setTimeout(() => setToast(null), 2500);
+              try {
+                await forceSave();
+                setToast('Đã lưu trang thành công!');
+                setTimeout(() => setToast(null), 2500);
+              } catch (err: any) {
+                alert(`Lỗi khi lưu trang: ${err?.message || 'Vui lòng kiểm tra lại'}`);
+              } finally {
+                setSaving(false);
+              }
             }}
             disabled={saving || autosaveStatus === 'saving'}
             className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-semibold shadow-lg shadow-rosewood-950/50 transition active:scale-95 disabled:opacity-50"
@@ -805,50 +802,164 @@ export default function VisualPageEditorDirectPage() {
         {/* RIGHT COLUMN: Properties Panel (width: 320px) */}
         <aside className="w-80 bg-[#140B10] border-l border-rosewood-900/40 flex flex-col justify-between shrink-0 overflow-y-auto">
           <div className="flex flex-col h-full">
-            {/* Inspector Top Switcher (Tabs: Element vs Background vs Interaction) */}
-            <div className="p-2.5 bg-[#1C0F16] border-b border-rosewood-900/40 flex items-center gap-1.5 shrink-0">
+            {/* Inspector Top Switcher (Tabs: Element vs Background vs Interaction vs Metadata) */}
+            <div className="p-2 bg-[#1C0F16] border-b border-rosewood-900/40 grid grid-cols-4 gap-1 shrink-0 text-[11px]">
               <button
                 type="button"
                 onClick={() => setInspectorTab('element')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`flex items-center justify-center gap-1 py-1.5 rounded-lg font-medium transition-all ${
                   inspectorTab === 'element'
                     ? 'bg-rosewood-600 text-white font-semibold shadow'
                     : 'text-stone-400 hover:text-white hover:bg-[#25151F]'
                 }`}
+                title="Thuộc tính phần tử"
               >
-                <Sliders className="w-3.5 h-3.5" />
-                <span>Phần tử</span>
+                <Sliders className="w-3 h-3" />
+                <span className="truncate">Phần tử</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setInspectorTab('interaction')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`flex items-center justify-center gap-1 py-1.5 rounded-lg font-medium transition-all ${
                   inspectorTab === 'interaction'
                     ? 'bg-rosewood-600 text-white font-semibold shadow'
                     : 'text-stone-400 hover:text-white hover:bg-[#25151F]'
                 }`}
+                title="Tương tác phần tử"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Tương tác</span>
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                <span className="truncate">T.Tác</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setInspectorTab('background')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`flex items-center justify-center gap-1 py-1.5 rounded-lg font-medium transition-all ${
                   inspectorTab === 'background'
                     ? 'bg-rosewood-600 text-white font-semibold shadow'
                     : 'text-stone-400 hover:text-white hover:bg-[#25151F]'
                 }`}
+                title="Hình nền trang"
               >
-                <Palette className="w-3.5 h-3.5 text-pink-400" />
-                <span>Nền (BG)</span>
+                <Palette className="w-3 h-3 text-pink-400" />
+                <span className="truncate">Nền</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setInspectorTab('metadata')}
+                className={`flex items-center justify-center gap-1 py-1.5 rounded-lg font-medium transition-all ${
+                  inspectorTab === 'metadata'
+                    ? 'bg-rosewood-600 text-white font-semibold shadow'
+                    : 'text-stone-400 hover:text-white hover:bg-[#25151F]'
+                }`}
+                title="Thông tin trang & Nhạc nền riêng"
+              >
+                <FileText className="w-3 h-3 text-champagne-300" />
+                <span className="truncate">Trang</span>
               </button>
             </div>
 
             {/* Inspector Tab Content */}
             <div className="flex-1 overflow-y-auto p-4 space-y-5">
+              {inspectorTab === 'metadata' && (
+                <div className="space-y-4 text-xs">
+                  <div className="pb-2 border-b border-rosewood-900/40 flex items-center justify-between">
+                    <span className="font-serif font-bold text-champagne-300 text-sm">
+                      Thông Tin &amp; Nhạc Nền Trang
+                    </span>
+                    <span className="font-mono text-[10px] text-stone-500">#{page.order}</span>
+                  </div>
+
+                  {/* Title */}
+                  <div>
+                    <label className="block text-stone-300 font-medium mb-1">Tiêu đề trang</label>
+                    <input
+                      type="text"
+                      value={page.title || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setPage((prev) => (prev ? { ...prev, isCustomized: true, title: val } : prev));
+                      }}
+                      placeholder="Nhập tiêu đề trang..."
+                      className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-white text-xs focus:outline-none focus:border-rosewood-500"
+                    />
+                  </div>
+
+                  {/* Chapter */}
+                  <div>
+                    <label className="block text-stone-300 font-medium mb-1">Tên chương (Chapter)</label>
+                    <input
+                      type="text"
+                      value={page.chapter || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setPage((prev) => (prev ? { ...prev, isCustomized: true, chapter: val } : prev));
+                      }}
+                      placeholder="Ví dụ: Chapter IV, Ngày Chung Đôi..."
+                      className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-white text-xs focus:outline-none focus:border-rosewood-500"
+                    />
+                  </div>
+
+                  {/* Quote */}
+                  <div>
+                    <label className="block text-stone-300 font-medium mb-1">Lời trích dẫn (Quote)</label>
+                    <textarea
+                      rows={2}
+                      value={page.quote || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setPage((prev) => (prev ? { ...prev, isCustomized: true, quote: val } : prev));
+                      }}
+                      placeholder="Câu danh ngôn hoặc tâm tình..."
+                      className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-white text-xs focus:outline-none focus:border-rosewood-500"
+                    />
+                  </div>
+
+                  {/* Handwriting text */}
+                  <div>
+                    <label className="block text-stone-300 font-medium mb-1">Dòng chữ viết tay (Handwriting)</label>
+                    <input
+                      type="text"
+                      value={page.handwriting || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setPage((prev) => (prev ? { ...prev, isCustomized: true, handwriting: val } : prev));
+                      }}
+                      placeholder="Chữ ký hoặc lời đề từ..."
+                      className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-white text-xs focus:outline-none focus:border-rosewood-500 font-serif italic"
+                    />
+                  </div>
+
+                  {/* Page Audio Track */}
+                  <div className="pt-2 border-t border-rosewood-900/40">
+                    <label className="block text-stone-300 font-medium mb-1.5 flex items-center gap-1.5">
+                      <Music className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Nhạc nền riêng cho trang này</span>
+                    </label>
+                    <select
+                      value={(page as any).audioTrackId || ''}
+                      onChange={(e) => {
+                        const val = e.target.value || null;
+                        setPage((prev) => (prev ? { ...prev, isCustomized: true, audioTrackId: val } as any : prev));
+                      }}
+                      className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white focus:outline-none"
+                    >
+                      <option value="">(Không dùng nhạc riêng — Dùng nhạc nền sách)</option>
+                      {audioTracks.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.title} — {t.artist}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-stone-500 mt-1.5">
+                      Khi lật đến trang này, bài hát này sẽ tự động vang lên thay cho nhạc nền chung.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {inspectorTab === 'background' && (
                 <BackgroundEditor
                   background={page.background || { type: 'color', color: '#F9F5EC' }}

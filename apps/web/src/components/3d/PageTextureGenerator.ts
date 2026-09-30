@@ -960,6 +960,11 @@ export class PageTextureGenerator {
       ? cover?.insideBackgroundUrl || photoSrc
       : cover?.outsideBackgroundUrl || photoSrc;
 
+    // Correctly read insideElements for inside, and elements for outside!
+    const elements = isInside
+      ? cover?.insideElements || []
+      : cover?.elements || [];
+
     const backCoverPage: Page = {
       id: `page-cover-back-${isInside ? 'inside' : 'outside'}`,
       pageNumber: -1,
@@ -972,7 +977,7 @@ export class PageTextureGenerator {
         imageUrl: bgUrl,
         color: '#1F1218',
       },
-      elements: cover?.elements || [],
+      elements,
     };
 
     return this.renderPageTexture(backCoverPage, bookContext);

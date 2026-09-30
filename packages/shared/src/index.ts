@@ -8,3 +8,4 @@ export * from './pageUtils';
 export * from './safeMerge';
 export * from './snappingEngine';
 export * from './textVariableResolver';
+export * from './numericUtils';

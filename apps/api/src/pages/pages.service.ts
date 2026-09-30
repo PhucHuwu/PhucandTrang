@@ -11,7 +11,7 @@ import { ReorderPagesDto } from './dto/reorder-pages.dto';
 import { DuplicatePageDto } from './dto/duplicate-page.dto';
 import { PublicCacheService } from '../public/public-cache.service';
 import { derivePageSideEnum } from '../utils/page-utils';
-import { safeDeepMerge } from '@phucandtrang/shared';
+import { safeDeepMerge, LAYOUT_PRESETS } from '@phucandtrang/shared';
 
 @Injectable()
 export class PagesService {
@@ -170,6 +170,50 @@ export class PagesService {
         audioTrack: true,
       },
     });
+
+    // Automatically instantiate elements from layout template if provided (Prompt 40.2 / Reliability)
+    const templateId = dto.layoutTemplateId || 'single-hero';
+    let prototypes: any[] = [];
+    if (LAYOUT_PRESETS[templateId]) {
+      prototypes = LAYOUT_PRESETS[templateId].elementPrototypes;
+    } else {
+      const customTpl = await this.prisma.layoutTemplate.findUnique({
+        where: { id: templateId },
+      });
+      if (customTpl?.prototypes) {
+        prototypes = customTpl.prototypes as any[];
+      }
+    }
+
+    if (prototypes.length > 0) {
+      for (const proto of prototypes) {
+        const { zIndex: _ignore, ...cleanTransform } = proto.transform || {};
+        let elementData: any = { ...(proto.defaultData || {}) };
+        if (proto.slot === 'title' && dto.title) {
+          elementData.text = dto.title;
+        } else if (proto.slot === 'subtitle' && dto.chapter) {
+          elementData.text = dto.chapter;
+        } else if (proto.slot === 'quote' && dto.quote) {
+          elementData.text = dto.quote;
+        }
+
+        await this.prisma.pageElement.create({
+          data: {
+            pageId: page.id,
+            type: proto.defaultType,
+            slot: proto.slot,
+            zIndex: proto.zIndex,
+            order: proto.zIndex,
+            visible: true,
+            locked: false,
+            opacity: 1.0,
+            transform: cleanTransform,
+            style: proto.style || {},
+            data: elementData,
+          },
+        });
+      }
+    }
 
     await this.normalizeBookPageSequence(dto.bookId);
     await this.cacheService.touchBook(dto.bookId);
@@ -413,5 +457,64 @@ export class PagesService {
     // Touch book once after successful reorder transaction
     await this.cacheService.touchBook(bookId);
     return result;
+  }
+
+  /**
+   * Atomic Apply Layout (Prompt 40.2 / Reliability Repair)
+   * 1. Replaces all existing page elements with newly arranged elements.
+   * 2. Updates page layout metadata: layoutTemplateId = id, sourceTemplateId = id, layoutMode = 'PRESET', isCustomized = false.
+   * 3. Guarantees everything commits in a single transaction.
+   */
+  async applyLayout(pageId: string, layoutTemplateId: string, elements: any[]) {
+    const existing = await this.findOne(pageId);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 1. Delete all existing elements on this page
+      await tx.pageElement.deleteMany({
+        where: { pageId },
+      });
+
+      // 2. Insert new elements
+      for (const el of elements) {
+        const { zIndex: _ignore, ...cleanTransform } = el.transform || {};
+        await tx.pageElement.create({
+          data: {
+            pageId,
+            type: el.type,
+            slot: el.slot || null,
+            zIndex: el.zIndex,
+            order: el.order !== undefined ? el.order : el.zIndex,
+            visible: el.visible !== false,
+            locked: Boolean(el.locked),
+            opacity: el.opacity !== undefined ? el.opacity : 1.0,
+            transform: cleanTransform,
+            style: el.style || {},
+            data: el.data || {},
+            interaction: el.interaction || null,
+          },
+        });
+      }
+
+      // 3. Update page metadata: strictly reset isCustomized to false!
+      const updatedPage = await tx.page.update({
+        where: { id: pageId },
+        data: {
+          layoutTemplateId,
+          sourceTemplateId: layoutTemplateId,
+          layoutMode: 'PRESET',
+          isCustomized: false,
+        },
+        include: {
+          elements: { orderBy: { zIndex: 'asc' } },
+          layoutTemplate: true,
+          audioTrack: true,
+        },
+      });
+
+      return updatedPage;
+    });
+
+    await this.cacheService.touchBook(existing.bookId);
+    return this.resolveElementMediaUrls(result);
   }
 }

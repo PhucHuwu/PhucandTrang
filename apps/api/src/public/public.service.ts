@@ -150,6 +150,12 @@ export class PublicService {
       if (d.posterMediaId) mediaIdSet.add(d.posterMediaId);
     }
 
+    for (const el of cover.back?.insideElements || []) {
+      const d = (el.data as any) || {};
+      if (d.mediaId) mediaIdSet.add(d.mediaId);
+      if (d.posterMediaId) mediaIdSet.add(d.posterMediaId);
+    }
+
     // 2. Background music
     if (book.backgroundMusic?.mediaId) {
       mediaIdSet.add(book.backgroundMusic.mediaId);
@@ -330,6 +336,10 @@ export class PublicService {
       .filter((el: any) => el.visible !== false)
       .map((el: any) => this.compileElement(el, mediaMap, images, allUrls, videos));
 
+    const backInsideCoverElements = (cover.back?.insideElements || [])
+      .filter((el: any) => el.visible !== false)
+      .map((el: any) => this.compileElement(el, mediaMap, images, allUrls, videos));
+
     // 3. Pages & Elements: sort strictly by order ASC
     const rawPages = [...(book.pages || [])].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
 
@@ -438,6 +448,7 @@ export class PublicService {
           insideBackgroundUrl: backInsideBg,
           outsideBackgroundUrl: backOutsideBg,
           elements: backCoverElements,
+          insideElements: backInsideCoverElements,
         },
       },
       audio: compiledAudio,

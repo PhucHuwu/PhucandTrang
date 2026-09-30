@@ -14,6 +14,7 @@ import { CreatePageDto } from './dto/create-page.dto';
 import { UpdatePageDto } from './dto/update-page.dto';
 import { ReorderPagesDto } from './dto/reorder-pages.dto';
 import { DuplicatePageDto } from './dto/duplicate-page.dto';
+import { ApplyLayoutDto } from './dto/apply-layout.dto';
 import { AuthGuard } from '@nestjs/passport';
 
 @UseGuards(AuthGuard('jwt'))
@@ -34,6 +35,14 @@ export class PagesController {
   @Post()
   async create(@Body() dto: CreatePageDto) {
     return this.pagesService.create(dto);
+  }
+
+  @Post(':id/apply-layout')
+  async applyLayout(
+    @Param('id') id: string,
+    @Body() dto: ApplyLayoutDto,
+  ) {
+    return this.pagesService.applyLayout(id, dto.layoutTemplateId, dto.elements);
   }
 
   @Put(':id')

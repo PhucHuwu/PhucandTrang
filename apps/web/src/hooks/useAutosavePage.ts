@@ -26,6 +26,7 @@ export function useAutosavePage(
   const lastSavedStateRef = useRef<string | null>(null);
   const isInitialMountRef = useRef(true);
   const isSavingRef = useRef(false);
+  const hasPendingUpdateRef = useRef(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Latest page ref to guarantee latest state wins (avoid stale closure)
@@ -61,11 +62,18 @@ export function useAutosavePage(
 
   // Perform actual PATCH of changed data
   const executeSave = useCallback(
-    async (targetPage: Page) => {
-      if (isViewer || isSavingRef.current) return;
+    async (targetPage: Page, shouldThrow = false): Promise<boolean> => {
+      if (isViewer) return false;
+
+      // If already in flight, mark pending update and let current cycle re-trigger
+      if (isSavingRef.current) {
+        hasPendingUpdateRef.current = true;
+        return false;
+      }
 
       const currentSeq = ++saveSequenceRef.current;
       isSavingRef.current = true;
+      hasPendingUpdateRef.current = false;
       setStatus('saving');
       setErrorMessage(null);
 
@@ -106,17 +114,28 @@ export function useAutosavePage(
           setLastSavedTime(new Date());
           setErrorMessage(null);
         }
+        return true;
       } catch (err: any) {
         if (currentSeq === saveSequenceRef.current) {
           setStatus('error');
           setErrorMessage(err?.message || 'Không thể lưu tự động');
         }
+        if (shouldThrow) {
+          throw err;
+        }
+        return false;
       } finally {
         isSavingRef.current = false;
 
-        // If page has changed further during the async save, trigger one more cycle
-        if (latestPageRef.current && serializePageState(latestPageRef.current) !== lastSavedStateRef.current) {
+        // If changes arrived while saving or pending update flag was set, immediately trigger next save cycle
+        if (
+          hasPendingUpdateRef.current ||
+          (latestPageRef.current && serializePageState(latestPageRef.current) !== lastSavedStateRef.current)
+        ) {
           setStatus('unsaved');
+          if (latestPageRef.current) {
+            executeSave(latestPageRef.current, false);
+          }
         }
       }
     },
@@ -127,15 +146,15 @@ export function useAutosavePage(
   const retrySave = useCallback(() => {
     if (latestPageRef.current && !isViewer) {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-      executeSave(latestPageRef.current);
+      executeSave(latestPageRef.current, false);
     }
   }, [executeSave, isViewer]);
 
-  // Force immediate save (e.g. user clicks Save button)
+  // Force immediate save (e.g. user clicks Save button): strictly throws on failure so caller doesn't show false success!
   const forceSave = useCallback(async () => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     if (latestPageRef.current && !isViewer) {
-      await executeSave(latestPageRef.current);
+      await executeSave(latestPageRef.current, true);
     }
   }, [executeSave, isViewer]);
 
@@ -170,7 +189,7 @@ export function useAutosavePage(
 
     debounceTimerRef.current = setTimeout(() => {
       if (latestPageRef.current) {
-        executeSave(latestPageRef.current);
+        executeSave(latestPageRef.current, false);
       }
     }, debounceMs);
 

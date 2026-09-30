@@ -129,7 +129,7 @@ export default function QbjectAuthenticExperience({
           });
         });
 
-        // 6. Instantiate 100% Original Flipbook from Qbject with fast initial textures
+        // 6. Instantiate 100% Original Flipbook from Qbject with fast initial textures & custom camera settings
         const flipbook = new Flipbook({
           containerEl: container,
           pageWidth: book.settings.dimensions.pageWidth,
@@ -141,6 +141,10 @@ export default function QbjectAuthenticExperience({
           coverMarginY: book.settings.dimensions.coverMarginY,
           pageEdgeColor: book.settings.theme.edgeColor,
           pageActiveAreas,
+          settings: {
+            cameraFov: book.settings.camera?.fov || 14,
+            cameraDistance: book.settings.camera?.distance ? book.settings.camera.distance / 5200 * 1.02 : 1.02,
+          } as any,
           textureUrls: {
             pages: pageUrls,
             spineInner: pageUrls[0],
