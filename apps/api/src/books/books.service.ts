@@ -195,9 +195,9 @@ export class BooksService {
       backgroundMusicUpdate.backgroundMusicId = dto.backgroundMusicId;
     }
 
-    // Safe merge for partial JSON objects if PATCH
+    // Safe merge for partial JSON objects if PATCH (do NOT merge cover if fully provided, replace cover cleanly)
     const cover = isPatch && dto.cover
-      ? safeDeepMerge(existingBook.cover as any, dto.cover)
+      ? (dto.cover.front || dto.cover.back ? dto.cover : safeDeepMerge(existingBook.cover as any, dto.cover))
       : dto.cover;
 
     const settings = isPatch && dto.settings

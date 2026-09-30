@@ -409,6 +409,8 @@ export default function BookCoverEditorPage() {
           backgroundUrl: bg?.imageUrl || currentCover.front?.backgroundUrl || '',
           mediaId: bg?.mediaId || currentCover.front?.mediaId,
           elements: virtualPage.elements,
+          headerFade: bg?.headerFade,
+          gutterFade: bg?.gutterFade,
         };
       } else if (activeSide === 'back-inside') {
         currentCover.back = {
@@ -417,6 +419,8 @@ export default function BookCoverEditorPage() {
           insideMediaId: bg?.mediaId || currentCover.back?.insideMediaId,
           insideBackground: bg,
           insideElements: virtualPage.elements,
+          headerFade: bg?.headerFade,
+          gutterFade: bg?.gutterFade,
         };
       } else {
         currentCover.back = {
@@ -425,6 +429,8 @@ export default function BookCoverEditorPage() {
           outsideMediaId: bg?.mediaId || currentCover.back?.outsideMediaId,
           outsideBackground: bg,
           elements: virtualPage.elements,
+          headerFade: bg?.headerFade,
+          gutterFade: bg?.gutterFade,
         };
       }
 

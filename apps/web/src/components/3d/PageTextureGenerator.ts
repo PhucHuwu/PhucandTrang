@@ -333,17 +333,19 @@ export class PageTextureGenerator {
       ctx.fillStyle = vGrad;
       ctx.fillRect(0, 0, canvasW, canvasH);
 
-      // Spine shadow gradient on inner edge
-      const spineGrad = ctx.createLinearGradient(
-        side === 'left' ? canvasW : 0,
-        0,
-        side === 'left' ? canvasW - 144 : 144,
-        0
-      );
-      spineGrad.addColorStop(0, 'rgba(0, 0, 0, 0.16)');
-      spineGrad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
-      ctx.fillStyle = spineGrad;
-      ctx.fillRect(side === 'left' ? canvasW - 144 : 0, 0, 144, canvasH);
+      // Spine shadow gradient on inner edge (respect gutterFade if disabled or customized)
+      if (bg?.gutterFade?.enabled !== false) {
+        const spineGrad = ctx.createLinearGradient(
+          side === 'left' ? canvasW : 0,
+          0,
+          side === 'left' ? canvasW - 144 : 144,
+          0
+        );
+        spineGrad.addColorStop(0, 'rgba(0, 0, 0, 0.16)');
+        spineGrad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+        ctx.fillStyle = spineGrad;
+        ctx.fillRect(side === 'left' ? canvasW - 144 : 0, 0, 144, canvasH);
+      }
       ctx.restore();
     }
   }
@@ -794,16 +796,18 @@ export class PageTextureGenerator {
     photoSrc: string,
     bookContext?: Partial<Book>
   ): Promise<THREE.CanvasTexture> {
-    const cover = bookContext?.cover?.front;
-    const title = cover?.title || 'Chúng Mình';
-    const bgUrl = cover?.backgroundUrl || photoSrc;
-    const subtitle =
-      cover?.counterBadge?.subtitle || 'Bên nhau từ ngày {{anniversaryDate}}';
+    const frontCover = bookContext?.cover?.front as any;
+    const bgUrl = frontCover?.backgroundUrl || photoSrc;
 
-    // If front cover elements are already configured in JSON, use them
-    let elements: PageElement[] = cover?.elements || [];
+    let elements: PageElement[] = frontCover?.elements || [];
 
     if (!elements || elements.length === 0) {
+      const coupleHe = bookContext?.couple?.he || 'PHÚC';
+      const coupleShe = bookContext?.couple?.she || 'TRANG';
+      const title = frontCover?.title || 'Chúng Mình';
+      const subtitle =
+        frontCover?.counterBadge?.subtitle || 'Bên nhau từ ngày {{anniversaryDate}}';
+
       elements = [
         // Title: "Chúng Mình"
         {
@@ -937,9 +941,16 @@ export class PageTextureGenerator {
       side: 'right',
       layout: 'custom',
       background: {
-        type: bgUrl ? 'image' : 'color',
+        type: frontCover?.type || (bgUrl ? 'image' : 'color'),
         imageUrl: bgUrl,
-        color: '#FFE8EE',
+        mediaId: frontCover?.mediaId,
+        color: frontCover?.color || '#FFE8EE',
+        opacity: frontCover?.opacity !== undefined ? frontCover.opacity : 1,
+        objectFit: frontCover?.objectFit || 'cover',
+        focalPoint: frontCover?.focalPoint || { x: 0.5, y: 0.5 },
+        gradient: frontCover?.gradient,
+        headerFade: frontCover?.headerFade,
+        gutterFade: frontCover?.gutterFade,
       },
       elements,
     };
@@ -955,10 +966,14 @@ export class PageTextureGenerator {
     isInside: boolean,
     bookContext?: Partial<Book>
   ): Promise<THREE.CanvasTexture> {
-    const cover = bookContext?.cover?.back;
+    const cover = bookContext?.cover?.back as any;
     const bgUrl = isInside
       ? cover?.insideBackgroundUrl || photoSrc
       : cover?.outsideBackgroundUrl || photoSrc;
+
+    const targetBg = isInside
+      ? cover?.insideBackground || cover
+      : cover?.outsideBackground || cover;
 
     // Correctly read insideElements for inside, and elements for outside!
     const elements = isInside
@@ -973,9 +988,16 @@ export class PageTextureGenerator {
       side: isInside ? 'left' : 'right',
       layout: 'custom',
       background: {
-        type: bgUrl ? 'image' : 'color',
+        type: targetBg?.type || (bgUrl ? 'image' : 'color'),
         imageUrl: bgUrl,
-        color: '#1F1218',
+        mediaId: isInside ? (cover?.insideMediaId || targetBg?.mediaId) : (cover?.outsideMediaId || targetBg?.mediaId),
+        color: targetBg?.color || '#1F1218',
+        opacity: targetBg?.opacity !== undefined ? targetBg.opacity : 1,
+        objectFit: targetBg?.objectFit || 'cover',
+        focalPoint: targetBg?.focalPoint || { x: 0.5, y: 0.5 },
+        gradient: targetBg?.gradient,
+        headerFade: targetBg?.headerFade,
+        gutterFade: targetBg?.gutterFade,
       },
       elements,
     };

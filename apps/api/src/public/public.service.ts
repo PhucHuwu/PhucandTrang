@@ -438,6 +438,7 @@ export class PublicService {
         proposalQuote: book.proposalQuote,
       },
       cover: {
+        ...cover,
         front: {
           ...cover.front,
           backgroundUrl: frontBg,
