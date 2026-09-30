@@ -40,8 +40,13 @@ module.exports = {
       },
       fontFamily: {
         serif: ['var(--font-cormorant)', 'Georgia', 'Cambria', 'serif'],
-        handwriting: ['var(--font-alex-brush)', 'cursive'],
-        script: ['var(--font-pinyon)', 'cursive'],
+        // --font-alex-brush / --font-pinyon were never defined, and an undefined var() without a
+        // fallback makes the whole declaration invalid at computed-value time — the `cursive`
+        // entry was dropped too and every font-handwriting / font-script node inherited the body
+        // font. Both now resolve to the Dancing Script face loaded in app/layout.tsx (the only
+        // script face with a Vietnamese subset, which these headings need).
+        handwriting: ['var(--font-handwriting)', 'cursive'],
+        script: ['var(--font-handwriting)', 'cursive'],
         sans: ['var(--font-montserrat)', 'sans-serif'],
       },
       boxShadow: {

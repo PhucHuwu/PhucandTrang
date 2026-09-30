@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Stage,
   Layer,
@@ -14,6 +14,12 @@ import {
 } from 'react-konva';
 import type Konva from 'konva';
 import { Page, PageElement, Book } from '@/types/book';
+import {
+  CAPTION_FONT,
+  PAGE_NUMBER_FONT,
+  ensureCanvasFontLoaded,
+  ensureCustomFontLoaded,
+} from '@/data/fontLoader';
 import {
   DESIGN_CANVAS_WIDTH,
   DESIGN_CANVAS_HEIGHT,
@@ -65,6 +71,71 @@ function useKonvaImage(src?: string) {
   return image;
 }
 
+/**
+ * Single source of truth for Konva text typography — shared by the KonvaText props and by the
+ * pre-draw font load, so the editor never paints a face it did not wait for.
+ */
+function resolveKonvaTextFont(element: PageElement): {
+  fontFamily: string;
+  fontSize: number;
+  fontStyle: string;
+} {
+  const s = element.style || {};
+  const d = element.data as any;
+
+  const fontFamily =
+    s.fontFamily ||
+    (d?.variant === 'handwriting'
+      ? 'Dancing Script'
+      : d?.variant === 'quote'
+      ? 'Dancing Script'
+      : d?.variant === 'chapter-label'
+      ? 'Montserrat'
+      : 'Cormorant Garamond');
+
+  const fontSize =
+    s.fontSize ||
+    (d?.variant === 'title'
+      ? 38
+      : d?.variant === 'chapter-label'
+      ? 20
+      : d?.variant === 'quote'
+      ? 26
+      : d?.variant === 'handwriting'
+      ? 32
+      : d?.variant === 'caption'
+      ? 19
+      : 22);
+
+  const fontStyle =
+    s.fontStyle === 'italic' ||
+    d?.variant === 'quote' ||
+    d?.variant === 'handwriting' ||
+    d?.variant === 'caption'
+      ? 'italic'
+      : s.fontWeight === 'bold' || d?.variant === 'title' || d?.variant === 'chapter-label'
+      ? 'bold'
+      : 'normal';
+
+  return { fontFamily, fontSize, fontStyle };
+}
+
+/** Canvas font shorthand Konva assigns for a text element — the exact string its draw resolves. */
+function konvaTextFontShorthand(element: PageElement): string {
+  const { fontFamily, fontSize, fontStyle } = resolveKonvaTextFont(element);
+  return `${fontStyle} ${fontSize}px ${fontFamily}`;
+}
+
+/** True when every shorthand already resolves — a warm session needs no load and no Stage re-key. */
+function canvasFontsReady(shorthands: string[]): boolean {
+  if (typeof document === 'undefined' || !document.fonts) return false;
+  try {
+    return shorthands.every((shorthand) => document.fonts.check(shorthand));
+  } catch {
+    return false;
+  }
+}
+
 // Single Element Renderer inside Konva
 function KonvaElementItem({
   element,
@@ -99,40 +170,8 @@ function KonvaElementItem({
   const s = element.style || {};
   const d = element.data as any;
 
-  // Text variant styling
-  const fontFamily =
-    s.fontFamily ||
-    (d?.variant === 'handwriting'
-      ? 'Dancing Script'
-      : d?.variant === 'quote'
-      ? 'Dancing Script'
-      : d?.variant === 'chapter-label'
-      ? 'Montserrat'
-      : 'Cormorant Garamond');
-
-  const fontSize =
-    s.fontSize ||
-    (d?.variant === 'title'
-      ? 38
-      : d?.variant === 'chapter-label'
-      ? 20
-      : d?.variant === 'quote'
-      ? 26
-      : d?.variant === 'handwriting'
-      ? 32
-      : d?.variant === 'caption'
-      ? 19
-      : 22);
-
-  const fontStyle =
-    s.fontStyle === 'italic' ||
-    d?.variant === 'quote' ||
-    d?.variant === 'handwriting' ||
-    d?.variant === 'caption'
-      ? 'italic'
-      : s.fontWeight === 'bold' || d?.variant === 'title' || d?.variant === 'chapter-label'
-      ? 'bold'
-      : 'normal';
+  // Text variant styling — shared with the pre-draw font load (see resolveKonvaTextFont)
+  const { fontFamily, fontSize, fontStyle } = resolveKonvaTextFont(element);
 
   const rawText = d?.text || (d?.textLines ? d.textLines.join('\n') : '');
   const displayText = varContext ? TextVariableResolver.resolve(rawText, varContext) : rawText;
@@ -402,6 +441,22 @@ export default function KonvaPageCanvas({
   // Active magnetic snapping guide lines
   const [activeGuides, setActiveGuides] = useState<SnapGuideLine[]>([]);
 
+  // Konva rasterizes into its own canvas, so text is painted with whatever faces are loaded at
+  // draw time and never waits for a webfont — an element-style stack silently falls through to
+  // `cursive`. Flipping this once the page fonts land re-keys the Stage below so Konva measures
+  // the line breaks again with the real faces instead of keeping the fallback layout. A warm
+  // session starts ready, so the re-key (which recreates every Konva node) only ever runs cold.
+  const pageFontShorthands = useMemo(() => {
+    const shorthands = new Set<string>([CAPTION_FONT, PAGE_NUMBER_FONT]);
+    for (const el of page.elements || []) {
+      if (el.visible === false) continue;
+      if (el.type === 'TEXT') shorthands.add(konvaTextFontShorthand(el));
+    }
+    return Array.from(shorthands);
+  }, [page.elements]);
+
+  const [fontsReady, setFontsReady] = useState(() => canvasFontsReady(pageFontShorthands));
+
   const canvasW = book?.settings?.dimensions?.canvasResolution?.width || DESIGN_CANVAS_WIDTH;
   const canvasH = book?.settings?.dimensions?.canvasResolution?.height || DESIGN_CANVAS_HEIGHT;
 
@@ -430,6 +485,27 @@ export default function KonvaPageCanvas({
   const sortedElements = [...(page.elements || [])].filter((el) => el.visible !== false);
   sortedElements.sort((a, b) => a.zIndex - b.zIndex);
 
+  // Every family this page can paint must be loaded before the first Stage draw (see fontsReady).
+  useEffect(() => {
+    if (canvasFontsReady(pageFontShorthands)) {
+      setFontsReady(true);
+      return;
+    }
+
+    let cancelled = false;
+
+    Promise.all([
+      ensureCustomFontLoaded(),
+      ...pageFontShorthands.map((shorthand) => ensureCanvasFontLoaded(shorthand)),
+    ]).then(() => {
+      if (!cancelled) setFontsReady(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pageFontShorthands]);
+
   // Attach transformer to selected node
   useEffect(() => {
     if (!transformerRef.current || !stageRef.current) return;
@@ -445,7 +521,7 @@ export default function KonvaPageCanvas({
     }
     transformerRef.current.nodes([]);
     transformerRef.current.getLayer()?.batchDraw();
-  }, [selectedElementId, page.elements, scale, editingActiveArea]);
+  }, [selectedElementId, page.elements, scale, editingActiveArea, fontsReady]);
 
   useEffect(() => {
     if (!activeAreaTransformerRef.current) return;
@@ -455,7 +531,7 @@ export default function KonvaPageCanvas({
       activeAreaTransformerRef.current.nodes([]);
     }
     activeAreaTransformerRef.current.getLayer()?.batchDraw();
-  }, [editingActiveArea, selectedElementId, page.elements, scale]);
+  }, [editingActiveArea, selectedElementId, page.elements, scale, fontsReady]);
 
   // Click on stage blank area deselects
   const checkDeselect = (e: any) => {
@@ -551,6 +627,7 @@ export default function KonvaPageCanvas({
       }}
     >
       <Stage
+        key={fontsReady ? 'fonts-ready' : 'fonts-loading'}
         ref={stageRef}
         width={canvasW * scale}
         height={canvasH * scale}
@@ -648,7 +725,7 @@ export default function KonvaPageCanvas({
               y={canvasH - 45}
               width={canvasW}
               text={`— ${page.pageNumber} —`}
-              fontFamily="Cormorant Garamond"
+              fontFamily={'"Cormorant Garamond", Georgia, serif'}
               fontSize={16}
               fontStyle="italic"
               fill="#8C6F5A"

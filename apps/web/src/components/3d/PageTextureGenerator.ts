@@ -18,6 +18,13 @@ import {
   VariableContext,
   computeImageFit,
 } from '@phucandtrang/shared';
+import {
+  CAPTION_FONT,
+  DECORATION_GLYPH_FONT,
+  PAGE_NUMBER_FONT,
+  ensureCanvasFontLoaded,
+  ensureCustomFontLoaded,
+} from '@/data/fontLoader';
 
 // Re-export types for consumers
 export type { PageMediaItem, PageLayoutType };
@@ -147,14 +154,12 @@ export class PageTextureGenerator {
 
     const ctx = canvas.getContext('2d')!;
 
-    // 1. Ensure custom fonts are ready
-    if (typeof document !== 'undefined' && document.fonts) {
-      try {
-        await document.fonts.ready;
-      } catch {
-        // Fallback gracefully
-      }
-    }
+    // 1. Rasterizing text on canvas requires every face to be loaded BEFORE the draw:
+    //    canvas never triggers a webfont fetch, it just paints the fallback family instead.
+    //    Both awaits are bounded internally and per-family — a blanket document.fonts.ready
+    //    would add nothing here and would hang forever on an unrelated stalled font.
+    await ensureCustomFontLoaded();
+    await this.ensurePageFontsLoaded(page, bookContext);
 
     // 2. Prepare dynamic text variable context
     const varContext = TextVariableResolver.createContext({
@@ -428,14 +433,14 @@ export class PageTextureGenerator {
    * - Multiline and automatic word wrapping within element box
    * - Font typography, letter spacing, alignment, colors
    */
-  private static renderTextElement(
-    ctx: CanvasRenderingContext2D,
+  /**
+   * Single source of truth for element text typography — shared by the renderer and by the
+   * pre-draw font load, so a canvas never paints a family it did not wait for.
+   */
+  private static resolveTextFont(
     el: TextElement,
-    boxW: number,
-    boxH: number,
-    varContext?: VariableContext,
     bookContext?: Partial<Book>
-  ) {
+  ): { fontFamily: string; fontSize: number; fontWeight: string; fontStyle: string } {
     const s = el.style || {};
     const d = el.data;
 
@@ -483,6 +488,68 @@ export class PageTextureGenerator {
         ? 'italic'
         : 'normal');
 
+    return { fontFamily, fontSize, fontWeight, fontStyle };
+  }
+
+  /** Canvas font shorthand for a text element — the exact string the renderer assigns to ctx.font. */
+  private static textElementFontShorthand(
+    el: TextElement,
+    bookContext?: Partial<Book>
+  ): string {
+    const { fontFamily, fontSize, fontWeight, fontStyle } = this.resolveTextFont(el, bookContext);
+    return `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+  }
+
+  /**
+   * Waits for every font face this page is about to paint. Canvas 2D silently substitutes the
+   * next family in the stack when a face is not loaded yet, so a page rendered before this
+   * resolves keeps the fallback glyphs for the whole session (textures are cached).
+   */
+  private static async ensurePageFontsLoaded(
+    page: Page,
+    bookContext?: Partial<Book>
+  ): Promise<void> {
+    const shorthands = new Set<string>();
+
+    for (const el of page.elements || []) {
+      if (el.visible === false) continue;
+
+      if (el.type === 'TEXT') {
+        shorthands.add(this.textElementFontShorthand(el as TextElement, bookContext));
+      } else if (el.type === 'VIDEO') {
+        shorthands.add(CAPTION_FONT);
+      } else if (el.type === 'IMAGE') {
+        // Legacy polaroid caption — renderImageElement paints it in CAPTION_FONT.
+        if ((el.data as { caption?: string }).caption) shorthands.add(CAPTION_FONT);
+      } else if (el.type === 'DECORATION') {
+        shorthands.add(DECORATION_GLYPH_FONT);
+      }
+    }
+
+    if (
+      page.showPageNumber !== false &&
+      page.pageNumber !== undefined &&
+      page.pageNumber > 0
+    ) {
+      shorthands.add(PAGE_NUMBER_FONT);
+    }
+
+    await Promise.all(Array.from(shorthands).map((shorthand) => ensureCanvasFontLoaded(shorthand)));
+  }
+
+  private static renderTextElement(
+    ctx: CanvasRenderingContext2D,
+    el: TextElement,
+    boxW: number,
+    boxH: number,
+    varContext?: VariableContext,
+    bookContext?: Partial<Book>
+  ) {
+    const s = el.style || {};
+    const d = el.data;
+
+    const { fontSize } = this.resolveTextFont(el, bookContext);
+
     const themeColor = bookContext?.settings?.theme?.textColor;
     const accentColor = bookContext?.settings?.theme?.accentColor;
 
@@ -501,7 +568,7 @@ export class PageTextureGenerator {
         : (themeColor || '#474039'));
 
     ctx.fillStyle = color;
-    ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+    ctx.font = this.textElementFontShorthand(el, bookContext);
     ctx.textAlign = (s.textAlign === 'justify' ? 'left' : s.textAlign) || 'left';
     ctx.textBaseline = 'middle';
 
@@ -628,7 +695,7 @@ export class PageTextureGenerator {
     // Legacy inline caption if still present
     if (captionText) {
       ctx.fillStyle = s.color || '#4A1523';
-      ctx.font = 'italic 19px "Dancing Script", cursive';
+      ctx.font = CAPTION_FONT;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(captionText, 0, cardH / 2 - 13);
@@ -764,7 +831,7 @@ export class PageTextureGenerator {
       case 'flourish':
       default:
         if (d.icon) {
-          ctx.font = '24px "Dancing Script", cursive';
+          ctx.font = DECORATION_GLYPH_FONT;
           ctx.fillStyle = '#C99A9A';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
@@ -787,7 +854,7 @@ export class PageTextureGenerator {
   ) {
     ctx.save();
     ctx.fillStyle = '#8C6F5A';
-    ctx.font = 'italic 16px "Cormorant Garamond", Georgia, serif';
+    ctx.font = PAGE_NUMBER_FONT;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.letterSpacing = '2px';
