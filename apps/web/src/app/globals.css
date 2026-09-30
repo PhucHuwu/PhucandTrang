@@ -1,4 +1,12 @@
 @font-face {
+  font-family: "SVN-Housttely Signature";
+  src: url("/font/2.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
   font-family: "Coldwell Bridges";
   src: url("/font/2.otf") format("opentype");
   font-weight: normal;
