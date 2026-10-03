@@ -264,6 +264,12 @@ export default function QbjectAuthenticExperience({
     if (isAutoFlipping) {
       autoFlipTimerRef.current = setInterval(() => {
         if (!flipbookInstanceRef.current) return;
+        
+        // PAUSE auto-flip if user is currently watching an interactive video!
+        if (flipbookInstanceRef.current.isWatchingVideo()) {
+          return;
+        }
+
         const currentPr = (flipbookInstanceRef.current as any).progress?.getValue?.() || 0;
         const total = totalPages || (flipbookInstanceRef.current as any).pages?.length || 0;
 

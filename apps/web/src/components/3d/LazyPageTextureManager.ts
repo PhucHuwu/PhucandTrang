@@ -15,8 +15,8 @@ export class LazyPageTextureManager {
   private placeholderDataUrl: string = '';
   private destroyed = false;
 
-  // Window distance: eagerly generate ±4 pages ahead of time to eliminate hitching
-  public readonly WINDOW_SIZE = 4;
+  // Window distance: eagerly generate ±6 pages ahead of time to eliminate hitching
+  public readonly WINDOW_SIZE = 6;
 
   constructor(book: Book) {
     this.book = book;
@@ -162,8 +162,8 @@ export class LazyPageTextureManager {
       }
     }
 
-    // 2. Prune distant textures to conserve GPU / canvas RAM (keep at most 24 textures in cache)
-    if (this.cache.size > 24) {
+    // 2. Prune distant textures to conserve GPU / canvas RAM (keep at most 32 textures in cache)
+    if (this.cache.size > 32) {
       const entries = Array.from(this.cache.entries()).sort(
         (a, b) => a[1].lastAccessed - b[1].lastAccessed
       );
@@ -179,7 +179,7 @@ export class LazyPageTextureManager {
         }
         this.cache.delete(idx);
 
-        if (this.cache.size <= 18) break;
+        if (this.cache.size <= 24) break;
       }
     }
   }
