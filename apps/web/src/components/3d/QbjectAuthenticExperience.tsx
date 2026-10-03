@@ -195,9 +195,9 @@ export default function QbjectAuthenticExperience({
         setTotalPages(pageUrls.length / 2);
 
         // Preload rest of window around page 0
-        lazyManager.updateActiveWindow(0, (faceIdx, textureUrl) => {
+        lazyManager.updateActiveWindow(0, (faceIdx, textureUrl, directTexture) => {
           if (!destroyed && flipbook) {
-            flipbook.updateFaceTexture(faceIdx, textureUrl);
+            flipbook.updateFaceTexture(faceIdx, textureUrl, directTexture);
           }
         });
 
@@ -217,10 +217,10 @@ export default function QbjectAuthenticExperience({
               lastPage = current;
               setCurrentPage(current);
 
-              // Prompt 26: Trigger lazy loading for window around new currentPage
-              lazyManager.updateActiveWindow(current, (faceIdx, textureUrl) => {
+              // Prompt 26: Trigger lazy loading for window around new currentPage with zero-lag directTexture
+              lazyManager.updateActiveWindow(current, (faceIdx, textureUrl, directTexture) => {
                 if (!destroyed && flipbookInstanceRef.current) {
-                  flipbookInstanceRef.current.updateFaceTexture(faceIdx, textureUrl);
+                  flipbookInstanceRef.current.updateFaceTexture(faceIdx, textureUrl, directTexture);
                 }
               });
 

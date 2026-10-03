@@ -896,12 +896,12 @@ export default class Flipbook {
 		);
 	}
 
-	public updateFaceTexture(faceIndex: number, url: string) {
+	public updateFaceTexture(faceIndex: number, url: string, directTexture?: THREE.Texture) {
 		const pageIndex = Math.floor(faceIndex / 2);
 		const side: 'front' | 'back' = faceIndex % 2 === 0 ? 'front' : 'back';
 		const page = this.pages[pageIndex];
 		if (page) {
-			page.setSideTexture(side, url);
+			page.setSideTexture(side, url, directTexture);
 		}
 	}
 

@@ -327,20 +327,25 @@ export default class Page {
 		return lerp(this.elevationLeft, this.elevationRight, turnProgress);
 	}
 
-	public setSideTexture(side: 'front' | 'back', url: string) {
+	public setSideTexture(side: 'front' | 'back', url: string, directTexture?: THREE.Texture) {
 		const materialIndex = side === 'back' ? 0 : 1;
 		const materials = this.mesh.material as THREE.MeshStandardMaterial[];
 		if (!materials || !materials[materialIndex]) return;
 
 		const currentMap = materials[materialIndex].map;
-		if (currentMap) {
+		if (currentMap && currentMap !== directTexture) {
 			currentMap.dispose();
 		}
 
-		const newTexture = this.textureLoader.load(url);
-		newTexture.colorSpace = THREE.SRGBColorSpace;
-		newTexture.minFilter = THREE.LinearFilter;
-		newTexture.generateMipmaps = false;
+		let newTexture: THREE.Texture;
+		if (directTexture) {
+			newTexture = directTexture;
+		} else {
+			newTexture = this.textureLoader.load(url);
+			newTexture.colorSpace = THREE.SRGBColorSpace;
+			newTexture.minFilter = THREE.LinearFilter;
+			newTexture.generateMipmaps = false;
+		}
 
 		materials[materialIndex].map = newTexture;
 		materials[materialIndex].needsUpdate = true;

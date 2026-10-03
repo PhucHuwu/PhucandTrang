@@ -11,12 +11,12 @@ export interface TextureCacheEntry {
 export class LazyPageTextureManager {
   private book: Book;
   private cache = new Map<number, TextureCacheEntry>();
-  private inFlightGenerations = new Map<number, Promise<string>>();
+  private inFlightGenerations = new Map<number, Promise<TextureCacheEntry>>();
   private placeholderDataUrl: string = '';
   private destroyed = false;
 
-  // Window distance: current page ± WINDOW_SIZE pages
-  public readonly WINDOW_SIZE = 3;
+  // Window distance: eagerly generate ±4 pages ahead of time to eliminate hitching
+  public readonly WINDOW_SIZE = 4;
 
   constructor(book: Book) {
     this.book = book;
@@ -44,16 +44,18 @@ export class LazyPageTextureManager {
   }
 
   /**
-   * Retrieves or lazily generates texture dataUrl for a given page index.
-   * pageIndex: 0 = front cover, 1..N = inside pages, N+1 = back cover inside, N+2 = back cover outside.
+   * Retrieves or lazily generates texture entry for a given page index.
+   * Directly creates and caches THREE.CanvasTexture to prevent repeated dataUrl decoding.
    */
-  public async getPageTextureUrl(pageIndex: number): Promise<string> {
-    if (this.destroyed) return this.placeholderDataUrl;
+  public async getPageTextureEntry(pageIndex: number): Promise<TextureCacheEntry> {
+    if (this.destroyed) {
+      return { dataUrl: this.placeholderDataUrl, lastAccessed: Date.now() };
+    }
 
     const cached = this.cache.get(pageIndex);
     if (cached) {
       cached.lastAccessed = Date.now();
-      return cached.dataUrl;
+      return cached;
     }
 
     if (this.inFlightGenerations.has(pageIndex)) {
@@ -61,71 +63,75 @@ export class LazyPageTextureManager {
     }
 
     const generationPromise = this.renderTextureByIndex(pageIndex)
-      .then((dataUrl) => {
-        this.cache.set(pageIndex, {
-          dataUrl,
-          lastAccessed: Date.now(),
-        });
+      .then((entry) => {
+        this.cache.set(pageIndex, entry);
         this.inFlightGenerations.delete(pageIndex);
-        return dataUrl;
+        return entry;
       })
       .catch((err) => {
         this.inFlightGenerations.delete(pageIndex);
         console.warn(`[LazyTextureManager] Failed to render page texture #${pageIndex}:`, err);
-        return this.placeholderDataUrl;
+        return { dataUrl: this.placeholderDataUrl, lastAccessed: Date.now() };
       });
 
     this.inFlightGenerations.set(pageIndex, generationPromise);
     return generationPromise;
   }
 
+  public async getPageTextureUrl(pageIndex: number): Promise<string> {
+    const entry = await this.getPageTextureEntry(pageIndex);
+    return entry.dataUrl;
+  }
+
   /**
    * Internal renderer for front cover, inside pages, or back covers
    */
-  private async renderTextureByIndex(index: number): Promise<string> {
+  private async renderTextureByIndex(index: number): Promise<TextureCacheEntry> {
     const totalInsidePages = this.book.pages.length;
+    let canvasTexture: THREE.CanvasTexture | undefined;
 
     // 0: Front Cover
     if (index === 0) {
-      const coverFront = await PageTextureGenerator.createCoverTexture(
+      canvasTexture = await PageTextureGenerator.createCoverTexture(
         this.book.cover.front.backgroundUrl,
         this.book
       );
-      const canvas = coverFront.image as HTMLCanvasElement;
-      return canvas.toDataURL('image/jpeg', 0.90);
-    }
-
-    // Inside Pages: 1..totalInsidePages
-    if (index >= 1 && index <= totalInsidePages) {
+    } else if (index >= 1 && index <= totalInsidePages) {
+      // Inside Pages: 1..totalInsidePages
       const pageData = this.book.pages[index - 1];
-      const texture = await PageTextureGenerator.renderPageTexture(pageData, this.book);
-      const canvas = texture.image as HTMLCanvasElement;
-      return canvas.toDataURL('image/jpeg', 0.90);
-    }
-
-    // Back Cover Inside: totalInsidePages + 1
-    if (index === totalInsidePages + 1) {
-      const coverBackInside = await PageTextureGenerator.createBackCoverTexture(
+      canvasTexture = await PageTextureGenerator.renderPageTexture(pageData, this.book);
+    } else if (index === totalInsidePages + 1) {
+      // Back Cover Inside: totalInsidePages + 1
+      canvasTexture = await PageTextureGenerator.createBackCoverTexture(
         this.book.cover.back.insideBackgroundUrl,
         true,
         this.book
       );
-      const canvas = coverBackInside.image as HTMLCanvasElement;
-      return canvas.toDataURL('image/jpeg', 0.90);
-    }
-
-    // Back Cover Outside: totalInsidePages + 2
-    if (index === totalInsidePages + 2) {
-      const coverBackOutside = await PageTextureGenerator.createBackCoverTexture(
+    } else if (index === totalInsidePages + 2) {
+      // Back Cover Outside: totalInsidePages + 2
+      canvasTexture = await PageTextureGenerator.createBackCoverTexture(
         this.book.cover.back.outsideBackgroundUrl,
         false,
         this.book
       );
-      const canvas = coverBackOutside.image as HTMLCanvasElement;
-      return canvas.toDataURL('image/jpeg', 0.90);
     }
 
-    return this.placeholderDataUrl;
+    if (canvasTexture) {
+      canvasTexture.generateMipmaps = false;
+      canvasTexture.minFilter = THREE.LinearFilter;
+      const canvas = canvasTexture.image as HTMLCanvasElement;
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+      return {
+        dataUrl,
+        canvasTexture,
+        lastAccessed: Date.now(),
+      };
+    }
+
+    return {
+      dataUrl: this.placeholderDataUrl,
+      lastAccessed: Date.now(),
+    };
   }
 
   /**
@@ -135,7 +141,7 @@ export class LazyPageTextureManager {
    */
   public async updateActiveWindow(
     currentSpread: number,
-    onPageTextureReady?: (pageIndex: number, textureUrl: string) => void
+    onPageTextureReady?: (pageIndex: number, textureUrl: string, directTexture?: THREE.Texture) => void
   ) {
     if (this.destroyed) return;
 
@@ -148,16 +154,16 @@ export class LazyPageTextureManager {
     // 1. Generate nearby textures asynchronously in parallel
     for (let i = minIdx; i <= maxIdx; i++) {
       if (!this.cache.has(i)) {
-        this.getPageTextureUrl(i).then((url) => {
+        this.getPageTextureEntry(i).then((entry) => {
           if (!this.destroyed && onPageTextureReady) {
-            onPageTextureReady(i, url);
+            onPageTextureReady(i, entry.dataUrl, entry.canvasTexture);
           }
         });
       }
     }
 
-    // 2. Prune distant textures to conserve GPU / canvas RAM (keep at most 16 textures in cache)
-    if (this.cache.size > 16) {
+    // 2. Prune distant textures to conserve GPU / canvas RAM (keep at most 24 textures in cache)
+    if (this.cache.size > 24) {
       const entries = Array.from(this.cache.entries()).sort(
         (a, b) => a[1].lastAccessed - b[1].lastAccessed
       );
@@ -173,7 +179,7 @@ export class LazyPageTextureManager {
         }
         this.cache.delete(idx);
 
-        if (this.cache.size <= 12) break;
+        if (this.cache.size <= 18) break;
       }
     }
   }
