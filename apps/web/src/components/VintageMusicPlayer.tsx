@@ -1,32 +1,63 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Volume2, VolumeX, Music, Disc } from 'lucide-react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import {
+  Volume2,
+  VolumeX,
+  Music,
+  Disc,
+  SkipForward,
+  SkipBack,
+  ListMusic,
+  X,
+} from 'lucide-react';
 import { AudioTrack } from '@/types/book';
 
 interface VintageMusicPlayerProps {
   autoPlayTrigger?: boolean;
   audioTrack?: AudioTrack | null;
+  playlist?: AudioTrack[];
 }
 
 export default function VintageMusicPlayer({
   autoPlayTrigger,
   audioTrack,
+  playlist,
 }: VintageMusicPlayerProps) {
+  // Combine single audioTrack fallback and playlist into active queue
+  const queue: AudioTrack[] = useMemo(() => {
+    if (Array.isArray(playlist) && playlist.length > 0) {
+      return playlist;
+    }
+    if (audioTrack && audioTrack.src) {
+      return [audioTrack];
+    }
+    return [];
+  }, [playlist, audioTrack]);
+
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [userInteracted, setUserInteracted] = useState(false);
+
+  // Track whether user explicitly stopped or paused playback
+  const isManuallyPausedRef = useRef(false);
+  // Track whether initial autoplay has already fired
+  const hasAutoPlayedRef = useRef(false);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fadeIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const songSrc = audioTrack?.src;
-  const songTitle = audioTrack?.title || 'Nhạc kỷ niệm';
-  const songArtist = audioTrack?.artist;
-  const targetVolume = audioTrack?.volume ?? 0.8;
-  const loop = audioTrack?.loop ?? true;
-  const startAt = audioTrack?.startAt ?? 0.0;
-  const fadeIn = audioTrack?.fadeIn ?? 0.0;
-  const fadeOut = audioTrack?.fadeOut ?? 0.0;
+  const currentTrack: AudioTrack | undefined = queue[currentIndex] || queue[0];
+  const songSrc = currentTrack?.src;
+  const songTitle = currentTrack?.title || 'Nhạc kỷ niệm';
+  const songArtist = currentTrack?.artist;
+  const targetVolume = currentTrack?.volume ?? 0.8;
+  const loop = queue.length === 1 ? (currentTrack?.loop ?? true) : false;
+  const startAt = currentTrack?.startAt ?? 0.0;
+  const fadeIn = currentTrack?.fadeIn ?? 0.0;
+  const fadeOut = currentTrack?.fadeOut ?? 0.0;
 
   // Clear any active volume fade interval
   const clearFade = useCallback(() => {
@@ -122,26 +153,79 @@ export default function VintageMusicPlayer({
           applyFadeIn();
         })
         .catch(() => {
-          // Autoplay policy prevented playback. Wait for user interaction.
           setIsPlaying(false);
         });
     }
   }, [applyFadeIn, songSrc, startAt]);
 
-  // Trigger Autoplay when requested by the reader turning a page
+  // Next Track in Playlist
+  const handleNextTrack = useCallback(() => {
+    if (queue.length <= 1) {
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play();
+      }
+      return;
+    }
+    const nextIdx = (currentIndex + 1) % queue.length;
+    setCurrentIndex(nextIdx);
+    setTimeout(() => {
+      startPlayback();
+    }, 100);
+  }, [currentIndex, queue.length, startPlayback]);
+
+  // Previous Track in Playlist
+  const handlePrevTrack = useCallback(() => {
+    if (queue.length <= 1) {
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+      }
+      return;
+    }
+    const prevIdx = (currentIndex - 1 + queue.length) % queue.length;
+    setCurrentIndex(prevIdx);
+    setTimeout(() => {
+      startPlayback();
+    }, 100);
+  }, [currentIndex, queue.length, startPlayback]);
+
+  // Handle Track Completion: Automatically play next song in Playlist!
+  const handleSongEnded = useCallback(() => {
+    if (queue.length > 1) {
+      handleNextTrack();
+    } else if (loop) {
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play();
+      }
+    } else {
+      setIsPlaying(false);
+    }
+  }, [handleNextTrack, loop, queue.length]);
+
+  // Trigger Autoplay ONLY ONCE when reader first starts opening the book (page > 0)
+  // Strictly respects user pause: NEVER restart if user manually paused!
   useEffect(() => {
-    if (autoPlayTrigger && !isPlaying && songSrc) {
+    if (
+      autoPlayTrigger &&
+      !hasAutoPlayedRef.current &&
+      !isManuallyPausedRef.current &&
+      !isPlaying &&
+      songSrc
+    ) {
+      hasAutoPlayedRef.current = true;
       startPlayback();
     }
   }, [autoPlayTrigger, isPlaying, songSrc, startPlayback]);
 
-  // One-time interaction fallback: unlock audio on first page click or touch
+  // One-time interaction fallback: unlock audio on first gesture if not manually paused
   useEffect(() => {
     if (userInteracted || !songSrc) return;
 
     const handleFirstGesture = () => {
       setUserInteracted(true);
-      if (autoPlayTrigger && !isPlaying) {
+      if (autoPlayTrigger && !hasAutoPlayedRef.current && !isManuallyPausedRef.current && !isPlaying) {
+        hasAutoPlayedRef.current = true;
         startPlayback();
       }
     };
@@ -169,14 +253,16 @@ export default function VintageMusicPlayer({
     if (!audioRef.current || !songSrc) return;
 
     if (isPlaying) {
+      isManuallyPausedRef.current = true;
       applyFadeOutAndPause();
     } else {
+      isManuallyPausedRef.current = false;
       startPlayback();
     }
   };
 
-  // If no audio track is provided, do not render player
-  if (!songSrc) {
+  // If no audio tracks are in queue, do not render player
+  if (queue.length === 0 || !songSrc) {
     return null;
   }
 
@@ -187,10 +273,11 @@ export default function VintageMusicPlayer({
         src={songSrc}
         loop={loop}
         preload="auto"
+        onEnded={handleSongEnded}
       />
 
       {/* Floating mini music controller */}
-      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3">
+      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2">
         {/* Toast track info */}
         <div
           className={`transition-all duration-500 transform ${
@@ -200,11 +287,43 @@ export default function VintageMusicPlayer({
           } bg-[#FBF7EE]/95 backdrop-blur-md border border-[#8C2437]/20 shadow-lg px-4 py-2 rounded-full hidden sm:flex items-center gap-2`}
         >
           <Music className="w-3.5 h-3.5 text-[#8C2437] animate-bounce" />
-          <span className="text-xs tracking-wider text-[#2A2421] font-serif italic">
-            Đang phát: {songTitle}
+          <span className="text-xs tracking-wider text-[#2A2421] font-serif italic truncate max-w-xs">
+            {currentIndex + 1}/{queue.length}: {songTitle}
             {songArtist && <span className="opacity-70 font-normal"> • {songArtist}</span>}
           </span>
         </div>
+
+        {/* Playlist Controls bar if multi-track */}
+        {queue.length > 1 && (
+          <div className="flex items-center gap-1 bg-[#FAF6EE]/90 backdrop-blur-md border border-[#D4AF37]/40 px-2 py-1.5 rounded-full shadow-lg">
+            <button
+              onClick={handlePrevTrack}
+              className="p-1 rounded-full hover:bg-rosewood-100 text-[#4A1521] transition active:scale-90"
+              title="Bài trước đó"
+            >
+              <SkipBack className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              onClick={() => setShowPlaylistModal(!showPlaylistModal)}
+              className="p-1 rounded-full hover:bg-rosewood-100 text-[#4A1521] transition active:scale-90 relative"
+              title="Danh sách Playlist"
+            >
+              <ListMusic className="w-3.5 h-3.5" />
+              <span className="absolute -top-1 -right-1 bg-rosewood-600 text-white rounded-full text-[9px] w-3.5 h-3.5 flex items-center justify-center font-mono">
+                {queue.length}
+              </span>
+            </button>
+
+            <button
+              onClick={handleNextTrack}
+              className="p-1 rounded-full hover:bg-rosewood-100 text-[#4A1521] transition active:scale-90"
+              title="Bài kế tiếp"
+            >
+              <SkipForward className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* Vintage disc button */}
         <button
@@ -237,6 +356,57 @@ export default function VintageMusicPlayer({
           </span>
         </button>
       </div>
+
+      {/* Playlist Drawer/Modal */}
+      {showPlaylistModal && (
+        <div className="fixed bottom-20 right-6 z-50 w-72 max-h-80 bg-[#1C0F17]/95 border border-rosewood-800/80 backdrop-blur-xl shadow-2xl rounded-2xl p-3 text-xs text-parchment-200 overflow-y-auto animate-in fade-in zoom-in-95">
+          <div className="flex items-center justify-between pb-2 border-b border-rosewood-900/60 mb-2">
+            <span className="font-serif font-bold text-champagne-300 flex items-center gap-1.5">
+              <Music className="w-3.5 h-3.5 text-amber-400" />
+              <span>Playlist ({queue.length} bài)</span>
+            </span>
+            <button
+              onClick={() => setShowPlaylistModal(false)}
+              className="p-1 rounded hover:bg-rosewood-900/60 text-stone-400 hover:text-white"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="space-y-1">
+            {queue.map((track, idx) => (
+              <button
+                key={track.id || idx}
+                onClick={() => {
+                  setCurrentIndex(idx);
+                  isManuallyPausedRef.current = false;
+                  setTimeout(() => {
+                    startPlayback();
+                  }, 100);
+                }}
+                className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition ${
+                  idx === currentIndex
+                    ? 'bg-rosewood-900/80 text-champagne-300 font-bold border border-rosewood-600/50'
+                    : 'hover:bg-rosewood-950/60 text-stone-300'
+                }`}
+              >
+                <span className="font-mono text-[10px] text-stone-500 w-4 text-center">
+                  {idx + 1}
+                </span>
+                <div className="flex-1 truncate">
+                  <p className="truncate font-medium">{track.title}</p>
+                  {track.artist && (
+                    <p className="text-[10px] text-stone-500 truncate">{track.artist}</p>
+                  )}
+                </div>
+                {idx === currentIndex && isPlaying && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </>
   );
 }

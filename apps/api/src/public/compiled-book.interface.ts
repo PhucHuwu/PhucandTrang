@@ -135,6 +135,20 @@ export interface CompiledBookDocument {
     fadeOut: number;
     durationSeconds: number | null;
   } | null;
+  playlist?: Array<{
+    id?: string;
+    title: string;
+    artist: string | null;
+    src: string;
+    mediaId?: string | null;
+    autoPlay: boolean;
+    loop: boolean;
+    volume: number;
+    startAt: number;
+    fadeIn: number;
+    fadeOut: number;
+    durationSeconds: number | null;
+  }>;
   settings: Record<string, any>;
   pages: CompiledPage[];
   media: CompiledMediaReferences;

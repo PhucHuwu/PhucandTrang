@@ -156,9 +156,15 @@ export class PublicService {
       if (d.posterMediaId) mediaIdSet.add(d.posterMediaId);
     }
 
-    // 2. Background music
+    // 2. Background music & Playlist
     if (book.backgroundMusic?.mediaId) {
       mediaIdSet.add(book.backgroundMusic.mediaId);
+    }
+    const settings = (book.settings as any) || {};
+    if (Array.isArray(settings.playlistTracks)) {
+      for (const track of settings.playlistTracks) {
+        if (track.mediaId) mediaIdSet.add(track.mediaId);
+      }
     }
 
     // 3. Pages & Elements
@@ -297,6 +303,38 @@ export class PublicService {
         audio.push(resolvedSrc);
         allUrls.add(resolvedSrc);
       }
+    }
+
+    // 1b. Compiled Global Playlist
+    const settings = (book.settings as any) || {};
+    let compiledPlaylist: CompiledBookDocument['playlist'] = undefined;
+    if (Array.isArray(settings.playlistTracks) && settings.playlistTracks.length > 0) {
+      compiledPlaylist = settings.playlistTracks
+        .map((track: any) => {
+          const trackSrc =
+            (track.mediaId && mediaMap.get(track.mediaId)?.url) || track.src;
+          if (trackSrc) {
+            audio.push(trackSrc);
+            allUrls.add(trackSrc);
+          }
+          return {
+            id: track.id,
+            title: track.title,
+            artist: track.artist || null,
+            src: trackSrc,
+            mediaId: track.mediaId || null,
+            autoPlay: track.autoPlay ?? true,
+            loop: track.loop ?? false,
+            volume: track.volume ?? 0.8,
+            startAt: track.startAt ?? 0.0,
+            fadeIn: track.fadeIn ?? 0.0,
+            fadeOut: track.fadeOut ?? 0.0,
+            durationSeconds: track.durationSeconds ?? null,
+          };
+        })
+        .filter((t: any) => Boolean(t.src));
+    } else if (compiledAudio) {
+      compiledPlaylist = [compiledAudio];
     }
 
     // 2. Covers
@@ -453,6 +491,7 @@ export class PublicService {
         },
       },
       audio: compiledAudio,
+      playlist: compiledPlaylist,
       settings: (book.settings as any) || {},
       pages: compiledPages,
       media: mediaReferences,

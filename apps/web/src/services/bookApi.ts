@@ -62,6 +62,7 @@ export async function fetchPublishedBook(
         cover: data.cover,
         backgroundMusicId: resolvedAudio?.id || null,
         audio: resolvedAudio,
+        playlist: Array.isArray(data.playlist) ? data.playlist : resolvedAudio ? [resolvedAudio] : [],
         settings: data.settings || PHUC_AND_TRANG_BOOK.settings,
         pages: (data.pages || []).map((p: any) => ({
           ...p,

@@ -433,6 +433,7 @@ export interface BookSettings {
   theme: BookThemePalette;
   typography: BookFontTypography;
   atmospheric: AtmosphericConfig;
+  playlistIds?: string[]; // IDs of audio tracks in order for global playlist
 }
 
 // ==========================================
@@ -484,6 +485,7 @@ export interface Book {
   cover: BookCoverConfig;
   backgroundMusicId?: string | null;
   audio?: AudioTrack | null;
+  playlist?: AudioTrack[]; // Compiled global audio playlist
   settings: BookSettings;
   pages: Page[];
   createdAt?: string;

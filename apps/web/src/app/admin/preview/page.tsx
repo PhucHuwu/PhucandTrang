@@ -50,6 +50,7 @@ export default function AdminPreviewDraftDirectPage() {
           cover: doc.cover,
           backgroundMusicId: resolvedAudio?.id || null,
           audio: resolvedAudio,
+          playlist: Array.isArray(doc.playlist) ? doc.playlist : resolvedAudio ? [resolvedAudio] : [],
           settings: doc.settings || PHUC_AND_TRANG_BOOK.settings,
           pages: (doc.pages || []).map((p: any) => ({
             ...p,

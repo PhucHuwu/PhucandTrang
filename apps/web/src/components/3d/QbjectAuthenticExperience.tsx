@@ -327,10 +327,11 @@ export default function QbjectAuthenticExperience({
         </div>
       )}
 
-      {/* Romantic Music Player */}
+      {/* Romantic Music Player (Supporting Multi-track Global Playlist) */}
       <VintageMusicPlayer
         autoPlayTrigger={currentPage > 0}
         audioTrack={bookData?.audio}
+        playlist={bookData?.playlist}
       />
     </div>
   );
