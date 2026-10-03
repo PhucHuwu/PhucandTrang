@@ -11,7 +11,7 @@ import VintageMusicPlayer from '@/components/VintageMusicPlayer';
 import { ensureCustomFontLoaded } from '@/data/fontLoader';
 import { fetchPublishedBook } from '@/services/bookApi';
 import { Book } from '@/types/book';
-import { BookOpen, RefreshCw } from 'lucide-react';
+import { BookOpen, RefreshCw, Play, Pause } from 'lucide-react';
 import { deriveFaceIndex, computeActiveAreaPageRect } from '@phucandtrang/shared';
 
 interface QbjectAuthenticExperienceProps {
@@ -31,6 +31,8 @@ export default function QbjectAuthenticExperience({
   const [loadingProgress, setLoadingProgress] = useState(0.04);
   const [bookData, setBookData] = useState<Book | null>(customBookData || null);
   const [error, setError] = useState<string | null>(null);
+  const [isAutoFlipping, setIsAutoFlipping] = useState(false);
+  const autoFlipTimerRef = useRef<NodeJS.Timeout | null>(null);
   const flipbookInstanceRef = useRef<Flipbook | null>(null);
   const lazyTextureManagerRef = useRef<LazyPageTextureManager | null>(null);
   const mediaPreloaderRef = useRef<MediaPreloader | null>(null);
@@ -241,6 +243,10 @@ export default function QbjectAuthenticExperience({
 
     return () => {
       destroyed = true;
+      if (autoFlipTimerRef.current) {
+        clearInterval(autoFlipTimerRef.current);
+        autoFlipTimerRef.current = null;
+      }
       mediaPreloaderRef.current?.destroy();
       mediaPreloaderRef.current = null;
       lazyTextureManagerRef.current?.destroy();
@@ -252,6 +258,45 @@ export default function QbjectAuthenticExperience({
       }
     };
   }, []);
+
+  // Automatic Page Flip Loop (Interval: 4.5 seconds per spread)
+  useEffect(() => {
+    if (isAutoFlipping) {
+      autoFlipTimerRef.current = setInterval(() => {
+        if (!flipbookInstanceRef.current) return;
+        const currentPr = (flipbookInstanceRef.current as any).progress?.getValue?.() || 0;
+        const total = totalPages || (flipbookInstanceRef.current as any).pages?.length || 0;
+
+        if (currentPr >= total) {
+          // Reached back cover: stop auto-flip
+          setIsAutoFlipping(false);
+          if (autoFlipTimerRef.current) {
+            clearInterval(autoFlipTimerRef.current);
+            autoFlipTimerRef.current = null;
+          }
+          return;
+        }
+
+        flipbookInstanceRef.current.flipNext();
+      }, 4500);
+    } else {
+      if (autoFlipTimerRef.current) {
+        clearInterval(autoFlipTimerRef.current);
+        autoFlipTimerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (autoFlipTimerRef.current) {
+        clearInterval(autoFlipTimerRef.current);
+        autoFlipTimerRef.current = null;
+      }
+    };
+  }, [isAutoFlipping, totalPages]);
+
+  const toggleAutoFlip = () => {
+    setIsAutoFlipping((prev) => !prev);
+  };
 
   return (
     <div className="relative w-full h-full select-none overflow-hidden">
@@ -324,6 +369,28 @@ export default function QbjectAuthenticExperience({
         <div className="absolute top-4 left-4 z-40 flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 backdrop-blur-md text-xs font-sans font-medium shadow-lg pointer-events-none">
           <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
           <span>CHẾ ĐỘ XEM TRƯỚC BẢN NHÁP (DRAFT PREVIEW)</span>
+        </div>
+      )}
+
+      {/* Auto-flip Play/Pause Button (Minimalist Triangular Play/Pause Icon) */}
+      {isReady && (
+        <div className="fixed bottom-6 left-6 z-50 flex items-center gap-2">
+          <button
+            onClick={toggleAutoFlip}
+            className={`group relative flex items-center justify-center w-12 h-12 rounded-full border shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 ${
+              isAutoFlipping
+                ? 'bg-rosewood-900 border-rosewood-500 text-amber-300'
+                : 'bg-[#FAF6EE] border-[#D4AF37]/50 text-[#3A1F26]'
+            }`}
+            aria-label="Toggle auto page flip"
+            title={isAutoFlipping ? 'Tạm dừng tự động lật trang' : 'Bật tự động lật trang'}
+          >
+            {isAutoFlipping ? (
+              <Pause className="w-5 h-5 fill-current" />
+            ) : (
+              <Play className="w-5 h-5 fill-current ml-0.5" />
+            )}
+          </button>
         </div>
       )}
 

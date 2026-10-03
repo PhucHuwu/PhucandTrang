@@ -905,6 +905,60 @@ export default class Flipbook {
 		}
 	}
 
+	public flipNext() {
+		if (this.isTurning() || this.progress.getValue() >= this.pages.length) return false;
+		const current = this.progress.getValue();
+		const target = Math.min(this.pages.length, Math.floor(current) + 1);
+		this.progress.lock();
+		this.cameraSideShift.lock();
+		this.progress.setMin(current);
+		this.progress.setMax(target);
+
+		const self = this;
+		const obj = { val: current };
+		gsap.to(obj, {
+			val: target,
+			duration: 0.9,
+			ease: "power2.inOut",
+			onUpdate: () => {
+				self.progress.setValue(obj.val);
+			},
+			onComplete: () => {
+				self.progress.setValue(target);
+				self.progress.release();
+				self.cameraSideShift.release();
+			},
+		});
+		return true;
+	}
+
+	public flipPrev() {
+		if (this.isTurning() || this.progress.getValue() <= 0) return false;
+		const current = this.progress.getValue();
+		const target = Math.max(0, Math.ceil(current) - 1);
+		this.progress.lock();
+		this.cameraSideShift.lock();
+		this.progress.setMin(target);
+		this.progress.setMax(current);
+
+		const self = this;
+		const obj = { val: current };
+		gsap.to(obj, {
+			val: target,
+			duration: 0.9,
+			ease: "power2.inOut",
+			onUpdate: () => {
+				self.progress.setValue(obj.val);
+			},
+			onComplete: () => {
+				self.progress.setValue(target);
+				self.progress.release();
+				self.cameraSideShift.release();
+			},
+		});
+		return true;
+	}
+
 	public async watchArea(
 		corners: THREE.Vector3[],
 		preset: "direct" | "page-zoom" | "page-unzoom" = "direct",
