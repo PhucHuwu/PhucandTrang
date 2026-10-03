@@ -4,7 +4,18 @@
 // `unloaded` until something awaits document.fonts.load() — so every rasterizer has to await
 // this module before painting text with these families.
 
-export const CUSTOM_FONT_FAMILIES = ['SVN-Housttely Signature', 'Coldwell Bridges'];
+export const CUSTOM_FONT_FAMILIES = [
+  'SVN-Housttely Signature',
+  'Coldwell Bridges',
+  'SVN-Honeyguide Caps',
+  'Baby Doll',
+];
+export const CUSTOM_FONT_URLS: Record<string, string> = {
+  'SVN-Housttely Signature': '/font/2.otf',
+  'Coldwell Bridges': '/font/2.otf',
+  'SVN-Honeyguide Caps': '/font/1.otf',
+  'Baby Doll': '/font/1.otf',
+};
 export const CUSTOM_FONT_URL = '/font/2.otf';
 
 /**
@@ -89,8 +100,9 @@ async function loadCustomFonts(): Promise<void> {
     if (declared) return;
 
     try {
+      const url = CUSTOM_FONT_URLS[family] || CUSTOM_FONT_URL;
       document.fonts.add(
-        new FontFace(family, `url(${CUSTOM_FONT_URL})`, {
+        new FontFace(family, `url(${url})`, {
           weight: 'normal',
           style: 'normal',
           display: 'swap',

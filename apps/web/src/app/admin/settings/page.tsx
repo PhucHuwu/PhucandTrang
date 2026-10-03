@@ -562,7 +562,8 @@ export default function JournalSettingsDirectPage() {
                   onChange={(e) => setTypography({ ...typography, titleFont: e.target.value })}
                   className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white focus:outline-none"
                 >
-                  <option value="SVN-Housttely Signature">SVN-Housttely Signature / Coldwell Bridges (Font 2.otf)</option>
+                  <option value="SVN-Housttely Signature">Font 2.otf — SVN-Housttely Signature (Chữ ký nghệ thuật)</option>
+                  <option value="SVN-Honeyguide Caps">Font 1.otf — SVN-Honeyguide Caps / Baby Doll (Dễ thương)</option>
                   <option value="Dancing Script">Dancing Script (Thư pháp bay bổng)</option>
                   <option value="Cormorant Garamond">Cormorant Garamond (Cổ điển sang trọng)</option>
                   <option value="Playfair Display">Playfair Display (Trang nhã)</option>
@@ -579,7 +580,8 @@ export default function JournalSettingsDirectPage() {
                   <option value="Cormorant Garamond">Cormorant Garamond (Serif cổ điển)</option>
                   <option value="Montserrat">Montserrat (Hiện đại)</option>
                   <option value="Playfair Display">Playfair Display</option>
-                  <option value="SVN-Housttely Signature">SVN-Housttely Signature (Font 2.otf)</option>
+                  <option value="SVN-Housttely Signature">Font 2.otf — SVN-Housttely Signature</option>
+                  <option value="SVN-Honeyguide Caps">Font 1.otf — SVN-Honeyguide Caps / Baby Doll</option>
                 </select>
               </div>
 
@@ -590,7 +592,8 @@ export default function JournalSettingsDirectPage() {
                   onChange={(e) => setTypography({ ...typography, handwritingFont: e.target.value })}
                   className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white focus:outline-none"
                 >
-                  <option value="SVN-Housttely Signature">SVN-Housttely Signature / Coldwell Bridges (Font 2.otf)</option>
+                  <option value="SVN-Housttely Signature">Font 2.otf — SVN-Housttely Signature</option>
+                  <option value="SVN-Honeyguide Caps">Font 1.otf — SVN-Honeyguide Caps / Baby Doll</option>
                   <option value="Dancing Script">Dancing Script (Viết tay cảm xúc)</option>
                 </select>
               </div>

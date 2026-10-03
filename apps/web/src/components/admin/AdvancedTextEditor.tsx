@@ -27,7 +27,8 @@ interface AdvancedTextEditorProps {
 }
 
 const FONT_OPTIONS = [
-  { label: 'SVN-Housttely Signature / Coldwell Bridges (Chữ Ký Nghệ Thuật 2.otf)', value: '"SVN-Housttely Signature", "Coldwell Bridges", cursive, serif' },
+  { label: 'Font 2.otf — SVN-Housttely Signature (Chữ Ký Nghệ Thuật)', value: '"SVN-Housttely Signature", "Coldwell Bridges", cursive, serif' },
+  { label: 'Font 1.otf — SVN-Honeyguide Caps / Baby Doll (Chữ Tiêu Đề Dễ Thương)', value: '"SVN-Honeyguide Caps", "Baby Doll", cursive, sans-serif' },
   { label: 'Dancing Script (Viết Tay Cảm Xúc)', value: '"Dancing Script", cursive' },
   { label: 'Cormorant Garamond (Serif Cổ Điển)', value: '"Cormorant Garamond", Georgia, serif' },
   { label: 'Montserrat (Hiện Đại Không Chân)', value: 'Montserrat, sans-serif' },
