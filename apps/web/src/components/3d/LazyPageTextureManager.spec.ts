@@ -65,6 +65,53 @@ describe('texture scheduling', () => {
     await jest.advanceTimersByTimeAsync(40);
   });
 
+  it('reuses the startup window instead of rasterizing the first spreads again', async () => {
+    const manager = new LazyPageTextureManager(book);
+    for (let index = 0; index < 9; index++) {
+      const pending = manager.getPageTextureEntry(index);
+      await jest.advanceTimersByTimeAsync(40);
+      await pending;
+    }
+    jest.clearAllMocks();
+    const ready = jest.fn();
+    await manager.updateActiveWindow(1, ready);
+    await jest.advanceTimersByTimeAsync(200);
+    expect(PageTextureGenerator.renderPageTexture).not.toHaveBeenCalled();
+    expect(PageTextureGenerator.createCoverTexture).not.toHaveBeenCalled();
+    expect(ready).not.toHaveBeenCalled();
+    manager.destroy();
+  });
+
+  it('does not render an undefined face when the queue is emptied during an idle wait', async () => {
+    const manager = new LazyPageTextureManager(book);
+    const ready = jest.fn();
+    await manager.updateActiveWindow(0, ready);
+    // Populate the same window before the background worker resumes.
+    (manager as any).cache = new Map(Array.from({ length: 7 }, (_, index) => [
+      index, { dataUrl: 'placeholder', canvasTexture: texture(), lastAccessed: 0 },
+    ]));
+    await manager.updateActiveWindow(0, ready);
+    await jest.advanceTimersByTimeAsync(100);
+    expect(PageTextureGenerator.createBackCoverTexture).not.toHaveBeenCalled();
+    expect(ready).not.toHaveBeenCalled();
+    expect((manager as any).cache.has(undefined)).toBe(false);
+    manager.destroy();
+  });
+
+  it('continues preparing later faces after a single render fails', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    (PageTextureGenerator.createCoverTexture as jest.Mock).mockRejectedValueOnce(new Error('bad cover'));
+    const manager = new LazyPageTextureManager(book);
+    const ready = jest.fn();
+    await manager.updateActiveWindow(0, ready);
+    await jest.advanceTimersByTimeAsync(500);
+    expect(ready.mock.calls.some(([index]) => index === 1)).toBe(true);
+    expect(ready.mock.calls.some(([index]) => index === 2)).toBe(true);
+    manager.destroy();
+    await jest.advanceTimersByTimeAsync(40);
+    warn.mockRestore();
+  });
+
   it('disposes a render that completes after destruction without repopulating cache', async () => {
     let finish!: (value: any) => void;
     (PageTextureGenerator.renderPageTexture as jest.Mock).mockImplementation(() => new Promise(resolve => { finish = resolve; }));

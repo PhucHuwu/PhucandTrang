@@ -912,7 +912,13 @@ export default class Flipbook {
 
 	public isTextureWorkBlocked(): boolean {
 		return this.isTurning() || this.isShifting() || this.isWatchingVideo() ||
-			this.pages.some(page => page.needsUpdate());
+			gsap.isTweening(this.camera.position) || gsap.isTweening(this.camera.quaternion);
+	}
+
+	public async prepareInitialRender(): Promise<void> {
+		// Compile materials, including inside-page and atmospheric variants, behind loading.
+		await this.renderer.compileAsync(this.scene, this.camera);
+		if (!this.disposed) this.render();
 	}
 
 	public flipNext() {

@@ -39,7 +39,11 @@ function loadImageAsync(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
+    img.onload = async () => {
+      // Decode before the idle-gated canvas draw instead of deferring it to drawImage.
+      try { await img.decode(); } catch { /* Already loaded images remain usable. */ }
+      resolve(img);
+    };
     img.onerror = () => {
       // Create a 1x1 transparent dummy image on error to prevent crashing
       const fallback = new Image();
