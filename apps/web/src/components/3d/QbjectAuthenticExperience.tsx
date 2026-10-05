@@ -69,7 +69,9 @@ export default function QbjectAuthenticExperience({
         setLoadingProgress(0.15);
 
         // 3. Prompt 26: Initialize Lazy Texture Manager
-        const lazyManager = new LazyPageTextureManager(book);
+        const lazyManager = new LazyPageTextureManager(book, () =>
+          flipbookInstanceRef.current?.isTextureWorkBlocked() ?? false
+        );
         lazyTextureManagerRef.current = lazyManager;
 
         // Prompt 27: Initialize MediaPreloader for priority-driven background preloading
@@ -85,11 +87,12 @@ export default function QbjectAuthenticExperience({
         // This cuts initial load time from seconds to a few hundred milliseconds!
         const initialFacesCount = Math.min(totalFaces, 3);
         const pageUrls: string[] = new Array(totalFaces).fill(placeholderUrl);
+        const initialTextures: Array<{ index: number; texture: THREE.Texture }> = [];
 
         for (let i = 0; i < initialFacesCount; i++) {
           if (destroyed) return;
-          const url = await lazyManager.getPageTextureUrl(i);
-          pageUrls[i] = url;
+          const entry = await lazyManager.getPageTextureEntry(i);
+          if (entry.canvasTexture) initialTextures.push({ index: i, texture: entry.canvasTexture });
           setLoadingProgress(0.2 + ((i + 1) / initialFacesCount) * 0.65);
         }
 
@@ -177,6 +180,9 @@ export default function QbjectAuthenticExperience({
         }
 
         flipbookInstanceRef.current = flipbook;
+        for (const { index, texture } of initialTextures) {
+          flipbook.updateFaceTexture(index, placeholderUrl, texture);
+        }
 
         // 7. Attach 3D atmospheric environment (butterflies, floating petals, fairy dust)
         if (book.settings.atmospheric?.enabled !== false) {
@@ -192,7 +198,7 @@ export default function QbjectAuthenticExperience({
           flipbook.atmospheric = atmospheric;
         }
 
-        setTotalPages(pageUrls.length / 2);
+        setTotalPages(Math.ceil(pageUrls.length / 2));
 
         // Preload rest of window around page 0
         lazyManager.updateActiveWindow(0, (faceIdx, textureUrl, directTexture) => {
@@ -202,6 +208,7 @@ export default function QbjectAuthenticExperience({
         });
 
         let lastPage = -1;
+        let lastPreparedPage = 0;
         let readyReported = false;
         const checkProgress = () => {
           if (!destroyed && flipbook) {
@@ -216,8 +223,12 @@ export default function QbjectAuthenticExperience({
             if (current !== lastPage) {
               lastPage = current;
               setCurrentPage(current);
+            }
 
-              // Prompt 26: Trigger lazy loading for window around new currentPage with zero-lag directTexture
+            // Rounded progress changes halfway through a turn. Prepare textures only after
+            // the sheet and camera have settled, not during the animation's busiest frame.
+            if (current !== lastPreparedPage && !flipbook.isTextureWorkBlocked()) {
+              lastPreparedPage = current;
               lazyManager.updateActiveWindow(current, (faceIdx, textureUrl, directTexture) => {
                 if (!destroyed && flipbookInstanceRef.current) {
                   flipbookInstanceRef.current.updateFaceTexture(faceIdx, textureUrl, directTexture);

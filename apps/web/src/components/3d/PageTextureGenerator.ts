@@ -104,9 +104,10 @@ export class PageTextureGenerator {
    */
   static async renderPageTexture(
     page: Page,
-    bookContext?: Partial<Book>
+    bookContext?: Partial<Book>,
+    beforeDraw?: () => Promise<void>
   ): Promise<THREE.CanvasTexture> {
-    const canvas = await this.renderPageCanvas(page, bookContext);
+    const canvas = await this.renderPageCanvas(page, bookContext, beforeDraw);
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     return texture;
@@ -117,7 +118,8 @@ export class PageTextureGenerator {
    */
   static async renderPageCanvas(
     page: Page,
-    bookContext?: Partial<Book>
+    bookContext?: Partial<Book>,
+    beforeDraw?: () => Promise<void>
   ): Promise<HTMLCanvasElement> {
     const canvasW =
       bookContext?.settings?.dimensions?.canvasResolution?.width ||
@@ -129,7 +131,7 @@ export class PageTextureGenerator {
     const canvas = document.createElement('canvas');
     canvas.width = canvasW;
     canvas.height = canvasH;
-    await this.renderPageToCanvas(page, canvas, bookContext);
+    await this.renderPageToCanvas(page, canvas, bookContext, beforeDraw);
     return canvas;
   }
 
@@ -140,7 +142,8 @@ export class PageTextureGenerator {
   static async renderPageToCanvas(
     page: Page,
     canvas: HTMLCanvasElement,
-    bookContext?: Partial<Book>
+    bookContext?: Partial<Book>,
+    beforeDraw?: () => Promise<void>
   ): Promise<void> {
     const canvasW =
       bookContext?.settings?.dimensions?.canvasResolution?.width ||
@@ -200,6 +203,9 @@ export class PageTextureGenerator {
         }
       })
     );
+
+    // Asset requests can finish mid-turn. Defer the synchronous canvas work until idle.
+    if (beforeDraw) await beforeDraw();
 
     // 4. Render Background Layer
     this.renderBackground(ctx, page.background, page.side, imageCache, canvasW, canvasH, bookContext);
@@ -872,7 +878,8 @@ export class PageTextureGenerator {
    */
   static createCoverTexture(
     photoSrc: string,
-    bookContext?: Partial<Book>
+    bookContext?: Partial<Book>,
+    beforeDraw?: () => Promise<void>
   ): Promise<THREE.CanvasTexture> {
     const frontCover = bookContext?.cover?.front as any;
     const bgUrl = frontCover?.backgroundUrl || photoSrc;
@@ -1033,7 +1040,7 @@ export class PageTextureGenerator {
       elements,
     };
 
-    return this.renderPageTexture(frontCoverPage, bookContext);
+    return this.renderPageTexture(frontCoverPage, bookContext, beforeDraw);
   }
 
   /**
@@ -1042,7 +1049,8 @@ export class PageTextureGenerator {
   static createBackCoverTexture(
     photoSrc: string,
     isInside: boolean,
-    bookContext?: Partial<Book>
+    bookContext?: Partial<Book>,
+    beforeDraw?: () => Promise<void>
   ): Promise<THREE.CanvasTexture> {
     const cover = bookContext?.cover?.back as any;
     const bgUrl = isInside
@@ -1080,7 +1088,7 @@ export class PageTextureGenerator {
       elements,
     };
 
-    return this.renderPageTexture(backCoverPage, bookContext);
+    return this.renderPageTexture(backCoverPage, bookContext, beforeDraw);
   }
 
   // =========================================================================

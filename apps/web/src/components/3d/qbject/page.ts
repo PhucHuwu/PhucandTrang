@@ -333,6 +333,7 @@ export default class Page {
 		if (!materials || !materials[materialIndex]) return;
 
 		const currentMap = materials[materialIndex].map;
+		if (directTexture && currentMap === directTexture) return;
 		if (currentMap && currentMap !== directTexture) {
 			currentMap.dispose();
 		}
@@ -348,7 +349,7 @@ export default class Page {
 		}
 
 		materials[materialIndex].map = newTexture;
-		materials[materialIndex].needsUpdate = true;
+		if (!currentMap) materials[materialIndex].needsUpdate = true;
 	}
 
 	public getPageAreaCorners(area: PageArea, backside = false) {
