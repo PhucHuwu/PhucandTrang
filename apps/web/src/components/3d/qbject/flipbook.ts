@@ -901,18 +901,12 @@ export default class Flipbook {
 		const side: 'front' | 'back' = faceIndex % 2 === 0 ? 'front' : 'back';
 		const page = this.pages[pageIndex];
 		if (page) {
-			if (directTexture) this.renderer.initTexture(directTexture);
 			page.setSideTexture(side, url, directTexture);
 		}
 	}
 
 	public isWatchingVideo(): boolean {
 		return Boolean(this.focusedActiveArea || this.isChangingFocus);
-	}
-
-	public isTextureWorkBlocked(): boolean {
-		return this.isTurning() || this.isShifting() || this.isWatchingVideo() ||
-			this.pages.some(page => page.needsUpdate());
 	}
 
 	public flipNext() {
