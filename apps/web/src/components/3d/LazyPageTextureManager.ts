@@ -189,24 +189,8 @@ export class LazyPageTextureManager {
       }
     }
 
-    // 2. Prune distant textures to conserve GPU / canvas RAM (keep at most 32 textures in cache)
-    if (this.cache.size > 32) {
-      const entries = Array.from(this.cache.entries()).sort(
-        (a, b) => a[1].lastAccessed - b[1].lastAccessed
-      );
-
-      for (const [idx, entry] of entries) {
-        // Do not dispose front cover, back covers or textures in current window
-        if (idx === 0 || idx >= totalTextures - 2 || (idx >= minIdx && idx <= maxIdx)) {
-          continue;
-        }
-
-        // Installed textures remain owned by page materials until replacement or teardown.
-        this.cache.delete(idx);
-
-        if (this.cache.size <= 24) break;
-      }
-    }
+    // Page materials already retain these textures. Keep their cache entries too so
+    // returning to a visited spread never rasterizes or uploads the same page again.
   }
 
   public getCacheSize(): number {

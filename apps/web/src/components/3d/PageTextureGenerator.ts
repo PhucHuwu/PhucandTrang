@@ -35,14 +35,38 @@ export const DEFAULT_CANVAS_HEIGHT = 1360;
 /**
  * Loads an HTMLImageElement asynchronously with crossOrigin enabled.
  */
+const decodedImages = new Map<string, { image: HTMLImageElement; bytes: number }>();
+const pendingImages = new Map<string, Promise<HTMLImageElement>>();
+const DECODED_IMAGE_BUDGET = 128 * 1024 * 1024;
+let decodedImageBytes = 0;
+
 function loadImageAsync(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve) => {
+  const cached = decodedImages.get(src);
+  if (cached) {
+    decodedImages.delete(src);
+    decodedImages.set(src, cached);
+    return Promise.resolve(cached.image);
+  }
+  const pending = pendingImages.get(src);
+  if (pending) return pending;
+
+  const request = new Promise<HTMLImageElement>((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.decoding = 'async';
     img.onload = async () => {
       // onload alone does not guarantee decoded pixels are ready for drawImage.
       try { await img.decode(); } catch { /* Loaded images can still be drawable after decode rejection. */ }
+      const bytes = img.naturalWidth * img.naturalHeight * 4;
+      if (bytes <= DECODED_IMAGE_BUDGET) {
+        while (decodedImageBytes + bytes > DECODED_IMAGE_BUDGET && decodedImages.size) {
+          const oldest = decodedImages.entries().next().value!;
+          decodedImageBytes -= oldest[1].bytes;
+          decodedImages.delete(oldest[0]);
+        }
+        decodedImages.set(src, { image: img, bytes });
+        decodedImageBytes += bytes;
+      }
       resolve(img);
     };
     img.onerror = () => {
@@ -55,6 +79,9 @@ function loadImageAsync(src: string): Promise<HTMLImageElement> {
     };
     img.src = src;
   });
+  pendingImages.set(src, request);
+  void request.finally(() => pendingImages.delete(src));
+  return request;
 }
 
 /**
