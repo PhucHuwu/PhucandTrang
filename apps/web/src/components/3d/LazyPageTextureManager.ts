@@ -14,6 +14,19 @@ export class LazyPageTextureManager {
   private inFlightGenerations = new Map<number, Promise<TextureCacheEntry>>();
   private placeholderDataUrl: string = '';
   private destroyed = false;
+  private generationQueue: Promise<unknown> = Promise.resolve();
+  private windowRevision = 0;
+  private canGenerate = () => true;
+
+  public setGenerationGate(gate: () => boolean) {
+    this.canGenerate = gate;
+  }
+
+  private async waitForQuietFrame() {
+    do {
+      await new Promise<void>((resolve) => setTimeout(resolve, 32));
+    } while (!this.destroyed && !this.canGenerate());
+  }
 
   // Window distance: eagerly generate ±6 pages ahead of time to eliminate hitching
   public readonly WINDOW_SIZE = 6;
@@ -62,8 +75,16 @@ export class LazyPageTextureManager {
       return this.inFlightGenerations.get(pageIndex)!;
     }
 
-    const generationPromise = this.renderTextureByIndex(pageIndex)
+    const generationPromise = this.generationQueue.then(async (): Promise<TextureCacheEntry> => {
+      await this.waitForQuietFrame();
+      if (this.destroyed) return { dataUrl: this.placeholderDataUrl, lastAccessed: Date.now() };
+      return this.renderTextureByIndex(pageIndex);
+    })
       .then((entry) => {
+        if (this.destroyed) {
+          entry.canvasTexture?.dispose();
+          return { dataUrl: this.placeholderDataUrl, lastAccessed: Date.now() };
+        }
         this.cache.set(pageIndex, entry);
         this.inFlightGenerations.delete(pageIndex);
         return entry;
@@ -75,11 +96,16 @@ export class LazyPageTextureManager {
       });
 
     this.inFlightGenerations.set(pageIndex, generationPromise);
+    this.generationQueue = generationPromise;
     return generationPromise;
   }
 
   public async getPageTextureUrl(pageIndex: number): Promise<string> {
     const entry = await this.getPageTextureEntry(pageIndex);
+    // Only initial faces need URLs for the engine constructor.
+    if (entry.canvasTexture && entry.dataUrl === this.placeholderDataUrl) {
+      entry.dataUrl = (entry.canvasTexture.image as HTMLCanvasElement).toDataURL('image/jpeg', 0.88);
+    }
     return entry.dataUrl;
   }
 
@@ -119,10 +145,8 @@ export class LazyPageTextureManager {
     if (canvasTexture) {
       canvasTexture.generateMipmaps = false;
       canvasTexture.minFilter = THREE.LinearFilter;
-      const canvas = canvasTexture.image as HTMLCanvasElement;
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
       return {
-        dataUrl,
+        dataUrl: this.placeholderDataUrl,
         canvasTexture,
         lastAccessed: Date.now(),
       };
@@ -145,20 +169,23 @@ export class LazyPageTextureManager {
   ) {
     if (this.destroyed) return;
 
+    const revision = ++this.windowRevision;
+
     const totalTextures = this.book.pages.length + 3; // coverFront + pages + 2 back covers
     const targetFace = currentSpread * 2; // each 3D sheet has 2 faces (front & back)
 
     const minIdx = Math.max(0, targetFace - this.WINDOW_SIZE * 2);
     const maxIdx = Math.min(totalTextures - 1, targetFace + this.WINDOW_SIZE * 2);
 
-    // 1. Generate nearby textures asynchronously in parallel
-    for (let i = minIdx; i <= maxIdx; i++) {
+    const indices = Array.from({ length: maxIdx - minIdx + 1 }, (_, i) => minIdx + i)
+      .sort((a, b) => Math.abs(a - targetFace) - Math.abs(b - targetFace));
+    for (const i of indices) {
+      if (this.destroyed || revision !== this.windowRevision) return;
       if (!this.cache.has(i)) {
-        this.getPageTextureEntry(i).then((entry) => {
+        const entry = await this.getPageTextureEntry(i);
           if (!this.destroyed && onPageTextureReady) {
             onPageTextureReady(i, entry.dataUrl, entry.canvasTexture);
           }
-        });
       }
     }
 
@@ -174,9 +201,7 @@ export class LazyPageTextureManager {
           continue;
         }
 
-        if (entry.canvasTexture) {
-          entry.canvasTexture.dispose();
-        }
+        // Installed textures remain owned by page materials until replacement or teardown.
         this.cache.delete(idx);
 
         if (this.cache.size <= 24) break;

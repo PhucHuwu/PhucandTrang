@@ -192,7 +192,8 @@ export default function QbjectAuthenticExperience({
           flipbook.atmospheric = atmospheric;
         }
 
-        setTotalPages(pageUrls.length / 2);
+        setTotalPages(Math.ceil(pageUrls.length / 2));
+        lazyManager.setGenerationGate(() => flipbook.isTextureWorkSafe());
 
         // Preload rest of window around page 0
         lazyManager.updateActiveWindow(0, (faceIdx, textureUrl, directTexture) => {

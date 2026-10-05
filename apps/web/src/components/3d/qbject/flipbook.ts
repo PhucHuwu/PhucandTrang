@@ -520,6 +520,8 @@ export default class Flipbook {
 	public get isReady() { return this.introPhase === "COMPLETED" && this.initCompleted; }
 	public destroy() {
 		this.disposed = true;
+		for (const pending of this.pendingFaceTextures.values()) pending.texture?.dispose();
+		this.pendingFaceTextures.clear();
 		window.removeEventListener("resize", this.resizeHandler);
 		cancelAnimationFrame(this.animationFrame);
 		this.progress.destroy();
@@ -694,6 +696,7 @@ export default class Flipbook {
 	}
 
 	private render() {
+		this.flushFaceTexture();
 		this.renderer.render(this.scene, this.camera);
 	}
 
@@ -896,7 +899,25 @@ export default class Flipbook {
 		);
 	}
 
+	private pendingFaceTextures = new Map<number, { url: string; texture?: THREE.Texture }>();
+
+	public isTextureWorkSafe(): boolean {
+		return !this.disposed && this.isReady && !this.isTurning() && !this.isShifting()
+			&& !this.progress.locked && !this.isWatchingVideo();
+	}
+
 	public updateFaceTexture(faceIndex: number, url: string, directTexture?: THREE.Texture) {
+		if (this.disposed) return;
+		this.pendingFaceTextures.set(faceIndex, { url, texture: directTexture });
+	}
+
+	private flushFaceTexture() {
+		if (!this.isTextureWorkSafe()) return;
+		const next = this.pendingFaceTextures.entries().next();
+		if (next.done) return;
+		const [faceIndex, { url, texture: directTexture }] = next.value;
+		this.pendingFaceTextures.delete(faceIndex);
+		if (directTexture) this.renderer.initTexture(directTexture);
 		const pageIndex = Math.floor(faceIndex / 2);
 		const side: 'front' | 'back' = faceIndex % 2 === 0 ? 'front' : 'back';
 		const page = this.pages[pageIndex];
