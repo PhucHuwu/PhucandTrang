@@ -83,8 +83,9 @@ export default function QbjectAuthenticExperience({
         const totalFaces = totalInsidePages + 3; // front cover + N inside pages + 2 back covers
         const placeholderUrl = lazyManager.getPlaceholder();
 
-        // Prepare the cover and first four spreads before enabling reader interaction.
-        const initialFacesCount = Math.min(totalFaces, 9);
+        // 4. Initial Window: Generate immediate front cover & first 2 pages (Window 0..2)
+        // This cuts initial load time from seconds to a few hundred milliseconds!
+        const initialFacesCount = Math.min(totalFaces, 3);
         const pageUrls: string[] = new Array(totalFaces).fill(placeholderUrl);
         const initialTextures: Array<{ index: number; texture: THREE.Texture }> = [];
 
@@ -181,8 +182,6 @@ export default function QbjectAuthenticExperience({
         flipbookInstanceRef.current = flipbook;
         for (const { index, texture } of initialTextures) {
           flipbook.updateFaceTexture(index, placeholderUrl, texture);
-          await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-          if (destroyed) return;
         }
 
         // 7. Attach 3D atmospheric environment (butterflies, floating petals, fairy dust)
@@ -198,9 +197,6 @@ export default function QbjectAuthenticExperience({
           );
           flipbook.atmospheric = atmospheric;
         }
-
-        await flipbook.prepareInitialRender();
-        if (destroyed) return;
 
         setTotalPages(Math.ceil(pageUrls.length / 2));
 

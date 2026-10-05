@@ -43,9 +43,6 @@ export class LazyPageTextureManager {
   };
 
   public async getPageTextureEntry(index: number): Promise<TextureCacheEntry> {
-    if (!Number.isInteger(index) || index < 0 || index > this.book.pages.length + 2) {
-      throw new RangeError(`Invalid texture face index: ${index}`);
-    }
     const cached = this.cache.get(index);
     if (cached) return cached;
     const existing = this.inFlight.get(index);
@@ -103,18 +100,11 @@ export class LazyPageTextureManager {
     try {
       while (this.pending.length && !this.destroyed) {
         await this.waitForIdle();
-        // A window update can replace the queue while waitForIdle is suspended.
-        const index = this.pending.shift();
-        if (index === undefined) continue;
-        try {
-          const entry = await this.getPageTextureEntry(index);
-          await this.waitForIdle();
-          this.onReady?.(index, entry.dataUrl, entry.canvasTexture);
-          this.prune();
-        } catch (error) {
-          if (this.destroyed) break;
-          console.warn(`[LazyTextureManager] Face ${index} failed:`, error);
-        }
+        const index = this.pending.shift()!;
+        const entry = await this.getPageTextureEntry(index);
+        await this.waitForIdle();
+        this.onReady?.(index, entry.dataUrl, entry.canvasTexture);
+        this.prune();
       }
     } catch (error) {
       if (!this.destroyed) console.warn('[LazyTextureManager]', error);
