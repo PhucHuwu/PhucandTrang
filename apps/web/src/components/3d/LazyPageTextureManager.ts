@@ -120,25 +120,30 @@ export class LazyPageTextureManager {
     if (index === 0) {
       canvasTexture = await PageTextureGenerator.createCoverTexture(
         this.book.cover.front.backgroundUrl,
-        this.book
+        this.book,
+        () => this.waitForQuietFrame()
       );
     } else if (index >= 1 && index <= totalInsidePages) {
       // Inside Pages: 1..totalInsidePages
       const pageData = this.book.pages[index - 1];
-      canvasTexture = await PageTextureGenerator.renderPageTexture(pageData, this.book);
+      canvasTexture = await PageTextureGenerator.renderPageTexture(
+        pageData, this.book, () => this.waitForQuietFrame()
+      );
     } else if (index === totalInsidePages + 1) {
       // Back Cover Inside: totalInsidePages + 1
       canvasTexture = await PageTextureGenerator.createBackCoverTexture(
         this.book.cover.back.insideBackgroundUrl,
         true,
-        this.book
+        this.book,
+        () => this.waitForQuietFrame()
       );
     } else if (index === totalInsidePages + 2) {
       // Back Cover Outside: totalInsidePages + 2
       canvasTexture = await PageTextureGenerator.createBackCoverTexture(
         this.book.cover.back.outsideBackgroundUrl,
         false,
-        this.book
+        this.book,
+        () => this.waitForQuietFrame()
       );
     }
 

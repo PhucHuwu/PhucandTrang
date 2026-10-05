@@ -901,6 +901,22 @@ export default class Flipbook {
 
 	private pendingFaceTextures = new Map<number, { url: string; texture?: THREE.Texture }>();
 
+	public async prepareOpeningTextures(faceCount: number): Promise<void> {
+		const uploaded = new Set<THREE.Texture>();
+		for (let faceIndex = 0; faceIndex < faceCount; faceIndex++) {
+			await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+			if (this.disposed) return;
+			const page = this.pages[Math.floor(faceIndex / 2)];
+			if (!page) continue;
+			const materials = page.mesh.material as THREE.MeshStandardMaterial[];
+			const texture = materials[faceIndex % 2 === 0 ? 1 : 0].map;
+			if (texture && !uploaded.has(texture)) {
+				this.renderer.initTexture(texture);
+				uploaded.add(texture);
+			}
+		}
+	}
+
 	public isTextureWorkSafe(): boolean {
 		return !this.disposed && this.isReady && !this.isTurning() && !this.isShifting()
 			&& !this.progress.locked && !this.isWatchingVideo();

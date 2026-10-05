@@ -81,9 +81,8 @@ export default function QbjectAuthenticExperience({
         const totalFaces = totalInsidePages + 3; // front cover + N inside pages + 2 back covers
         const placeholderUrl = lazyManager.getPlaceholder();
 
-        // 4. Initial Window: Generate immediate front cover & first 2 pages (Window 0..2)
-        // This cuts initial load time from seconds to a few hundred milliseconds!
-        const initialFacesCount = Math.min(totalFaces, 3);
+        // Prepare the opening window before revealing the book.
+        const initialFacesCount = Math.min(totalFaces, lazyManager.WINDOW_SIZE * 2 + 1);
         const pageUrls: string[] = new Array(totalFaces).fill(placeholderUrl);
 
         for (let i = 0; i < initialFacesCount; i++) {
@@ -193,7 +192,8 @@ export default function QbjectAuthenticExperience({
         }
 
         setTotalPages(Math.ceil(pageUrls.length / 2));
-        lazyManager.setGenerationGate(() => flipbook.isTextureWorkSafe());
+        let readyReported = false;
+        lazyManager.setGenerationGate(() => readyReported && flipbook.isTextureWorkSafe());
 
         // Preload rest of window around page 0
         lazyManager.updateActiveWindow(0, (faceIdx, textureUrl, directTexture) => {
@@ -203,15 +203,19 @@ export default function QbjectAuthenticExperience({
         });
 
         let lastPage = -1;
-        let readyReported = false;
+        let warmingTextures = false;
         const checkProgress = () => {
           if (!destroyed && flipbook) {
             const progress = Math.max(0.88, Math.min(1, flipbook.loadingProgress));
             setLoadingProgress((prev) => (Math.abs(prev - progress) > 0.005 ? progress : prev));
-            if (flipbook.isReady && !readyReported) {
-              readyReported = true;
-              setLoadingProgress(1);
-              setIsReady(true);
+            if (flipbook.isReady && !readyReported && !warmingTextures) {
+              warmingTextures = true;
+              flipbook.prepareOpeningTextures(initialFacesCount).then(() => {
+                if (destroyed) return;
+                readyReported = true;
+                setLoadingProgress(1);
+                setIsReady(true);
+              });
             }
             const current = Math.round((flipbook as any).progress?.getValue?.() || 0);
             if (current !== lastPage) {
