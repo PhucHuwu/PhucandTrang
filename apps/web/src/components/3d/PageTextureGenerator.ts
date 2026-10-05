@@ -39,7 +39,12 @@ function loadImageAsync(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
+    img.decoding = 'async';
+    img.onload = async () => {
+      // onload alone does not guarantee decoded pixels are ready for drawImage.
+      try { await img.decode(); } catch { /* Loaded images can still be drawable after decode rejection. */ }
+      resolve(img);
+    };
     img.onerror = () => {
       // Create a 1x1 transparent dummy image on error to prevent crashing
       const fallback = new Image();
@@ -668,6 +673,12 @@ export class PageTextureGenerator {
       } else {
         ctx.fillRect(-cardW / 2, -cardH / 2, cardW, cardH);
       }
+
+      // The opaque card casts the shadow; its photo, border and tape need no duplicate blur passes.
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
 
       // Border
       ctx.strokeStyle = s.borderColor || 'rgba(180, 160, 140, 0.25)';

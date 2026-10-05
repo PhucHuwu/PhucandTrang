@@ -261,27 +261,22 @@ export default class Page {
 		const curveStretch = Math.max(curve.getLength() / this.width, 1);
 
 		const position = this.mesh.geometry.attributes.position;
+		// Front, back and edge vertices share the same longitudinal cross-sections.
+		const sections = new Map<number, { x: number; y: number; nx: number; ny: number; thickness: number }>();
 		for (let i = 0; i < position.count; i++) {
 			const relCoord = this.vertexRelCoords[i];
-
-			// const pos = curve.getPoint(relCoord.z * (1 / curveStretch));
-			const pos = curve.getPointAt(relCoord.z * (1 / curveStretch));
-
-			// TODO: get direction from previous point?
-			// const direction =
-			// 	vectorToRadians(curve.getTangent(relCoord.z)) + Math.PI / 2;
-			const direction =
-				vectorToRadians(curve.getTangentAt(relCoord.z)) + Math.PI / 2;
-
-			const thickness = lerp(
-				this.rootThickness,
-				this.thickness,
-				relCoord.z,
-			);
+			let section = sections.get(relCoord.z);
+			if (!section) {
+				const pos = curve.getPointAt(relCoord.z / curveStretch);
+				const direction = vectorToRadians(curve.getTangentAt(relCoord.z)) + Math.PI / 2;
+				section = { x: pos.x, y: pos.y, nx: Math.cos(direction), ny: Math.sin(direction),
+					thickness: lerp(this.rootThickness, this.thickness, relCoord.z) };
+				sections.set(relCoord.z, section);
+			}
 
 			const sign = -Math.sign(relCoord.x - 0.5);
-			const newX = pos.x + Math.cos(direction) * (thickness / 2) * sign;
-			const newZ = pos.y + Math.sin(direction) * (thickness / 2) * sign;
+			const newX = section.x + section.nx * (section.thickness / 2) * sign;
+			const newZ = section.y + section.ny * (section.thickness / 2) * sign;
 			position.setX(i, newX);
 			position.setZ(i, newZ);
 		}
