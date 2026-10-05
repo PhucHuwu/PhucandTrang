@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -106,6 +106,23 @@ export default function VisualPageEditorDirectPage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [canvasScale, setCanvasScale] = useState(0.42);
+  const [mobilePanel, setMobilePanel] = useState<'canvas' | 'layers' | 'properties'>('canvas');
+  const canvasViewportRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const viewport = canvasViewportRef.current;
+    if (!viewport) return;
+    const fitCanvas = () => {
+      if (viewport.clientWidth === 0 || viewport.clientHeight === 0) return;
+      setCanvasScale(Math.max(0.1, Math.min(1,
+        (viewport.clientWidth - 32) / 1024,
+        (viewport.clientHeight - 32) / 1360)));
+    };
+    const observer = new ResizeObserver(fitCanvas);
+    observer.observe(viewport);
+    fitCanvas();
+    return () => observer.disconnect();
+  }, [loading, mobilePanel]);
 
   // Layout Picker Modal state
   const [showLayoutPicker, setShowLayoutPicker] = useState(false);
@@ -470,10 +487,22 @@ export default function VisualPageEditorDirectPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-[#0C0609] select-none text-parchment-100 font-sans">
+    <div className="page-editor flex flex-col h-[100dvh] min-w-0 overflow-hidden bg-[#0C0609] select-none text-parchment-100 font-sans">
+      <style jsx global>{`
+        .page-editor button:focus-visible, .page-editor a:focus-visible {
+          outline: 2px solid #FFE5B4;
+          outline-offset: 2px;
+        }
+        @media (max-width: 1279px) {
+          .page-editor button, .page-editor a { min-height: 44px; }
+          .page-editor button { min-width: 44px; }
+          .page-editor input:not([type="checkbox"]):not([type="range"]),
+          .page-editor select { min-height: 44px; }
+        }
+      `}</style>
       {/* Top Application Bar */}
-      <div className="h-14 bg-[#160D12] border-b border-rosewood-900/50 px-5 flex items-center justify-between shrink-0 z-30">
-        <div className="flex items-center gap-3">
+      <div className="bg-[#160D12] border-b border-rosewood-900/50 p-2 lg:px-5 flex flex-wrap items-center justify-between gap-2 shrink-0 z-30">
+        <div className="flex items-center gap-3 min-w-0 w-full 2xl:w-auto">
           <Link
             href="/admin/pages"
             className="p-1.5 rounded-lg bg-[#25151F] hover:bg-[#331C2A] text-stone-300 border border-rosewood-900/40 transition-colors"
@@ -481,8 +510,8 @@ export default function VisualPageEditorDirectPage() {
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
-          <div className="flex items-center gap-2">
-            <h1 className="font-serif font-bold text-sm tracking-wide text-parchment-100">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <h1 className="font-serif font-bold text-sm tracking-wide text-parchment-100 break-words">
               Trang {page.pageNumber === 0 ? 'Lời ngỏ' : page.pageNumber}: {page.title || '(Không tiêu đề)'}
             </h1>
             <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-rosewood-950 text-champagne-300 border border-rosewood-800/40">
@@ -501,7 +530,7 @@ export default function VisualPageEditorDirectPage() {
         </div>
 
         {/* Center Quick Action Bar (Undo/Redo + Snap + Add Elements + Layout Preset Picker) */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           {/* Undo & Redo */}
           <div className="flex items-center gap-0.5 bg-[#20111A] p-1 rounded-xl border border-rosewood-900/40 text-xs">
             <button
@@ -603,7 +632,7 @@ export default function VisualPageEditorDirectPage() {
         </div>
 
         {/* Right Action: Autosave Indicator, Preview & Publish & Save Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <AutosaveIndicator
             status={autosaveStatus}
             lastSavedTime={lastSavedTime}
@@ -675,10 +704,20 @@ export default function VisualPageEditorDirectPage() {
         </div>
       </div>
 
+      <nav aria-label="Khu vực trình chỉnh sửa" className="flex gap-2 p-2 bg-[#160D12] shrink-0 xl:hidden">
+        {(['canvas', 'layers', 'properties'] as const).map((panel) => (
+          <button key={panel} type="button" aria-pressed={mobilePanel === panel}
+            onClick={() => setMobilePanel(panel)}
+            className={`flex-1 min-h-11 rounded-lg text-xs font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-champagne-300 ${mobilePanel === panel ? 'bg-rosewood-700 text-white' : 'bg-[#25151F] text-stone-300'}`}>
+            {panel === 'canvas' ? 'Canvas' : panel === 'layers' ? 'Lớp' : 'Thuộc tính'}
+          </button>
+        ))}
+      </nav>
+
       {/* 3-Column Visual Layout */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
         {/* LEFT COLUMN: Layers Panel */}
-        <aside className="w-68 bg-[#140B10] border-r border-rosewood-900/40 flex flex-col justify-between shrink-0 overflow-hidden">
+        <aside className={`${mobilePanel === 'layers' ? 'flex' : 'hidden'} xl:flex w-full xl:w-64 bg-[#140B10] border-r border-rosewood-900/40 flex-col justify-between shrink-0 overflow-y-auto min-h-0`}>
           <LayersPanel
             elements={page.elements || []}
             selectedElementId={selectedElementId}
@@ -744,9 +783,9 @@ export default function VisualPageEditorDirectPage() {
         </aside>
 
         {/* CENTER COLUMN: React Konva Visual Canvas (Flex-1) */}
-        <main className="flex-1 flex flex-col bg-[#0A0407] overflow-hidden relative">
+        <main className={`${mobilePanel === 'layers' || mobilePanel === 'properties' ? 'hidden md:flex' : 'flex'} ${mobilePanel === 'layers' ? 'md:hidden' : ''} xl:flex flex-1 min-w-0 min-h-0 flex-col bg-[#0A0407] overflow-hidden relative`}>
           {/* Canvas Viewport Toolbar */}
-          <div className="h-10 bg-[#140B10] border-b border-rosewood-900/40 px-4 flex items-center justify-between text-xs text-stone-400 z-10 shrink-0">
+          <div className="min-h-11 bg-[#140B10] border-b border-rosewood-900/40 px-2 flex flex-wrap gap-2 items-center justify-between text-xs text-stone-400 z-10 shrink-0">
             <div className="flex items-center gap-2 font-mono text-[11px]">
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
               <span>Canvas 1024 × 1360px</span>
@@ -785,7 +824,7 @@ export default function VisualPageEditorDirectPage() {
           </div>
 
           {/* Interactive Konva Canvas Viewport */}
-          <div className="flex-1 flex items-center justify-center p-6 overflow-auto">
+          <div ref={canvasViewportRef} className="flex-1 min-h-0 min-w-0 flex items-center justify-center p-4 overflow-auto">
             <KonvaPageCanvas
               page={page}
               book={journal}
@@ -801,7 +840,7 @@ export default function VisualPageEditorDirectPage() {
         </main>
 
         {/* RIGHT COLUMN: Properties Panel (width: 320px) */}
-        <aside className="w-80 bg-[#140B10] border-l border-rosewood-900/40 flex flex-col justify-between shrink-0 overflow-y-auto">
+        <aside className={`${mobilePanel === 'properties' ? 'flex' : 'hidden'} xl:flex w-full md:w-80 bg-[#140B10] border-l border-rosewood-900/40 flex-col justify-between shrink-0 overflow-y-auto min-h-0`}>
           <div className="flex flex-col h-full">
             {/* Inspector Top Switcher (Tabs: Element vs Background vs Interaction vs Metadata) */}
             <div className="p-2 bg-[#1C0F16] border-b border-rosewood-900/40 grid grid-cols-4 gap-1 shrink-0 text-[11px]">
