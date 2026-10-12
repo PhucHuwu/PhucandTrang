@@ -173,7 +173,7 @@ function KonvaElementItem({
   // Text variant styling — shared with the pre-draw font load (see resolveKonvaTextFont)
   const { fontFamily, fontSize, fontStyle } = resolveKonvaTextFont(element);
 
-  const rawText = d?.text || (d?.textLines ? d.textLines.join('\n') : '');
+  const rawText = d?.text ?? (d?.textLines ? d.textLines.join('\n') : '');
   const displayText = varContext ? TextVariableResolver.resolve(rawText, varContext) : rawText;
 
   // Render polaroid frame if enabled
@@ -193,7 +193,7 @@ function KonvaElementItem({
     rawSrcH,
     maxImgW,
     maxImgH,
-    d?.objectFit || (usePolaroid ? 'contain' : 'cover'),
+    d?.objectFit || (element.type === 'IMAGE' ? 'contain' : 'cover'),
     d?.focalPoint || { x: 0.5, y: 0.5 }
   );
 
@@ -786,7 +786,8 @@ export default function KonvaPageCanvas({
               return newBox;
             }}
             anchorCornerRadius={3}
-            anchorSize={8}
+            anchorSize={Math.max(8, 20 / scale)}
+            anchorHitStrokeWidth={24 / scale}
             anchorStroke="#8C2437"
             anchorFill="#FFE5B4"
             borderStroke="#8C2437"

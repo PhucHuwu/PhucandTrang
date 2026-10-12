@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useAdminDialog } from '@/hooks/useAdminDialog';
 import {
   getAdminVersions,
   getAdminVersion,
@@ -41,6 +42,7 @@ export default function VersionHistoryModal({
   onRollbackSuccess,
 }: VersionHistoryModalProps) {
   const { isViewer, isAdmin } = useAdminAuth();
+  const dialogRef = useAdminDialog(isOpen, onClose);
 
   const [versions, setVersions] = useState<BookVersionItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,8 +152,8 @@ export default function VersionHistoryModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-      <div className="relative w-full max-w-4xl h-[85vh] bg-[#170E14] border border-rosewood-800/60 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-parchment-100">
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Lịch sử phiên bản" className="cms-dialog fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+      <div className="history-dialog relative w-full max-w-4xl h-[calc(100dvh-2rem)] bg-[#170E14] border border-rosewood-800/60 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-parchment-100">
         {/* Top Header */}
         <div className="p-4 sm:p-5 border-b border-rosewood-900/50 bg-[#1D1019] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
@@ -244,9 +246,9 @@ export default function VersionHistoryModal({
         )}
 
         {/* Content 2-Column Split: Versions List (Left) - Metadata Inspector (Right) */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="history-columns flex-1 min-h-0 flex overflow-hidden">
           {/* Left Column: Versions List */}
-          <div className="w-full sm:w-2/5 border-r border-rosewood-900/40 flex flex-col bg-[#140B10]">
+          <div className="history-list w-full sm:w-2/5 min-h-0 border-r border-rosewood-900/40 flex flex-col bg-[#140B10]">
             <div className="p-3 bg-[#1C0F16] border-b border-rosewood-900/40 flex items-center justify-between text-xs font-mono text-stone-400">
               <span>Danh sách ({versions.length})</span>
               <span>Mới nhất ở trên</span>
@@ -316,7 +318,7 @@ export default function VersionHistoryModal({
           </div>
 
           {/* Right Column: Metadata Inspector & Rollback Action */}
-          <div className="hidden sm:flex flex-1 flex-col bg-[#170E14] overflow-hidden">
+          <div className="history-detail flex flex-1 min-h-0 min-w-0 flex-col bg-[#170E14] overflow-auto">
             {loadingDetail ? (
               <div className="flex-1 flex flex-col items-center justify-center text-stone-500 text-xs">
                 <Loader2 className="w-6 h-6 animate-spin text-rosewood-400 mb-2" />

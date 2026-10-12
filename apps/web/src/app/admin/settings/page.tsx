@@ -224,7 +224,7 @@ export default function JournalSettingsDirectPage() {
   return (
     <div className="p-8 max-w-5xl mx-auto w-full space-y-6">
       {/* Top Header */}
-      <div className="flex items-center justify-between border-b border-rosewood-900/40 pb-5">
+      <div className="flex flex-wrap gap-3 items-center justify-between border-b border-rosewood-900/40 pb-5">
         <div className="flex items-center gap-3">
           <Link
             href="/admin"
@@ -641,7 +641,7 @@ export default function JournalSettingsDirectPage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-5">
               <div>
                 <label className="block text-xs font-medium text-stone-300 mb-1.5">Chiều rộng trang 3D (pageWidth)</label>
                 <input
@@ -746,7 +746,7 @@ export default function JournalSettingsDirectPage() {
             </div>
 
             {atmospheric.enabled && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-3">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-5 pt-3">
                 <div>
                   <label className="block text-xs font-medium text-stone-300 mb-1.5">Số lượng bướm bay (butterflyCount)</label>
                   <input
@@ -856,7 +856,7 @@ export default function JournalSettingsDirectPage() {
                             }
                           }
                         }}
-                        className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition ${
+                        className={`flex flex-wrap gap-2 items-center justify-between p-2.5 rounded-xl border cursor-pointer transition ${
                           isSelected
                             ? 'bg-rosewood-900/60 border-rosewood-600/70 text-white font-medium shadow-sm'
                             : 'bg-[#25151F] border-rosewood-900/40 text-stone-400 hover:text-stone-200 hover:bg-[#2C1825]'

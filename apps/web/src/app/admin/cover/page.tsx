@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import EditorWorkspace from '@/components/admin/EditorWorkspace';
+import { useCanvasViewport } from '@/hooks/useCanvasViewport';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import {
@@ -65,7 +67,6 @@ export default function BookCoverEditorPage() {
   const [editingActiveArea, setEditingActiveArea] = useState(false);
 
   // Viewport zoom & snapping
-  const [canvasScale, setCanvasScale] = useState(0.42);
   const [snappingEnabled, setSnappingEnabled] = useState(true);
 
   // Media picker cache
@@ -73,6 +74,7 @@ export default function BookCoverEditorPage() {
 
   // Virtual Page representing current cover side for the visual editor engine
   const [virtualPage, setVirtualPage] = useState<Page | null>(null);
+  const { viewportRef, scale: canvasScale, zoom: setCanvasScale, fitViewport } = useCanvasViewport(Boolean(virtualPage));
 
   // Undo / Redo History Hook
   const {
@@ -310,7 +312,7 @@ export default function BookCoverEditorPage() {
       case 'IMAGE':
         defaultData = {
           src: 'https://res.cloudinary.com/dlvpiesfj/image/upload/v1789389698/phuc_trang_memories/her-pic-1.jpg',
-          objectFit: 'cover',
+          objectFit: 'contain',
         };
         defaultStyle = { polaroidFrame: true, washiTape: true };
         break;
@@ -459,9 +461,9 @@ export default function BookCoverEditorPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-[#0C0609] select-none text-parchment-100 font-sans">
+    <div className="editor-root flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-[#0C0609] select-none text-parchment-100 font-sans">
       {/* Top Application Bar */}
-      <div className="h-14 bg-[#160D12] border-b border-rosewood-900/50 px-5 flex items-center justify-between shrink-0 z-30">
+      <div className="min-h-14 bg-[#160D12] border-b border-rosewood-900/50 p-2 flex flex-wrap gap-2 items-center justify-between shrink-0 z-30">
         <div className="flex items-center gap-3">
           <Link
             href="/admin"
@@ -577,9 +579,9 @@ export default function BookCoverEditorPage() {
       )}
 
       {/* Main 3-Column Studio Layout */}
-      <div className="flex-1 flex overflow-hidden">
+      <EditorWorkspace>
         {/* LEFT COLUMN: Layers Panel */}
-        <aside className="w-68 bg-[#140B10] border-r border-rosewood-900/40 flex flex-col justify-between shrink-0 overflow-hidden">
+        <aside className="editor-layers bg-[#140B10] border-r border-rosewood-900/40 flex-col justify-between shrink-0 overflow-y-auto">
           <LayersPanel
             elements={virtualPage.elements}
             selectedElementId={selectedElementId}
@@ -608,9 +610,9 @@ export default function BookCoverEditorPage() {
         </aside>
 
         {/* CENTER COLUMN: Visual Konva Canvas Viewport */}
-        <main className="flex-1 flex flex-col bg-[#0A0407] overflow-hidden relative">
+        <main className="editor-canvas flex-1 min-w-0 min-h-0 flex flex-col bg-[#0A0407] overflow-hidden relative">
           {/* Top Quick Elements Add Bar */}
-          <div className="h-10 bg-[#140B10] border-b border-rosewood-900/40 px-4 flex items-center justify-between text-xs shrink-0">
+          <div className="min-h-11 bg-[#140B10] border-b border-rosewood-900/40 px-2 flex flex-wrap gap-2 items-center justify-between text-xs shrink-0">
             <div className="flex items-center gap-1.5 font-mono text-[11px] text-stone-400">
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
               <span>Bìa Canvas 1024 × 1360px</span>
@@ -679,9 +681,9 @@ export default function BookCoverEditorPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setCanvasScale(0.42)}
+                onClick={fitViewport}
                 className="p-1 rounded bg-[#20111A] hover:bg-rosewood-800 text-stone-300"
-                title="Chuẩn 42%"
+                title="Vừa vùng làm việc"
               >
                 <Maximize2 className="w-3.5 h-3.5" />
               </button>
@@ -689,7 +691,7 @@ export default function BookCoverEditorPage() {
           </div>
 
           {/* Konva Canvas Rendering Virtual Cover Page */}
-          <div className="flex-1 flex items-center justify-center p-6 overflow-auto">
+          <div ref={viewportRef} className="flex-1 min-h-0 min-w-0 flex items-center justify-center p-4 overflow-auto">
             <KonvaPageCanvas
               page={virtualPage}
               book={journal}
@@ -705,7 +707,7 @@ export default function BookCoverEditorPage() {
         </main>
 
         {/* RIGHT COLUMN: Properties Panel */}
-        <aside className="w-80 bg-[#140B10] border-l border-rosewood-900/40 flex flex-col justify-between shrink-0 overflow-y-auto">
+        <aside className="editor-properties bg-[#140B10] border-l border-rosewood-900/40 flex-col justify-between shrink-0 overflow-y-auto">
           <div className="flex flex-col h-full">
             {/* Inspector Tab Switcher */}
             <div className="p-2.5 bg-[#1C0F16] border-b border-rosewood-900/40 flex items-center gap-1.5 shrink-0">
@@ -839,7 +841,7 @@ export default function BookCoverEditorPage() {
             </div>
           </div>
         </aside>
-      </div>
+      </EditorWorkspace>
     </div>
   );
 }

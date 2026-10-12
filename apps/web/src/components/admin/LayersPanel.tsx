@@ -256,7 +256,10 @@ export default function LayersPanel({
               onDragOver={(e) => handleDragOver(e, index)}
               onDrop={() => handleDrop(index)}
               onClick={() => onSelectElement(el.id)}
-              className={`group relative flex items-center justify-between px-2 py-1.5 rounded-xl text-xs cursor-pointer select-none transition-all ${
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onSelectElement(el.id); } }}
+              className={`group relative flex flex-wrap gap-2 items-center justify-between px-2 py-1.5 rounded-xl text-xs cursor-pointer select-none transition-all ${
                 isSelected
                   ? 'bg-rosewood-600 text-white font-medium shadow-md'
                   : 'bg-[#1E1119] text-stone-400 hover:text-white hover:bg-[#2A1622]'
@@ -317,13 +320,13 @@ export default function LayersPanel({
 
               {/* Action Buttons */}
               {!isViewer && (
-                <div className="flex items-center gap-0.5 text-stone-400 shrink-0">
+                <div className="flex flex-wrap items-center gap-1 text-stone-400 shrink-0 max-w-full">
                   {/* Rename label button */}
                   {!isEditing && (
                     <button
                       type="button"
                       onClick={(e) => startEditingLabel(el, e)}
-                      className="p-1 rounded opacity-0 group-hover:opacity-100 hover:text-white transition"
+                      className="p-1 rounded hover:text-white transition"
                       title="Đổi tên layer"
                     >
                       <Edit2 className="w-3 h-3" />
@@ -338,7 +341,7 @@ export default function LayersPanel({
                         e.stopPropagation();
                         onDuplicateElement();
                       }}
-                      className="p-1 rounded opacity-0 group-hover:opacity-100 hover:text-white transition"
+                      className="p-1 rounded hover:text-white transition"
                       title="Nhân bản layer"
                     >
                       <Copy className="w-3 h-3" />
@@ -382,7 +385,7 @@ export default function LayersPanel({
                       e.stopPropagation();
                       onDeleteElement(el.id);
                     }}
-                    className="p-1 rounded opacity-0 group-hover:opacity-100 hover:text-red-400 transition"
+                    className="p-1 rounded hover:text-red-400 transition"
                     title="Xóa layer"
                   >
                     <Trash2 className="w-3 h-3" />

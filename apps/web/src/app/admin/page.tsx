@@ -81,7 +81,7 @@ export default function AdminDashboardPage() {
     : 'Chưa ghi nhận';
 
   return (
-    <div className="p-8 max-w-7xl mx-auto w-full space-y-6">
+    <div className="p-4 lg:p-6 max-w-7xl mx-auto w-full min-w-0 space-y-6">
       {/* Top Welcome Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rosewood-900/40 pb-5">
         <div>
@@ -98,7 +98,7 @@ export default function AdminDashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={() => refreshJournal()}
             className="p-2.5 rounded-xl bg-[#201319] hover:bg-[#2C1923] text-parchment-300 border border-rosewood-900/40 transition-colors"

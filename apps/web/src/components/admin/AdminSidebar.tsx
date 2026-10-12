@@ -71,7 +71,7 @@ export default function AdminSidebar() {
   ];
 
   return (
-    <aside className="w-64 bg-[#180E13] border-r border-rosewood-900/40 flex flex-col justify-between select-none text-parchment-200 shrink-0">
+    <aside className="w-64 max-w-full min-h-full bg-[#180E13] border-r border-rosewood-900/40 flex flex-col justify-between select-none text-parchment-200 shrink-0">
       {/* Brand Header */}
       <div>
         <div className="p-5 border-b border-rosewood-900/40 flex items-center gap-3">
@@ -95,7 +95,8 @@ export default function AdminSidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                aria-current={isActive ? 'page' : undefined}
+                className={`flex min-h-11 items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
                   isActive
                     ? 'bg-rosewood-600/30 text-champagne-300 font-semibold border border-rosewood-500/40 shadow-sm'
                     : 'text-stone-400 hover:text-parchment-100 hover:bg-[#25151F]'

@@ -148,7 +148,7 @@ export default function AdminLayoutTemplatesPage() {
   return (
     <div className="p-8 max-w-7xl mx-auto w-full space-y-6">
       {/* Top Header */}
-      <div className="flex items-center justify-between border-b border-rosewood-900/40 pb-5">
+      <div className="flex flex-wrap gap-3 items-center justify-between border-b border-rosewood-900/40 pb-5">
         <div className="flex items-center gap-3">
           <Link
             href="/admin/pages"
@@ -189,9 +189,9 @@ export default function AdminLayoutTemplatesPage() {
           <span>Đang nạp danh sách layout template...</span>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="template-workspace grid grid-cols-1 gap-6 items-start">
           {/* Template Cards List (7 cols) */}
-          <div className="lg:col-span-7 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="template-list grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-4">
             {templates.map((tpl) => {
               const isSelected = selectedTemplate?.id === tpl.id;
               const slotsCount = Array.isArray(tpl.slots) ? tpl.slots.length : 0;
@@ -239,7 +239,7 @@ export default function AdminLayoutTemplatesPage() {
           </div>
 
           {/* Template Inspector (5 cols) */}
-          <div className="lg:col-span-5 bg-[#180E14] border border-rosewood-900/40 rounded-2xl p-5 shadow-xl sticky top-6 space-y-4">
+          <div className="template-detail min-w-0 bg-[#180E14] border border-rosewood-900/40 rounded-2xl p-5 shadow-xl space-y-4">
             {selectedTemplate ? (
               <>
                 <div className="flex items-start justify-between border-b border-rosewood-900/40 pb-3 gap-2">

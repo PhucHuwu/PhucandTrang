@@ -9,6 +9,8 @@ node_modules/
 **/out/
 **/dist/
 coverage/
+**/test-results/
+**/playwright-report/
 *.tsbuildinfo
 
 # Local media mirrors are not committed; production uses Cloudinary CDN

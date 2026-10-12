@@ -255,7 +255,7 @@ export default function AdminMediaPage() {
           <p className="text-xs text-stone-500 mt-1">Bấm &quot;Tải lên Media&quot; để thêm ảnh hoặc video đầu tiên.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,160px),1fr))] gap-4">
           {mediaItems.map((item) => {
             const isVideo = item.type === 'VIDEO';
             const isAudio = item.type === 'AUDIO';

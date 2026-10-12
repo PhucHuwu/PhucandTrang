@@ -29,7 +29,7 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-[#1C0D15] via-[#12070D] to-[#0A0407] p-4">
+    <div className="min-h-[100dvh] w-full flex items-center justify-center bg-gradient-to-br from-[#1C0D15] via-[#12070D] to-[#0A0407] p-4">
       {/* Decorative warm aura */}
       <div className="absolute w-[500px] h-[500px] rounded-full bg-rosewood-600/15 blur-[120px] pointer-events-none" />
 

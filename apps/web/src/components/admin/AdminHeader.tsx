@@ -5,14 +5,15 @@ import Link from 'next/link';
 import { useAdminAuth } from '@/context/AdminAuthContext';
 import { LogOut, ExternalLink, ShieldCheck, Eye } from 'lucide-react';
 
-export default function AdminHeader() {
+export default function AdminHeader({ onMenu }: { onMenu: () => void }) {
   const { user, logout } = useAdminAuth();
 
   return (
-    <header className="h-16 bg-[#160D12] border-b border-rosewood-900/40 px-6 flex items-center justify-between shrink-0 select-none z-20">
+    <header className="min-h-14 bg-[#160D12] border-b border-rosewood-900/40 px-2 lg:px-4 py-1 flex flex-wrap gap-2 items-center justify-between shrink-0 select-none z-20">
       {/* Left: Single Admin Badge */}
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-rosewood-950/80 border border-rosewood-500/50 text-champagne-300 text-xs font-mono font-semibold">
+        <button type="button" onClick={onMenu} className="min-h-11 px-3 rounded-lg bg-[#25151F] text-sm">Menu</button>
+        <div className="hidden min-[1200px]:flex items-center gap-1.5 px-3 py-1 rounded-full bg-rosewood-950/80 border border-rosewood-500/50 text-champagne-300 text-xs font-mono font-semibold">
           <ShieldCheck className="w-3.5 h-3.5 text-rosewood-400" />
           <span>Quản Trị Viên (Admin)</span>
         </div>
@@ -48,7 +49,7 @@ export default function AdminHeader() {
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-rosewood-700 to-rosewood-900 border border-rosewood-500/40 flex items-center justify-center text-champagne-200 text-xs font-serif font-bold shadow">
               {(user.name || user.email || 'A').charAt(0).toUpperCase()}
             </div>
-            <div className="hidden md:block text-left">
+            <div className="hidden min-[1400px]:block text-left">
               <p className="text-xs font-medium text-parchment-100 leading-tight">{user.name || 'Quản trị viên'}</p>
               <p className="text-[10px] font-mono text-stone-400">{user.email || 'admin'}</p>
             </div>

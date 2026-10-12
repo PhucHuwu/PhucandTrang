@@ -34,7 +34,7 @@ export default function AdvancedImageEditor({
   const [showMediaPicker, setShowMediaPicker] = useState(false);
 
   // When image is chosen from Media Library or newly uploaded
-  const handleMediaSelect = (selected: { mediaId: string; url: string; alt?: string }) => {
+  const handleMediaSelect = (selected: { mediaId: string; url: string; alt?: string; width?: number | null; height?: number | null }) => {
     onChange((el) => ({
       ...el,
       data: {
@@ -42,6 +42,8 @@ export default function AdvancedImageEditor({
         mediaId: selected.mediaId, // Canonical DB reference
         src: selected.url, // Runtime preview URL
         alt: selected.alt || (el.data as any)?.alt || 'Ảnh kỷ niệm',
+        objectFit: 'contain',
+        aspectRatio: selected.width && selected.height ? selected.width / selected.height : undefined,
       },
     }));
   };
@@ -68,7 +70,7 @@ export default function AdvancedImageEditor({
         <div className="flex items-center gap-3">
           <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-[#10070D] border border-rosewood-900/60 shrink-0">
             {d.src ? (
-              <img src={d.src} alt={d.alt || ''} className="w-full h-full object-cover" />
+              <img src={d.src} alt={d.alt || ''} className="w-full h-full object-contain" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-stone-600">
                 <ImageIcon className="w-6 h-6" />
@@ -135,19 +137,19 @@ export default function AdvancedImageEditor({
                   }))
                 }
                 className={`py-1.5 rounded-lg text-xs font-medium capitalize transition-all ${
-                  (d.objectFit || 'cover') === fitMode
+                  (d.objectFit || 'contain') === fitMode
                     ? 'bg-rosewood-600 text-white font-semibold shadow'
                     : 'text-stone-400 hover:text-white hover:bg-[#25151F]'
                 }`}
               >
-                {fitMode}
+                {fitMode === 'contain' ? 'Giữ tỷ lệ' : fitMode === 'cover' ? 'Cắt vừa khung' : 'Kéo giãn'}
               </button>
             ))}
           </div>
         </div>
 
         {/* FocalPoint X / Y (Only applicable when objectFit = cover) */}
-        {(d.objectFit || 'cover') === 'cover' && (
+        {(d.objectFit || 'contain') === 'cover' && (
           <div className="space-y-2 pt-1">
             <div className="flex items-center justify-between text-[11px] text-stone-300">
               <span className="font-medium">Điểm neo căn chỉnh (focalPoint)</span>

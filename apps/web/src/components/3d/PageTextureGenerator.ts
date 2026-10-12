@@ -688,7 +688,7 @@ export class PageTextureGenerator {
     const maxImgW = Math.max(10, boxW - padding * 2);
     const maxImgH = Math.max(10, boxH - padding * 2 - captionSpace);
 
-    const objectFit = el.data.objectFit || (usePolaroid ? 'contain' : 'cover');
+    const objectFit = el.data.objectFit || 'contain';
     const focalPoint = el.data.focalPoint || { x: 0.5, y: 0.5 };
     const fit = computeImageFit(srcW, srcH, maxImgW, maxImgH, objectFit, focalPoint);
 
@@ -726,8 +726,8 @@ export class PageTextureGenerator {
     }
 
     // Draw Image with exact fit coordinates
-    const imgX = -cardW / 2 + padding + fit.dx;
-    const imgY = -cardH / 2 + padding + fit.dy;
+    const imgX = -cardW / 2 + padding;
+    const imgY = -cardH / 2 + padding;
     ctx.drawImage(img, fit.sx, fit.sy, fit.sw, fit.sh, imgX, imgY, fit.dw, fit.dh);
 
     // Optional Washi Tape on top

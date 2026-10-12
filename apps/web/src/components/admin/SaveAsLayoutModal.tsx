@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useAdminDialog } from '@/hooks/useAdminDialog';
 import { Page } from '@/types/book';
 import { extractLayoutDefinitionFromPage } from '@/templates/layoutPresets';
 import { createAdminLayoutTemplate } from '@/services/adminApi';
@@ -24,6 +25,7 @@ export default function SaveAsLayoutModal({
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dialogRef = useAdminDialog(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -83,8 +85,8 @@ export default function SaveAsLayoutModal({
   const elementsCount = (page.elements || []).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in select-none">
-      <div className="relative w-full max-w-md bg-[#180E14] border border-rosewood-800/60 rounded-2xl shadow-2xl overflow-hidden text-parchment-100 flex flex-col">
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Lưu bố cục" className="cms-dialog fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in select-none">
+      <div className="relative w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto bg-[#180E14] border border-rosewood-800/60 rounded-2xl shadow-2xl text-parchment-100 flex flex-col">
         {/* Header */}
         <div className="h-14 px-5 bg-[#20111A] border-b border-rosewood-900/40 flex items-center justify-between">
           <div className="flex items-center gap-2.5">

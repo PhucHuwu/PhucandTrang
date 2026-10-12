@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useAdminDialog } from '@/hooks/useAdminDialog';
 import Link from 'next/link';
 import {
   ValidationReport,
@@ -37,6 +38,7 @@ export default function PublishValidationModal({
   onPublishSuccess,
 }: PublishValidationModalProps) {
   const [publishing, setPublishing] = useState(false);
+  const dialogRef = useAdminDialog(isOpen && Boolean(report), onClose);
   const [changelog, setChangelog] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -65,8 +67,8 @@ export default function PublishValidationModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-      <div className="relative w-full max-w-2xl bg-[#170E14] border border-rosewood-800/60 rounded-2xl shadow-2xl flex flex-col max-h-[88vh] overflow-hidden text-parchment-100">
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Kiểm tra xuất bản" className="cms-dialog fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+      <div className="relative w-full max-w-2xl bg-[#170E14] border border-rosewood-800/60 rounded-2xl shadow-2xl flex flex-col max-h-[calc(100dvh-2rem)] overflow-hidden text-parchment-100">
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-rosewood-900/50 bg-[#1D1019] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">

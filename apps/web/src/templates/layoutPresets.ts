@@ -414,7 +414,7 @@ export function applyLayoutTemplate(
             data: {
               src: mediaItem.src,
               aspectRatio: mediaItem.aspectRatio,
-              objectFit: 'cover',
+              objectFit: 'contain',
               mediaId: mediaItem.mediaId,
             },
             style: { polaroidFrame: true, washiTape: true },

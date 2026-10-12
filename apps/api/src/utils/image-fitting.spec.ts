@@ -1,6 +1,21 @@
 import { computeImageFit } from '@phucandtrang/shared';
 
 describe('Image & Background Fitting Calculation (Req 9 & 10)', () => {
+  it.each([
+    [4000, 2000, 240, 600],
+    [2000, 4000, 600, 240],
+    [3000, 3000, 420, 180],
+  ])('preserves the complete %sx%s image in a %sx%s layout slot by default', (srcW, srcH, boxW, boxH) => {
+    const fit = computeImageFit(srcW, srcH, boxW, boxH);
+    expect(fit.sw).toBe(srcW);
+    expect(fit.sh).toBe(srcH);
+    expect(fit.sx).toBe(0);
+    expect(fit.sy).toBe(0);
+    expect(fit.dw / fit.dh).toBeCloseTo(srcW / srcH);
+    expect(fit.dw).toBeLessThanOrEqual(boxW);
+    expect(fit.dh).toBeLessThanOrEqual(boxH);
+  });
+
   it('should compute contain fit without cropping source', () => {
     // 400x200 source into 100x100 box
     const fit = computeImageFit(400, 200, 100, 100, 'contain');

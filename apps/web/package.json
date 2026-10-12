@@ -5,11 +5,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test:responsive": "playwright test"
   },
   "dependencies": {
-    "@phucandtrang/shared": "1.0.0",
     "@gsap/react": "^2.1.2",
+    "@phucandtrang/shared": "1.0.0",
     "@types/three": "^0.186.0",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
@@ -24,6 +25,7 @@
     "three": "^0.186.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^22.13.10",

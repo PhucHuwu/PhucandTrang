@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useAdminDialog } from '@/hooks/useAdminDialog';
 import { getAdminLayoutTemplates } from '@/services/adminApi';
 import { LayoutPresetDefinition } from '@/templates/layoutPresets';
 import {
@@ -32,6 +33,7 @@ export default function LayoutPresetPicker({
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string>(currentTemplateId || 'single-hero');
   const [showConfirm, setShowConfirm] = useState(false);
+  const dialogRef = useAdminDialog(isOpen, onClose);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -81,8 +83,8 @@ export default function LayoutPresetPicker({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in select-none">
-      <div className="relative w-full max-w-4xl bg-[#180E14] border border-rosewood-800/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Chọn bố cục" className="cms-dialog fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in select-none">
+      <div className="relative w-full max-w-4xl bg-[#180E14] border border-rosewood-800/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)]">
         {/* Header */}
         <div className="h-14 px-6 bg-[#20111A] border-b border-rosewood-900/40 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">

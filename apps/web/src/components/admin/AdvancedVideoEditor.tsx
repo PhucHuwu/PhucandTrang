@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useAdminDialog } from '@/hooks/useAdminDialog';
 import { VideoElement, VideoElementData, ElementStyle } from '@/types/book';
 import MediaPickerModal from '@/components/admin/MediaPickerModal';
 import { safeParseFloat } from '@phucandtrang/shared';
@@ -38,6 +39,7 @@ export default function AdvancedVideoEditor({
   // Picker states: 'video' | 'poster' | null
   const [pickerTarget, setPickerTarget] = useState<'video' | 'poster' | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const previewRef = useAdminDialog(showPreviewModal, () => setShowPreviewModal(false));
 
   // Handle media selection for video source or poster image
   const handleMediaSelect = (selected: { mediaId: string; url: string; alt?: string }) => {
@@ -359,8 +361,8 @@ export default function AdvancedVideoEditor({
 
       {/* Video Preview Modal */}
       {showPreviewModal && d.src && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
-          <div className="relative w-full max-w-2xl bg-[#160D12] border border-rosewood-800/60 rounded-2xl overflow-hidden shadow-2xl p-4 space-y-3">
+        <div ref={previewRef} role="dialog" aria-modal="true" aria-label="Xem thử video" className="cms-dialog fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto bg-[#160D12] border border-rosewood-800/60 rounded-2xl shadow-2xl p-4 space-y-3">
             <div className="flex items-center justify-between border-b border-rosewood-900/40 pb-2">
               <h4 className="font-serif font-bold text-sm text-champagne-300 flex items-center gap-2">
                 <Film className="w-4 h-4 text-amber-400" />

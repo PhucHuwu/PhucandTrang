@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
+import { useAdminDialog } from '@/hooks/useAdminDialog';
 import {
   getAdminMedia,
   requestSignedUpload,
@@ -23,7 +24,7 @@ import {
 interface MediaPickerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (media: { mediaId: string; url: string; alt?: string }) => void;
+  onSelect: (media: { mediaId: string; url: string; alt?: string; width?: number | null; height?: number | null }) => void;
   filterType?: MediaType;
   title?: string;
 }
@@ -43,6 +44,7 @@ export default function MediaPickerModal({
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const dialogRef = useAdminDialog(isOpen, onClose);
 
   const fetchMedia = async () => {
     setLoading(true);
@@ -105,6 +107,8 @@ export default function MediaPickerModal({
         mediaId: savedMedia.id,
         url: savedMedia.url,
         alt: savedMedia.alt || undefined,
+        width: savedMedia.width,
+        height: savedMedia.height,
       });
       onClose();
     } catch (err: any) {
@@ -125,13 +129,15 @@ export default function MediaPickerModal({
       mediaId: currentSelected.id,
       url: currentSelected.url,
       alt: currentSelected.alt || undefined,
+      width: currentSelected.width,
+      height: currentSelected.height,
     });
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in select-none">
-      <div className="relative w-full max-w-4xl bg-[#180E14] border border-rosewood-800/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] text-parchment-100">
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} className="cms-dialog fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in select-none">
+      <div className="relative w-full max-w-4xl bg-[#180E14] border border-rosewood-800/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)] text-parchment-100">
         {/* Header */}
         <div className="h-14 px-6 bg-[#20111A] border-b border-rosewood-900/40 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
@@ -233,7 +239,7 @@ export default function MediaPickerModal({
                       <img
                         src={m.url}
                         alt={m.alt || ''}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        className="w-full h-full object-contain"
                       />
                     )}
 

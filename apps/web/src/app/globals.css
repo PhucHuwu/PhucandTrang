@@ -34,6 +34,54 @@
 @tailwind components;
 @tailwind utilities;
 
+.cms-content { container-type: inline-size; }
+.editor-workspace { container-type: inline-size; }
+.editor-layers, .editor-properties { display: none; width: 320px; max-width: 100%; }
+.editor-workspace[data-panel="layers"] .editor-layers,
+.editor-workspace[data-panel="properties"] .editor-properties {
+  display: flex; position: absolute; inset: 0 0 0 auto; z-index: 25;
+  width: min(100%, 360px); box-shadow: -8px 0 24px #0008;
+}
+.editor-canvas { display: flex; }
+.editor-canvas > div:last-child { align-items: safe center; justify-content: safe center; }
+.editor-canvas canvas { touch-action: none; }
+.editor-root > div:first-of-type { flex-wrap: wrap; gap: 8px; height: auto; }
+.editor-tools-menu { position: absolute; top: 100%; right: 0; width: min(560px, 90vw); max-height: 60dvh; overflow-y: auto; z-index: 40; border: 1px solid #542030; border-radius: 12px; }
+@container (min-width: 900px) {
+  .editor-workspace[data-panel="layers"] .editor-layers,
+  .editor-workspace[data-panel="properties"] .editor-properties {
+    position: static; width: 300px; box-shadow: none;
+  }
+}
+@container (min-width: 1200px) {
+  .editor-panel-nav { display: none; }
+  .editor-columns > .editor-layers { display: flex; position: static; width: 256px; box-shadow: none; }
+  .editor-columns > .editor-properties { display: flex; position: static; width: 320px; box-shadow: none; }
+}
+.cms-shell :is(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid #ffe5b4; outline-offset: 2px;
+}
+.cms-shell header :is(button, a) { min-height: 44px; min-width: 44px; }
+.cms-shell input, .cms-shell select, .cms-shell textarea { max-width: 100%; }
+.cms-dialog > div { min-height: 0; }
+.cms-dialog :is(button, a) { min-height: 44px; min-width: 44px; }
+.cms-dialog :is(input, select, textarea) { font-size: 16px; }
+.cms-dialog :focus-visible { outline: 2px solid #ffe5b4; outline-offset: 2px; }
+@container (min-width: 1100px) {
+  .template-workspace { grid-template-columns: minmax(0, 7fr) minmax(320px, 5fr); }
+}
+@media (max-width: 639px) {
+  .history-columns { flex-direction: column; }
+  .history-list { flex: 0 0 35%; width: 100%; }
+  .history-detail { flex: 1; }
+}
+@media (pointer: coarse) {
+  .cms-shell :is(button, input:not([type="checkbox"]):not([type="range"]), select) { min-height: 44px; }
+  .cms-shell button { min-width: 44px; }
+.cms-shell :is(input, select, textarea) { font-size: 16px; }
+  .cms-shell .opacity-0 { opacity: 1; }
+}
+
 @layer base {
   :root {
     --paper-bg: #FDFBF7;

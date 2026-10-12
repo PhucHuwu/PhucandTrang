@@ -63,7 +63,7 @@ export default function AdvancedTextEditor({
     });
   }, [book, page]);
 
-  const rawText = d.text || (d.textLines ? d.textLines.join('\n') : '');
+  const rawText = d.text ?? (d.textLines ? d.textLines.join('\n') : '');
   const resolvedPreview = useMemo(() => {
     return TextVariableResolver.resolve(rawText, varContext);
   }, [rawText, varContext]);
@@ -77,6 +77,7 @@ export default function AdvancedTextEditor({
       data: {
         ...el.data,
         text: newText,
+        textLines: [],
       },
     }));
   };
@@ -102,6 +103,7 @@ export default function AdvancedTextEditor({
               data: {
                 ...el.data,
                 text: e.target.value,
+                textLines: [],
               },
             }))
           }
