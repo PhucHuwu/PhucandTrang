@@ -24,8 +24,11 @@ for (const viewport of [{ width: 768, height: 1024 }, { width: 1024, height: 768
     for (const path of ['/admin', '/admin/media', '/admin/settings', '/admin/pages', '/admin/audio', '/admin/layout-templates', '/admin/versions', '/admin/pages/page-test', '/admin/cover']) {
       await page.goto(path);
       await expect(page.getByRole('button', { name: 'Menu', exact: true })).toBeVisible();
-      await page.getByRole('button', { name: 'Menu', exact: true }).click();
-      await expect(page.getByRole('dialog', { name: 'Menu quản trị' })).toBeVisible();
+      // In dev mode the button can render before hydration attaches handlers, so retry the click.
+      await expect(async () => {
+        await page.getByRole('button', { name: 'Menu', exact: true }).click();
+        await expect(page.getByRole('dialog', { name: 'Menu quản trị' })).toBeVisible({ timeout: 1000 });
+      }).toPass({ timeout: 15000 });
       await page.keyboard.press('Escape');
       await expect(page.getByRole('dialog', { name: 'Menu quản trị' })).toHaveCount(0);
       if (path.includes('page-test') || path.endsWith('/cover')) {
@@ -97,6 +100,31 @@ test('layout picker is reachable from the page header', async ({ page }) => {
   await page.getByRole('button', { name: 'Đổi bố cục', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Chọn bố cục' })).toBeVisible();
 });
+
+for (const viewport of [{ width: 375, height: 812 }, { width: 1024, height: 768 }]) {
+  test(`editor dialogs cover the header and close ${viewport.width}x${viewport.height}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.goto('/admin/pages/page-test');
+    await page.locator('.editor-workspace').waitFor();
+    for (const [button, name] of [['Đổi bố cục', 'Chọn bố cục'], ['Lưu Template', 'Lưu bố cục'], ['Lịch sử phiên bản', 'Lịch sử phiên bản']]) {
+      await page.getByRole('button', { name: button, exact: true }).click();
+      const dialog = page.getByRole('dialog', { name });
+      await expect(dialog).toBeVisible();
+      // Dialog sits above the editor header: the top-left corner hit-tests inside the dialog.
+      expect(await dialog.evaluate((d) => d.contains(document.elementFromPoint(4, 4)))).toBe(true);
+      const box = (await dialog.locator('.cms-dialog-panel').boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 0.5);
+      expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 0.5);
+      await expect(dialog.getByRole('button', { name: 'Đóng', exact: true })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(dialog).toHaveCount(0);
+    }
+    await page.getByRole('button', { name: 'Đổi bố cục', exact: true }).click();
+    await page.mouse.click(viewport.width - 2, 2);
+    if (viewport.width >= 640) await expect(page.getByRole('dialog', { name: 'Chọn bố cục' })).toHaveCount(0);
+  });
+}
 
 test('rotation retains edited text and selected properties panel', async ({ page }) => {
   await page.setViewportSize({ width: 834, height: 1194 });

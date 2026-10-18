@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAdminDialog } from '@/hooks/useAdminDialog';
+import DialogPortal from '@/components/admin/DialogPortal';
 import {
   getAdminVersions,
   getAdminVersion,
@@ -152,39 +153,43 @@ export default function VersionHistoryModal({
   if (!isOpen) return null;
 
   return (
-    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Lịch sử phiên bản" className="cms-dialog fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-      <div className="history-dialog relative w-full max-w-4xl h-[calc(100dvh-2rem)] bg-[#170E14] border border-rosewood-800/60 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-parchment-100">
+    <DialogPortal>
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Lịch sử phiên bản" className="cms-dialog fixed inset-0 z-[200] flex items-end sm:items-center justify-center sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+      <div className="cms-dialog-panel history-dialog relative w-full max-w-4xl h-[100dvh] sm:h-[calc(100dvh-2rem)] bg-[#170E14] border border-rosewood-800/60 sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-parchment-100">
         {/* Top Header */}
-        <div className="p-4 sm:p-5 border-b border-rosewood-900/50 bg-[#1D1019] flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-rosewood-600/20 border border-rosewood-500/40 flex items-center justify-center text-rosewood-400">
+        <div className="px-4 sm:px-5 py-3 border-b border-rosewood-900/50 bg-[#1D1019] flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="hidden sm:flex w-8 h-8 shrink-0 rounded-lg bg-rosewood-600/20 border border-rosewood-500/40 items-center justify-center text-rosewood-400">
               <History className="w-4 h-4" />
             </div>
-            <div>
-              <h2 className="font-serif text-lg font-bold text-champagne-300 leading-tight">
-                Lịch Sử Phiên Bản (Version History)
+            <div className="min-w-0">
+              <h2 className="font-serif text-base sm:text-lg font-bold text-champagne-300 leading-tight">
+                Lịch sử phiên bản
               </h2>
-              <p className="text-xs text-stone-400">
-                {bookTitle} • Quản lý snapshots và phục hồi bản nháp (Rollback Draft)
+              <p className="text-xs text-stone-400 truncate">
+                {bookTitle} • Snapshot và khôi phục bản nháp
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {!isViewer && (
               <button
                 type="button"
                 onClick={() => setShowCreateForm(!showCreateForm)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rosewood-900/60 hover:bg-rosewood-800/80 text-parchment-100 text-xs font-medium border border-rosewood-700/50 transition-colors"
+                aria-expanded={showCreateForm}
+                aria-label="Tạo snapshot mới"
+                className="flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl bg-rosewood-900/60 hover:bg-rosewood-800/80 text-parchment-100 text-xs font-medium border border-rosewood-700/50 transition-colors"
               >
-                <Plus className="w-3.5 h-3.5 text-champagne-300" />
-                <span>Tạo Snapshot Mới</span>
+                <Plus className="w-4 h-4 text-champagne-300" />
+                <span className="hidden sm:inline">Tạo snapshot</span>
               </button>
             )}
             <button
+              type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-rosewood-900/40 text-stone-400 hover:text-white transition-colors"
-              title="Đóng modal"
+              aria-label="Đóng"
+              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-rosewood-900/40 text-stone-400 hover:text-white transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -226,11 +231,11 @@ export default function VersionHistoryModal({
                 className="w-full px-3 py-1.5 bg-[#140A10] border border-rosewood-900/60 rounded-lg text-xs text-white placeholder-stone-600 focus:outline-none focus:border-rosewood-500"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 type="submit"
                 disabled={creating || !versionTag.trim()}
-                className="px-4 py-2 rounded-lg bg-rosewood-600 hover:bg-rosewood-500 text-white text-xs font-medium disabled:opacity-50 transition"
+                className="flex-1 sm:flex-initial px-4 py-2 rounded-lg bg-rosewood-600 hover:bg-rosewood-500 text-white text-xs font-medium disabled:opacity-50 transition"
               >
                 {creating ? 'Đang tạo...' : 'Lưu Snapshot'}
               </button>
@@ -277,10 +282,12 @@ export default function VersionHistoryModal({
                   });
 
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={ver.id}
+                      aria-pressed={isSelected}
                       onClick={() => handleInspectVersion(ver.id)}
-                      className={`group p-3 rounded-xl cursor-pointer border transition-all ${
+                      className={`group block w-full text-left p-3 rounded-xl cursor-pointer border transition-all ${
                         isSelected
                           ? 'bg-rosewood-900/60 border-rosewood-600/80 shadow-md'
                           : 'bg-[#1C1017] border-rosewood-900/30 hover:border-rosewood-800/60'
@@ -310,7 +317,7 @@ export default function VersionHistoryModal({
                           </span>
                         )}
                       </div>
-                    </div>
+                    </button>
                   );
                 })
               )}
@@ -325,11 +332,11 @@ export default function VersionHistoryModal({
                 <span>Đang tải thông tin chi tiết snapshot...</span>
               </div>
             ) : selectedVersion ? (
-              <div className="flex-1 flex flex-col justify-between overflow-y-auto p-6 space-y-6">
+              <div className="flex-1 flex flex-col justify-between overflow-y-auto p-4 sm:p-6 space-y-6">
                 <div className="space-y-5">
                   {/* Title & Tag */}
-                  <div className="border-b border-rosewood-900/40 pb-4 flex items-start justify-between">
-                    <div>
+                  <div className="border-b border-rosewood-900/40 pb-4 flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="px-2.5 py-0.5 rounded-full bg-rosewood-900/70 border border-rosewood-500/50 font-mono text-xs font-bold text-champagne-300">
                           {selectedVersion.version}
@@ -355,13 +362,13 @@ export default function VersionHistoryModal({
                         ) : (
                           <RotateCcw className="w-4 h-4" />
                         )}
-                        <span>Rollback Bản Nháp</span>
+                        <span>Khôi phục bản nháp</span>
                       </button>
                     )}
                   </div>
 
                   {/* Metadata Grid */}
-                  <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-3 text-xs">
                     <div className="p-3 rounded-xl bg-[#20111A] border border-rosewood-900/40 space-y-1">
                       <span className="text-[10px] font-mono text-stone-400 flex items-center gap-1">
                         <Calendar className="w-3 h-3 text-rosewood-400" />
@@ -377,7 +384,7 @@ export default function VersionHistoryModal({
                         <UserIcon className="w-3 h-3 text-rosewood-400" />
                         <span>Người thực hiện</span>
                       </span>
-                      <p className="font-sans font-medium text-parchment-200">
+                      <p className="font-sans font-medium text-parchment-200 break-words">
                         {selectedVersion.createdBy?.name || 'Hệ thống'}
                         {selectedVersion.createdBy?.email ? ` (${selectedVersion.createdBy.email})` : ''}
                       </p>
@@ -452,5 +459,6 @@ export default function VersionHistoryModal({
         </div>
       </div>
     </div>
+    </DialogPortal>
   );
 }

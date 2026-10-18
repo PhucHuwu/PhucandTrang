@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAdminDialog } from '@/hooks/useAdminDialog';
+import DialogPortal from '@/components/admin/DialogPortal';
 import { getAdminLayoutTemplates } from '@/services/adminApi';
 import { LayoutPresetDefinition } from '@/templates/layoutPresets';
 import {
@@ -33,7 +34,7 @@ export default function LayoutPresetPicker({
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string>(currentTemplateId || 'single-hero');
   const [showConfirm, setShowConfirm] = useState(false);
-  const dialogRef = useAdminDialog(isOpen, onClose);
+  const dialogRef = useAdminDialog(isOpen, () => (showConfirm ? setShowConfirm(false) : onClose()));
 
   useEffect(() => {
     if (!isOpen) return;
@@ -83,20 +84,21 @@ export default function LayoutPresetPicker({
   };
 
   return (
-    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Chọn bố cục" className="cms-dialog fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in select-none">
-      <div className="relative w-full max-w-4xl bg-[#180E14] border border-rosewood-800/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)]">
+    <DialogPortal>
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Chọn bố cục" className="cms-dialog fixed inset-0 z-[200] flex items-end sm:items-center justify-center sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in select-none">
+      <div className="cms-dialog-panel relative w-full max-w-4xl bg-[#180E14] border border-rosewood-800/60 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[100dvh] sm:max-h-[calc(100dvh-2rem)]">
         {/* Header */}
-        <div className="h-14 px-6 bg-[#20111A] border-b border-rosewood-900/40 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rosewood-600 to-rosewood-800 flex items-center justify-center text-champagne-300 shadow">
+        <div className="px-4 sm:px-6 py-3 bg-[#20111A] border-b border-rosewood-900/40 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="hidden sm:flex w-8 h-8 shrink-0 rounded-xl bg-gradient-to-tr from-rosewood-600 to-rosewood-800 items-center justify-center text-champagne-300 shadow">
               <LayoutGrid className="w-4 h-4" />
             </div>
-            <div>
-              <h3 className="font-serif font-bold text-sm text-parchment-100 tracking-wide">
-                Chọn Bố Cục Trang (Layout Preset Picker)
+            <div className="min-w-0">
+              <h3 className="font-serif font-bold text-base text-parchment-100 tracking-wide">
+                Chọn bố cục trang
               </h3>
-              <p className="text-[11px] text-rosewood-300/70 font-mono">
-                Áp dụng template vị trí, giữ nguyên toàn bộ ảnh và nội dung hiện có
+              <p className="text-[11px] text-rosewood-300/80">
+                Giữ nguyên toàn bộ ảnh và nội dung hiện có
               </p>
             </div>
           </div>
@@ -104,14 +106,15 @@ export default function LayoutPresetPicker({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-rosewood-900/50 transition-colors"
+            aria-label="Đóng"
+            className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg text-stone-400 hover:text-white hover:bg-rosewood-900/50 transition-colors"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content Area: Grid of Templates & Details */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-6 space-y-6">
           {loading ? (
             <div className="py-24 flex flex-col items-center justify-center text-stone-500 text-xs">
               <div className="w-8 h-8 rounded-full border-2 border-rosewood-500 border-t-transparent animate-spin mb-3" />
@@ -122,7 +125,7 @@ export default function LayoutPresetPicker({
               Chưa tải được mẫu bố cục nào. Hãy đóng cửa sổ này và thử lại.
             </p>
           ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,200px),1fr))] gap-4">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(min(calc(50%-0.375rem),200px),1fr))] gap-3 sm:gap-4">
               {templates.map((tpl) => {
                 const isSelected = tpl.id === selectedId;
                 const isCurrent = tpl.id === currentTemplateId;
@@ -130,19 +133,21 @@ export default function LayoutPresetPicker({
                 const protos: any[] = (tpl as any).elementPrototypes || (tpl as any).prototypes || [];
 
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={tpl.id}
+                    aria-pressed={isSelected}
                     onClick={() => setSelectedId(tpl.id)}
-                    className={`group relative p-4 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
+                    className={`group relative min-w-0 p-2.5 sm:p-4 rounded-2xl border text-left cursor-pointer transition-all duration-200 flex flex-col justify-between ${
                       isSelected
                         ? 'bg-[#291423] border-champagne-400 shadow-xl shadow-rosewood-950/60 ring-1 ring-champagne-400/40'
                         : 'bg-[#1D1018] border-rosewood-900/40 hover:border-rosewood-700/60 hover:bg-[#23141F]'
                     }`}
                   >
-                    <div>
+                    <div className="w-full min-w-0">
                       {/* Top Badges */}
-                      <div className="flex items-center justify-between gap-1 mb-2.5">
-                        <span className="font-serif font-bold text-xs text-parchment-100 group-hover:text-champagne-300 transition-colors">
+                      <div className="flex flex-wrap items-center justify-between gap-1 mb-2.5">
+                        <span className="min-w-0 font-serif font-bold text-xs text-parchment-100 group-hover:text-champagne-300 transition-colors">
                           {tpl.name}
                         </span>
                         <div className="flex items-center gap-1">
@@ -164,7 +169,7 @@ export default function LayoutPresetPicker({
                       </div>
 
                       {/* Schematic Diagram Thumbnail */}
-                      <div className="relative aspect-[3/4] w-full max-h-40 rounded-xl bg-[#10080D] border border-rosewood-900/40 mb-3 overflow-hidden p-2 flex flex-col justify-between">
+                      <div className="relative aspect-[3/4] w-full max-h-28 sm:max-h-40 rounded-xl bg-[#10080D] border border-rosewood-900/40 mb-3 overflow-hidden p-2 flex flex-col justify-between">
                         {/* Title guide line */}
                         <div className="h-1.5 w-1/2 bg-rosewood-700/60 rounded" />
                         <div className="h-1 w-3/4 bg-stone-700/40 rounded mt-1" />
@@ -197,16 +202,16 @@ export default function LayoutPresetPicker({
                         <div className="h-1 w-1/3 bg-stone-700/40 rounded self-end" />
                       </div>
 
-                      <p className="text-[11px] text-stone-400 line-clamp-2 leading-relaxed">
+                      <p className="hidden sm:block text-[11px] text-stone-400 line-clamp-2 leading-relaxed">
                         {tpl.description || 'Bố cục tự động dàn trang tối ưu'}
                       </p>
                     </div>
 
-                    <div className="mt-3 pt-2.5 border-t border-rosewood-900/40 flex items-center justify-between text-[10px] font-mono text-stone-500">
-                      <span>{slotsCount} vị trí (slots)</span>
+                    <div className="w-full mt-2 sm:mt-3 pt-2 sm:pt-2.5 border-t border-rosewood-900/40 flex items-center justify-between text-[10px] font-mono text-stone-500">
+                      <span>{slotsCount} vị trí</span>
                       {isSelected && <Check className="w-3.5 h-3.5 text-champagne-400" />}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -214,19 +219,17 @@ export default function LayoutPresetPicker({
         </div>
 
         {/* Footer Actions */}
-        <div className="h-16 px-6 bg-[#20111A] border-t border-rosewood-900/40 flex items-center justify-between shrink-0">
-          <div className="text-xs text-stone-400 flex items-center gap-1.5">
-            <Info className="w-4 h-4 text-rosewood-400" />
-            <span>
-              Áp dụng sẽ sắp xếp lại vị trí các phần tử theo layout mới, sau đó bạn vẫn có thể kéo thả tự do.
-            </span>
+        <div className="cms-dialog-footer px-4 sm:px-6 py-3 bg-[#20111A] border-t border-rosewood-900/40 flex items-center justify-between gap-3 shrink-0">
+          <div className="hidden md:flex text-xs text-stone-400 items-center gap-1.5 min-w-0">
+            <Info className="w-4 h-4 shrink-0 text-rosewood-400" />
+            <span>Sau khi áp dụng, bạn vẫn có thể kéo thả tự do.</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full md:w-auto">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs transition-colors"
+              className="h-11 px-4 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-sm transition-colors"
             >
               Hủy
             </button>
@@ -234,18 +237,18 @@ export default function LayoutPresetPicker({
               type="button"
               disabled={!currentSelected || loading}
               onClick={handleApplyClick}
-              className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-semibold shadow-lg shadow-rosewood-950/60 transition-all active:scale-95 disabled:opacity-50"
+              className="h-11 flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-5 rounded-xl bg-rosewood-600 hover:bg-rosewood-500 text-white text-sm font-semibold shadow-lg shadow-rosewood-950/60 transition-all active:scale-95 disabled:opacity-50"
             >
-              <Sparkles className="w-3.5 h-3.5 text-champagne-300" />
-              <span>Áp dụng bố cục này</span>
+              <Sparkles className="w-4 h-4 text-champagne-300" />
+              <span>Áp dụng bố cục</span>
             </button>
           </div>
         </div>
 
         {/* Confirmation Sub-Modal if layout will reset customized arrangements */}
         {showConfirm && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center p-6 bg-black/85 backdrop-blur-sm animate-fade-in">
-            <div className="max-w-md w-full p-6 rounded-2xl bg-[#23121D] border border-amber-500/50 shadow-2xl text-center space-y-4">
+          <div role="alertdialog" aria-modal="true" aria-label="Xác nhận đổi bố cục" className="absolute inset-0 z-20 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fade-in">
+            <div className="max-w-md w-full max-h-full overflow-y-auto p-5 sm:p-6 rounded-2xl bg-[#23121D] border border-amber-500/50 shadow-2xl text-center space-y-4">
               <div className="w-12 h-12 rounded-full bg-amber-500/20 border border-amber-500/50 flex items-center justify-center mx-auto text-amber-400">
                 <AlertTriangle className="w-6 h-6" />
               </div>
@@ -263,18 +266,19 @@ export default function LayoutPresetPicker({
                 </p>
               </div>
 
-              <div className="flex items-center justify-center gap-3 pt-2">
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                 <button
                   type="button"
+                  autoFocus
                   onClick={() => setShowConfirm(false)}
-                  className="px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs transition-colors"
+                  className="h-11 px-4 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-sm transition-colors"
                 >
                   Giữ bố cục cũ
                 </button>
                 <button
                   type="button"
                   onClick={handleConfirmApply}
-                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-lg transition-colors"
+                  className="h-11 px-5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold shadow-lg transition-colors"
                 >
                   Đồng ý áp dụng
                 </button>
@@ -284,5 +288,6 @@ export default function LayoutPresetPicker({
         )}
       </div>
     </div>
+    </DialogPortal>
   );
 }

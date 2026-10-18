@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useAdminDialog } from '@/hooks/useAdminDialog';
+import DialogPortal from '@/components/admin/DialogPortal';
 import {
   getAdminMedia,
   requestSignedUpload,
@@ -136,18 +137,19 @@ export default function MediaPickerModal({
   };
 
   return (
-    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} className="cms-dialog fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in select-none">
-      <div className="relative w-full max-w-4xl bg-[#180E14] border border-rosewood-800/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)] text-parchment-100">
+    <DialogPortal>
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} className="cms-dialog fixed inset-0 z-[200] flex items-end sm:items-center justify-center sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in select-none">
+      <div className="cms-dialog-panel relative w-full max-w-4xl bg-[#180E14] border border-rosewood-800/60 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[calc(100dvh-2rem)] text-parchment-100">
         {/* Header */}
-        <div className="h-14 px-6 bg-[#20111A] border-b border-rosewood-900/40 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rosewood-600 to-rosewood-800 flex items-center justify-center text-champagne-300 shadow">
+        <div className="px-4 sm:px-6 py-3 bg-[#20111A] border-b border-rosewood-900/40 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="hidden sm:flex w-8 h-8 shrink-0 rounded-xl bg-gradient-to-tr from-rosewood-600 to-rosewood-800 items-center justify-center text-champagne-300 shadow">
               <ImageIcon className="w-4 h-4" />
             </div>
-            <div>
-              <h3 className="font-serif font-bold text-sm text-parchment-100">{title}</h3>
-              <p className="text-[11px] text-rosewood-300/70 font-mono">
-                Chọn ảnh có sẵn hoặc tải ảnh mới trực tiếp lên Cloudinary
+            <div className="min-w-0">
+              <h3 className="font-serif font-bold text-base text-parchment-100 truncate">{title}</h3>
+              <p className="text-[11px] text-rosewood-300/80 truncate">
+                Chọn file có sẵn hoặc tải file mới lên
               </p>
             </div>
           </div>
@@ -155,33 +157,36 @@ export default function MediaPickerModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-rosewood-900/50 transition-colors"
+            aria-label="Đóng"
+            className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg text-stone-400 hover:text-white hover:bg-rosewood-900/50 transition-colors"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Toolbar: Search & Direct Upload */}
-        <div className="p-4 bg-[#140A0F] border-b border-rosewood-900/40 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
-          <form onSubmit={handleSearchSubmit} className="relative w-full sm:w-80">
-            <Search className="w-3.5 h-3.5 text-stone-500 absolute left-3 top-1/2 -translate-y-1/2" />
+        <div className="p-3 sm:p-4 bg-[#140A0F] border-b border-rosewood-900/40 flex flex-wrap items-center justify-between gap-2 sm:gap-3 shrink-0">
+          <form onSubmit={handleSearchSubmit} role="search" className="relative flex-1 min-w-[12rem] sm:max-w-80">
+            <Search className="w-4 h-4 text-stone-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
-              type="text"
+              type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Tìm kiếm hình ảnh theo tên..."
-              className="w-full pl-9 pr-3 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white placeholder-stone-600 focus:outline-none focus:border-rosewood-500"
+              placeholder="Tìm theo tên..."
+              aria-label="Tìm media theo tên"
+              className="w-full h-11 pl-9 pr-3 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-sm text-white placeholder-stone-500 focus:outline-none focus:border-rosewood-500"
             />
           </form>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={fetchMedia}
-              className="p-2 rounded-xl bg-[#201319] hover:bg-[#2C1923] text-parchment-300 border border-rosewood-900/40 transition-colors"
+              aria-label="Làm mới"
+              className="w-11 h-11 flex items-center justify-center rounded-xl bg-[#201319] hover:bg-[#2C1923] text-parchment-300 border border-rosewood-900/40 transition-colors"
               title="Làm mới"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
 
             <input
@@ -196,16 +201,16 @@ export default function MediaPickerModal({
               type="button"
               disabled={uploading}
               onClick={() => fileInputRef.current?.click()}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-semibold shadow-md transition-all active:scale-95 disabled:opacity-50"
+              className="h-11 flex items-center justify-center gap-1.5 px-4 rounded-xl bg-rosewood-600 hover:bg-rosewood-500 text-white text-sm font-semibold shadow-md transition-all active:scale-95 disabled:opacity-50"
             >
-              <Upload className="w-3.5 h-3.5" />
-              <span>{uploading ? `Đang tải lên (${uploadProgress}%)...` : filterType === 'VIDEO' ? 'Tải video mới' : 'Tải ảnh mới'}</span>
+              <Upload className="w-4 h-4" />
+              <span>{uploading ? `Đang tải (${uploadProgress}%)` : filterType === 'VIDEO' ? 'Tải video' : 'Tải ảnh'}</span>
             </button>
           </div>
         </div>
 
         {/* Media Grid */}
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-5">
           {loading ? (
             <div className="py-20 flex flex-col items-center justify-center text-stone-500 text-xs">
               <div className="w-8 h-8 rounded-full border-2 border-rosewood-500 border-t-transparent animate-spin mb-3" />
@@ -216,15 +221,19 @@ export default function MediaPickerModal({
               Không tìm thấy media phù hợp. Bấm nút tải lên để bổ sung vào thư viện.
             </div>
           ) : (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-2 sm:gap-3">
               {mediaList.map((m) => {
                 const isSelected = m.id === selectedId;
 
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={m.id}
+                    aria-pressed={isSelected}
+                    aria-label={m.alt || m.publicId?.split('/').pop() || 'Ảnh'}
                     onClick={() => setSelectedId(m.id)}
-                    className={`group relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition-all ${
+                    onDoubleClick={() => { setSelectedId(m.id); onSelect({ mediaId: m.id, url: m.url, alt: m.alt || undefined, width: m.width, height: m.height }); onClose(); }}
+                    className={`group relative block w-full p-0 aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition-all ${
                       isSelected
                         ? 'border-champagne-400 ring-2 ring-champagne-400/40 shadow-lg scale-[0.98]'
                         : 'border-transparent hover:border-rosewood-700/60 bg-[#1D1018]'
@@ -256,7 +265,7 @@ export default function MediaPickerModal({
                         {m.alt || m.publicId?.split('/').pop() || 'Ảnh'}
                       </p>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -264,22 +273,22 @@ export default function MediaPickerModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="h-16 px-6 bg-[#20111A] border-t border-rosewood-900/40 flex items-center justify-between shrink-0">
-          <div className="text-xs text-stone-400 truncate max-w-md">
+        <div className="cms-dialog-footer px-4 sm:px-6 py-3 bg-[#20111A] border-t border-rosewood-900/40 flex items-center justify-between gap-3 shrink-0">
+          <div className="hidden sm:block min-w-0 text-xs text-stone-400 truncate">
             {currentSelected ? (
               <span className="font-mono text-champagne-300">
                 Đã chọn: {currentSelected.alt || currentSelected.id}
               </span>
             ) : (
-              <span>Vui lòng nhấp chọn một ảnh để chèn vào phần tử</span>
+              <span>Chọn một file để chèn vào phần tử</span>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs transition-colors"
+              className="h-11 px-4 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-sm transition-colors"
             >
               Hủy
             </button>
@@ -287,14 +296,15 @@ export default function MediaPickerModal({
               type="button"
               disabled={!currentSelected}
               onClick={handleConfirmSelect}
-              className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-semibold shadow-lg transition-all active:scale-95 disabled:opacity-50"
+              className="h-11 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-5 rounded-xl bg-rosewood-600 hover:bg-rosewood-500 text-white text-sm font-semibold shadow-lg transition-all active:scale-95 disabled:opacity-50"
             >
-              <Check className="w-3.5 h-3.5" />
-              <span>Sử dụng ảnh này</span>
+              <Check className="w-4 h-4" />
+              <span>{filterType === 'VIDEO' ? 'Dùng video này' : 'Dùng ảnh này'}</span>
             </button>
           </div>
         </div>
       </div>
     </div>
+    </DialogPortal>
   );
 }

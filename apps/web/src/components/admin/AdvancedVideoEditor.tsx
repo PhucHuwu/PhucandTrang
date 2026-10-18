@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useAdminDialog } from '@/hooks/useAdminDialog';
 import { VideoElement, VideoElementData, ElementStyle } from '@/types/book';
 import MediaPickerModal from '@/components/admin/MediaPickerModal';
+import DialogPortal from '@/components/admin/DialogPortal';
 import { safeParseFloat } from '@phucandtrang/shared';
 import {
   Video,
@@ -19,6 +20,7 @@ import {
   Film,
   Eye,
   ExternalLink,
+  X,
 } from 'lucide-react';
 
 interface AdvancedVideoEditorProps {
@@ -361,37 +363,30 @@ export default function AdvancedVideoEditor({
 
       {/* Video Preview Modal */}
       {showPreviewModal && d.src && (
-        <div ref={previewRef} role="dialog" aria-modal="true" aria-label="Xem thử video" className="cms-dialog fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
-          <div className="relative w-full max-w-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto bg-[#160D12] border border-rosewood-800/60 rounded-2xl shadow-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between border-b border-rosewood-900/40 pb-2">
-              <h4 className="font-serif font-bold text-sm text-champagne-300 flex items-center gap-2">
-                <Film className="w-4 h-4 text-amber-400" />
-                <span>Xem Thử Video: {d.caption || 'Video Kỷ Niệm'}</span>
+        <DialogPortal>
+        <div ref={previewRef} role="dialog" aria-modal="true" aria-label="Xem thử video" className="cms-dialog fixed inset-0 z-[200] flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+          <div className="cms-dialog-panel relative w-full max-w-2xl max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col bg-[#160D12] border border-rosewood-800/60 rounded-2xl shadow-2xl p-3 sm:p-4 gap-3">
+            <div className="flex items-center justify-between gap-3 border-b border-rosewood-900/40 pb-2 shrink-0">
+              <h4 className="min-w-0 font-serif font-bold text-sm text-champagne-300 flex items-center gap-2">
+                <Film className="w-4 h-4 shrink-0 text-amber-400" />
+                <span className="truncate">{d.caption || 'Xem thử video'}</span>
               </h4>
               <button
                 type="button"
                 onClick={() => setShowPreviewModal(false)}
-                className="p-1 rounded text-stone-400 hover:text-white"
+                aria-label="Đóng"
+                className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg text-stone-400 hover:text-white hover:bg-rosewood-900/50"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="aspect-video w-full rounded-xl overflow-hidden bg-black flex items-center justify-center">
-              <video src={d.src} controls autoPlay className="w-full h-full object-contain" />
-            </div>
-
-            <div className="flex items-center justify-end">
-              <button
-                type="button"
-                onClick={() => setShowPreviewModal(false)}
-                className="px-4 py-1.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs"
-              >
-                Đóng
-              </button>
+            <div className="min-h-0 flex-1 w-full rounded-xl overflow-hidden bg-black flex items-center justify-center">
+              <video src={d.src} controls autoPlay playsInline className="w-full max-h-[calc(100dvh-7rem)] aspect-video object-contain" />
             </div>
           </div>
         </div>
+        </DialogPortal>
       )}
     </div>
   );

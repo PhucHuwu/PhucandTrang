@@ -91,6 +91,10 @@
 .cms-dialog :is(button, a) { min-height: 44px; min-width: 44px; }
 .cms-dialog :is(input, select, textarea) { font-size: 16px; }
 .cms-dialog :focus-visible { outline: 2px solid #ffe5b4; outline-offset: 2px; }
+.cms-dialog { overscroll-behavior: contain; }
+@media (max-width: 639px) {
+  .cms-dialog-footer { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+}
 @container (min-width: 1100px) {
   .template-workspace { grid-template-columns: minmax(0, 7fr) minmax(320px, 5fr); }
 }

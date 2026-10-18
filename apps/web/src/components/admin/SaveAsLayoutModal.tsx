@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAdminDialog } from '@/hooks/useAdminDialog';
+import DialogPortal from '@/components/admin/DialogPortal';
 import { Page } from '@/types/book';
 import { extractLayoutDefinitionFromPage } from '@/templates/layoutPresets';
 import { createAdminLayoutTemplate } from '@/services/adminApi';
@@ -85,20 +86,21 @@ export default function SaveAsLayoutModal({
   const elementsCount = (page.elements || []).length;
 
   return (
-    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Lưu bố cục" className="cms-dialog fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in select-none">
-      <div className="relative w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto bg-[#180E14] border border-rosewood-800/60 rounded-2xl shadow-2xl text-parchment-100 flex flex-col">
+    <DialogPortal>
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Lưu bố cục" className="cms-dialog fixed inset-0 z-[200] flex items-end sm:items-center justify-center sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in select-none">
+      <div className="cms-dialog-panel relative w-full sm:max-w-md max-h-[100dvh] sm:max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain bg-[#180E14] border border-rosewood-800/60 rounded-t-2xl sm:rounded-2xl shadow-2xl text-parchment-100 flex flex-col">
         {/* Header */}
-        <div className="h-14 px-5 bg-[#20111A] border-b border-rosewood-900/40 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rosewood-600 to-rosewood-800 flex items-center justify-center text-champagne-300 shadow">
+        <div className="sticky top-0 z-10 px-4 sm:px-5 py-3 bg-[#20111A] border-b border-rosewood-900/40 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="hidden sm:flex w-8 h-8 shrink-0 rounded-xl bg-gradient-to-tr from-rosewood-600 to-rosewood-800 items-center justify-center text-champagne-300 shadow">
               <BookmarkPlus className="w-4 h-4" />
             </div>
-            <div>
-              <h3 className="font-serif font-bold text-sm text-parchment-100">
-                Lưu Thành Bố Cục Mới (Save as Layout)
+            <div className="min-w-0">
+              <h3 className="font-serif font-bold text-base text-parchment-100">
+                Lưu thành bố cục mới
               </h3>
-              <p className="text-[11px] text-rosewood-300/70 font-mono">
-                Lưu {elementsCount} phần tử hiện tại thành template tùy biến
+              <p className="text-[11px] text-rosewood-300/80">
+                Lưu {elementsCount} phần tử hiện tại thành mẫu tùy biến
               </p>
             </div>
           </div>
@@ -106,9 +108,10 @@ export default function SaveAsLayoutModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-rosewood-900/50 transition-colors"
+            aria-label="Đóng"
+            className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg text-stone-400 hover:text-white hover:bg-rosewood-900/50 transition-colors"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -177,14 +180,14 @@ export default function SaveAsLayoutModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs transition-colors"
+              className="h-11 px-4 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-sm transition-colors"
             >
               Hủy
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white font-semibold shadow-lg transition-all active:scale-95 disabled:opacity-50"
+              className="h-11 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-5 rounded-xl bg-rosewood-600 hover:bg-rosewood-500 text-white text-sm font-semibold shadow-lg transition-all active:scale-95 disabled:opacity-50"
             >
               <BookmarkPlus className="w-4 h-4" />
               <span>{submitting ? 'Đang tạo template...' : 'Lưu bố cục'}</span>
@@ -193,5 +196,6 @@ export default function SaveAsLayoutModal({
         </form>
       </div>
     </div>
+    </DialogPortal>
   );
 }

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAdminDialog } from '@/hooks/useAdminDialog';
+import DialogPortal from '@/components/admin/DialogPortal';
 import Link from 'next/link';
 import {
   ValidationReport,
@@ -67,13 +68,14 @@ export default function PublishValidationModal({
   };
 
   return (
-    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Kiểm tra xuất bản" className="cms-dialog fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-      <div className="relative w-full max-w-2xl bg-[#170E14] border border-rosewood-800/60 rounded-2xl shadow-2xl flex flex-col max-h-[calc(100dvh-2rem)] overflow-hidden text-parchment-100">
+    <DialogPortal>
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Kiểm tra xuất bản" className="cms-dialog fixed inset-0 z-[200] flex items-end sm:items-center justify-center sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+      <div className="cms-dialog-panel relative w-full max-w-2xl bg-[#170E14] border border-rosewood-800/60 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[100dvh] sm:max-h-[calc(100dvh-2rem)] overflow-hidden text-parchment-100">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-rosewood-900/50 bg-[#1D1019] flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
+        <div className="px-4 sm:px-5 py-3 border-b border-rosewood-900/50 bg-[#1D1019] flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div
-              className={`w-9 h-9 rounded-xl flex items-center justify-center border ${
+              className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center border ${
                 report.isValid
                   ? 'bg-emerald-950/70 border-emerald-500/50 text-emerald-400'
                   : 'bg-rose-950/70 border-rose-500/50 text-rose-400'
@@ -81,19 +83,21 @@ export default function PublishValidationModal({
             >
               {report.isValid ? <CheckCircle2 className="w-5 h-5" /> : <ShieldAlert className="w-5 h-5" />}
             </div>
-            <div>
-              <h2 className="font-serif text-lg font-bold text-champagne-300 leading-tight">
-                {report.isValid ? 'Kiểm Tra Toàn Vẹn Xuất Bản: ĐẠT' : 'Phát Hiện Lỗi Cản Trở Xuất Bản'}
+            <div className="min-w-0">
+              <h2 className="font-serif text-base sm:text-lg font-bold text-champagne-300 leading-tight">
+                {report.isValid ? 'Sẵn sàng xuất bản' : 'Chưa thể xuất bản'}
               </h2>
               <p className="text-xs text-stone-400">
-                {bookTitle} • {report.errorCount} lỗi chặn (Blocking Errors) • {report.warningCount} cảnh báo
+                {report.errorCount} lỗi chặn • {report.warningCount} cảnh báo
               </p>
             </div>
           </div>
 
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-rosewood-900/40 text-stone-400 hover:text-white transition"
+            aria-label="Đóng"
+            className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg hover:bg-rosewood-900/40 text-stone-400 hover:text-white transition"
           >
             <X className="w-5 h-5" />
           </button>
@@ -108,7 +112,7 @@ export default function PublishValidationModal({
         )}
 
         {/* Scrollable Issues List */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4">
           {/* Summary Status Box */}
           <div
             className={`p-3.5 rounded-xl border text-xs leading-relaxed ${
@@ -142,9 +146,9 @@ export default function PublishValidationModal({
                     key={issue.id}
                     className="p-3 rounded-xl bg-[#221016] border border-rose-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-rose-950 text-rose-300 border border-rose-700/50">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono break-all bg-rose-950 text-rose-300 border border-rose-700/50">
                           {issue.code}
                         </span>
                         {issue.location.pageNumber !== undefined && (
@@ -191,9 +195,9 @@ export default function PublishValidationModal({
                     key={issue.id}
                     className="p-3 rounded-xl bg-[#1F1514] border border-amber-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-950 text-amber-300 border border-amber-700/50">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono break-all bg-amber-950 text-amber-300 border border-amber-700/50">
                           {issue.code}
                         </span>
                         {issue.location.pageNumber !== undefined && (
@@ -239,11 +243,11 @@ export default function PublishValidationModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 bg-[#1A0E15] border-t border-rosewood-900/50 flex items-center justify-between shrink-0">
+        <div className="cms-dialog-footer px-4 py-3 bg-[#1A0E15] border-t border-rosewood-900/50 flex items-center justify-between gap-2 shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs transition"
+            className="h-11 px-4 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-sm transition"
           >
             Đóng
           </button>
@@ -253,23 +257,24 @@ export default function PublishValidationModal({
               type="button"
               onClick={handleProceedPublish}
               disabled={publishing}
-              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-950/50 transition active:scale-95 disabled:opacity-50"
+              className="h-11 flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-lg shadow-emerald-950/50 transition active:scale-95 disabled:opacity-50"
             >
               {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              <span>{publishing ? 'Đang xuất bản...' : 'Xác nhận xuất bản (Publish)'}</span>
+              <span>{publishing ? 'Đang xuất bản...' : 'Xuất bản'}</span>
             </button>
           ) : (
             <button
               type="button"
               disabled
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-950/40 text-stone-500 text-xs font-medium cursor-not-allowed border border-rose-900/40"
+              className="h-11 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 rounded-xl bg-rose-950/40 text-stone-400 text-sm font-medium cursor-not-allowed border border-rose-900/40"
             >
-              <ShieldAlert className="w-4 h-4" />
-              <span>Bị khóa do có {report.errorCount} lỗi chặn</span>
+              <ShieldAlert className="w-4 h-4 shrink-0" />
+              <span>Sửa {report.errorCount} lỗi để xuất bản</span>
             </button>
           )}
         </div>
       </div>
     </div>
+    </DialogPortal>
   );
 }
