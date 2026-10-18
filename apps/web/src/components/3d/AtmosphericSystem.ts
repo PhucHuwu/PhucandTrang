@@ -18,14 +18,10 @@ export interface ButterflyEntity {
 // steered by a noise flow field and pulled back towards a home area.
 const WING_SEGMENTS = 8;
 const WING_DISPLACEMENT = 1.25;
-const WING_VARIANTS = [
-  { inner: '#FFF0F3', outer: '#F28FA8', border: '#6E2A3E' },
-  { inner: '#FFF6DF', outer: '#F0B25C', border: '#55311D' },
-  { inner: '#F7EDFF', outer: '#B78BE0', border: '#432762' },
-  { inner: '#FFF0E6', outer: '#F4A58A', border: '#663024' },
-  { inner: '#FFFFFF', outer: '#EED6C2', border: '#7E5F4C' },
-  { inner: '#EEF8FF', outer: '#8DC3EC', border: '#22476A' },
-];
+// Butterfly photos from klevron/threejs-toys (packages/toys/public/b1-b4.png, ISC),
+// packed left to right into one strip, head towards the top of each 256px cell.
+const BUTTERFLY_ATLAS_URL = '/butterflies/atlas.webp';
+const BUTTERFLY_ATLAS_COUNT = 4;
 const FLIGHT = {
   homeRadiusInner: 220,
   homeRadiusOuter: 420,
@@ -35,128 +31,6 @@ const FLIGHT = {
   maxSpeed: 150,
   minSpeed: 45,
 };
-
-function bezierPoint(p0: number[], p1: number[], p2: number[], p3: number[], t: number) {
-  const u = 1 - t;
-  return [
-    u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0],
-    u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1],
-  ];
-}
-
-/** Top-down butterfly sprites (head towards the top), one 256px cell per colour variant. */
-function createButterflyAtlas(): THREE.CanvasTexture {
-  const cell = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = cell * WING_VARIANTS.length;
-  canvas.height = cell;
-  const ctx = canvas.getContext('2d')!;
-
-  // Left-side wing outlines as cubic segments; the right side is mirrored.
-  const fore = [
-    [[122, 112], [100, 70], [50, 28], [20, 38]],
-    [[20, 38], [6, 60], [18, 110], [44, 130]],
-    [[44, 130], [70, 140], [100, 136], [122, 128]],
-  ];
-  const hind = [
-    [[122, 130], [90, 132], [52, 140], [44, 170]],
-    [[44, 170], [36, 206], [70, 234], [96, 222]],
-    [[96, 222], [112, 212], [120, 180], [124, 150]],
-  ];
-  const tracePath = (segments: number[][][]) => {
-    const path = new Path2D();
-    path.moveTo(segments[0][0][0], segments[0][0][1]);
-    for (const [, c1, c2, end] of segments) path.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], end[0], end[1]);
-    path.closePath();
-    return path;
-  };
-  const forePath = tracePath(fore);
-  const hindPath = tracePath(hind);
-
-  const drawWing = (path: Path2D, segments: number[][][], variant: typeof WING_VARIANTS[number]) => {
-    ctx.save();
-    ctx.clip(path);
-
-    const gradient = ctx.createRadialGradient(122, 128, 6, 122, 128, 125);
-    gradient.addColorStop(0, variant.inner);
-    gradient.addColorStop(0.55, variant.outer);
-    gradient.addColorStop(1, variant.outer);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, cell, cell);
-
-    // Veins radiating from the wing root
-    ctx.strokeStyle = variant.border;
-    ctx.globalAlpha = 0.45;
-    ctx.lineWidth = 1.6;
-    for (let t = 0.1; t < 1; t += 0.16) {
-      for (const segment of segments.slice(0, 2)) {
-        const [x, y] = bezierPoint(segment[0], segment[1], segment[2], segment[3], t);
-        ctx.beginPath();
-        ctx.moveTo(122, 128);
-        ctx.quadraticCurveTo((122 + x) / 2, (128 + y) / 2 + 6, x, y);
-        ctx.stroke();
-      }
-    }
-
-    // Dark margin with pale spots
-    ctx.globalAlpha = 1;
-    ctx.lineWidth = 16;
-    ctx.stroke(path);
-    ctx.fillStyle = 'rgba(255, 250, 240, 0.9)';
-    for (const segment of segments.slice(0, 2)) {
-      for (let t = 0.12; t < 0.95; t += 0.14) {
-        const [x, y] = bezierPoint(segment[0], segment[1], segment[2], segment[3], t);
-        const dx = 122 - x;
-        const dy = 128 - y;
-        const len = Math.hypot(dx, dy) || 1;
-        ctx.beginPath();
-        ctx.arc(x + (dx / len) * 4, y + (dy / len) * 4, 2.2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-    ctx.restore();
-  };
-
-  WING_VARIANTS.forEach((variant, index) => {
-    ctx.save();
-    ctx.translate(index * cell, 0);
-    for (const mirrored of [false, true]) {
-      ctx.save();
-      if (mirrored) {
-        ctx.translate(cell, 0);
-        ctx.scale(-1, 1);
-      }
-      drawWing(hindPath, hind, variant);
-      drawWing(forePath, fore, variant);
-      ctx.restore();
-    }
-
-    ctx.fillStyle = '#2E1E19';
-    ctx.beginPath();
-    ctx.ellipse(128, 140, 5, 42, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(128, 96, 7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#2E1E19';
-    ctx.lineWidth = 2;
-    for (const side of [-1, 1]) {
-      ctx.beginPath();
-      ctx.moveTo(128 + side * 2, 90);
-      ctx.quadraticCurveTo(128 + side * 8, 64, 128 + side * 22, 50);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(128 + side * 22, 50, 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-  });
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
-  return texture;
-}
 
 export class AtmosphericSystem {
   scene: THREE.Scene;
@@ -374,14 +248,23 @@ export class AtmosphericSystem {
     const geometry = new THREE.PlaneGeometry(2, 2, WING_SEGMENTS, WING_SEGMENTS).rotateX(Math.PI / 2);
     const wingPhases = new Float32Array(count);
     const atlasIndexes = new Float32Array(count);
-    for (let i = 0; i < count; i++) atlasIndexes[i] = i % WING_VARIANTS.length;
+    for (let i = 0; i < count; i++) atlasIndexes[i] = i % BUTTERFLY_ATLAS_COUNT;
     this.wingPhaseAttribute = new THREE.InstancedBufferAttribute(wingPhases, 1);
     this.wingPhaseAttribute.setUsage(THREE.DynamicDrawUsage);
     geometry.setAttribute('aWingPhase', this.wingPhaseAttribute);
     geometry.setAttribute('aAtlasIndex', new THREE.InstancedBufferAttribute(atlasIndexes, 1));
 
+    const mesh = new THREE.InstancedMesh(geometry, undefined, count);
+    // Stay hidden until the photos arrive, otherwise the quads render as solid squares
+    mesh.visible = false;
+    const atlas = new THREE.TextureLoader().load(BUTTERFLY_ATLAS_URL, () => {
+      if (this.butterflyMesh === mesh) mesh.visible = true;
+    });
+    atlas.colorSpace = THREE.SRGBColorSpace;
+    atlas.anisotropy = 4;
+
     const material = new THREE.MeshBasicMaterial({
-      map: createButterflyAtlas(),
+      map: atlas,
       side: THREE.DoubleSide,
       transparent: true,
       alphaTest: 0.5,
@@ -392,7 +275,7 @@ export class AtmosphericSystem {
         WINGS_DX: (2 / WING_SEGMENTS).toFixed(10),
         WINGS_DZ: (2 / WING_SEGMENTS).toFixed(10),
         WING_DISPLACEMENT: WING_DISPLACEMENT.toFixed(10),
-        ATLAS_COUNT: WING_VARIANTS.length.toFixed(10),
+        ATLAS_COUNT: BUTTERFLY_ATLAS_COUNT.toFixed(10),
       };
       shader.vertexShader = `
         attribute float aWingPhase;
@@ -416,7 +299,7 @@ export class AtmosphericSystem {
         );
     };
 
-    const mesh = new THREE.InstancedMesh(geometry, material, count);
+    mesh.material = material;
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     mesh.frustumCulled = false;
     this.butterflyMesh = mesh;
@@ -441,7 +324,7 @@ export class AtmosphericSystem {
         heading: velocity.clone().normalize(),
         home,
         wingPhase: Math.random() * Math.PI * 2,
-        size: 18 + Math.random() * 10,
+        size: 24 + Math.random() * 12,
         seed: Math.random() * 100,
       });
     }
