@@ -148,6 +148,7 @@ export default function VisualPageEditorDirectPage() {
     errorMessage: autosaveError,
     retrySave,
     forceSave,
+    flush: flushAutosave,
   } = useAutosavePage(page, {
     pageId,
     isViewer: false,
@@ -316,6 +317,10 @@ export default function VisualPageEditorDirectPage() {
     if (publishing) return;
     try {
       setPublishing(true);
+      if (!(await flushAutosave())) {
+        alert('Chưa lưu được thay đổi mới nhất của trang. Vui lòng thử lưu lại trước khi xuất bản.');
+        return;
+      }
       const report = await validateJournalForPublish();
       setValidationModal({
         bookId: journal?.id || (page as any)?.bookId || '',
@@ -526,6 +531,16 @@ export default function VisualPageEditorDirectPage() {
           <Link
             href="/admin/preview"
             target="_blank"
+            onClick={(e) => {
+              if (autosaveStatus === 'saved') return;
+              // Open the tab synchronously (popup blockers), then navigate once pending edits are saved
+              e.preventDefault();
+              const previewTab = window.open('about:blank', '_blank');
+              flushAutosave().finally(() => {
+                if (previewTab) previewTab.location.href = '/admin/preview';
+                else window.location.href = '/admin/preview';
+              });
+            }}
             className="h-10 flex items-center gap-1.5 px-2.5 rounded-lg bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 border border-amber-800/40 text-xs font-medium transition"
             title="Xem trước bản nháp trên 3D Flipbook"
             aria-label="Xem trước bản nháp"
@@ -1086,8 +1101,13 @@ export default function VisualPageEditorDirectPage() {
             try {
               const refreshed = await getAdminPage(pageId);
               setPage(refreshed);
+              // Undo stack holds pre-rollback element IDs; start a fresh history
+              initHistory(refreshed);
+              setSelectedElementId(refreshed.elements?.[0]?.id ?? null);
+              refreshJournal();
             } catch {
-              window.location.reload();
+              // This page did not exist in the restored version
+              window.location.href = '/admin/pages';
             }
           }}
         />

@@ -129,6 +129,34 @@ export class VersionsService {
       throw new NotFoundException(`Không tìm thấy cuốn sách với ID: ${bookId}`);
     }
 
+    // References may have been deleted since the snapshot was taken; restoring a dangling
+    // foreign key would abort the whole transaction, so drop the ones that no longer exist.
+    const snapshotTemplateIds = new Set<string>();
+    const snapshotAudioIds = new Set<string>();
+    if (snapshot.backgroundMusicId) snapshotAudioIds.add(snapshot.backgroundMusicId);
+    for (const page of snapshot.pages) {
+      if (page.layoutTemplateId) snapshotTemplateIds.add(page.layoutTemplateId);
+      if (page.audioTrackId) snapshotAudioIds.add(page.audioTrackId);
+    }
+    const [existingTemplates, existingAudio] = await Promise.all([
+      snapshotTemplateIds.size
+        ? this.prisma.layoutTemplate.findMany({
+            where: { id: { in: [...snapshotTemplateIds] } },
+            select: { id: true },
+          })
+        : [],
+      snapshotAudioIds.size
+        ? this.prisma.audioTrack.findMany({
+            where: { id: { in: [...snapshotAudioIds] } },
+            select: { id: true },
+          })
+        : [],
+    ]);
+    const validTemplateIds = new Set(existingTemplates.map((t) => t.id));
+    const validAudioIds = new Set(existingAudio.map((a) => a.id));
+    const keepTemplate = (id?: string | null) => (id && validTemplateIds.has(id) ? id : null);
+    const keepAudio = (id?: string | null) => (id && validAudioIds.has(id) ? id : null);
+
     // Atomic transaction restoring ONLY the draft state
     await this.prisma.$transaction(async (tx) => {
       // 1. Delete current draft pages (cascades to elements)
@@ -137,7 +165,7 @@ export class VersionsService {
       // 2. Restore book metadata to draft.
       // Notice: we do NOT touch publishedSnapshot or publishedRevision!
       const backgroundMusicId =
-        'backgroundMusicId' in snapshot ? snapshot.backgroundMusicId : null;
+        'backgroundMusicId' in snapshot ? keepAudio(snapshot.backgroundMusicId) : null;
 
       await tx.book.update({
         where: { id: bookId },
@@ -154,10 +182,12 @@ export class VersionsService {
         },
       });
 
-      // 3. Re-create pages and elements from snapshot
+      // 3. Re-create pages and elements from snapshot.
+      // Original IDs are reused so open editor sessions and links keep pointing at the same page.
       for (const page of snapshot.pages) {
         await tx.page.create({
           data: {
+            ...(page.id ? { id: page.id } : {}),
             bookId,
             pageNumber: page.pageNumber,
             side: page.side,
@@ -166,14 +196,15 @@ export class VersionsService {
             title: page.title,
             quote: page.quote,
             handwriting: page.handwriting,
-            layoutTemplateId: page.layoutTemplateId,
+            layoutTemplateId: keepTemplate(page.layoutTemplateId),
             sourceTemplateId: page.sourceTemplateId,
             layoutMode: page.layoutMode,
             isCustomized: page.isCustomized,
             background: page.background,
-            audioTrackId: page.audioTrackId,
+            audioTrackId: keepAudio(page.audioTrackId),
             elements: {
               create: (page.elements || []).map((el: any) => ({
+                ...(el.id ? { id: el.id } : {}),
                 type: el.type,
                 slot: el.slot,
                 order: el.order,
@@ -190,7 +221,7 @@ export class VersionsService {
           },
         });
       }
-    });
+    }, { timeout: 30_000, maxWait: 10_000 });
 
     // Prompt 40.1 Fix: Use invalidateBookCache so contentRevision is incremented exactly once in transaction
     await this.cacheService.invalidateBookCache(bookId);

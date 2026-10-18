@@ -15,11 +15,18 @@ export async function POST(request: Request) {
       );
     }
 
+    // Forward the end-user IP so the backend rate-limits per browser instead of per BFF instance
+    const clientIp =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      request.headers.get('x-real-ip') ||
+      '';
+
     // Call backend login endpoint (password-only)
     const backendRes = await fetch(`${BACKEND_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(clientIp ? { 'x-client-ip': clientIp } : {}),
       },
       body: JSON.stringify({ pass }),
     });

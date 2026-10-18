@@ -108,12 +108,10 @@ export default class Flipbook {
 		this.pageEdgeColor = params.pageEdgeColor;
 		this.pageActiveAreas = params.pageActiveAreas || [];
 
+		// Video elements are created lazily by VideoOverlay.open() so nothing downloads up front
 		this.videoOverlay = new VideoOverlay(this.containerEl, () => {
 			this.unfocusActiveArea();
 		});
-		this.pageActiveAreas.forEach(area =>
-			this.videoOverlay.addVideo(area?.video),
-		);
 
 		const introEl = this.containerEl.querySelector(".intro-overlay");
 		if (introEl) {
@@ -153,7 +151,8 @@ export default class Flipbook {
 		this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 		// this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
 		// this.renderer.toneMappingExposure = 1.2;
-		this.renderer.setPixelRatio(window.devicePixelRatio);
+		// Phones report DPR 3+; rendering the scene (and its soft shadows) at that density is too heavy
+		this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 		this.renderer.setSize(window.innerWidth, window.innerHeight);
 		this.renderer.shadowMap.enabled = true;
 		this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -344,6 +343,8 @@ export default class Flipbook {
 			this.onSwipeMove(swipe);
 		});
 
+		document.addEventListener("keydown", this.keydownHandler);
+
 		/*
 		document.addEventListener("keydown", (event: KeyboardEvent) => {
 			if (event.key === "Escape" || event.code === "Escape") {
@@ -515,6 +516,25 @@ export default class Flipbook {
 
 	private disposed = false;
 	private resizeHandler = () => this.onWindowResize();
+	private keydownHandler = (event: KeyboardEvent) => {
+		if (this.disposed || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+		const target = event.target as HTMLElement | null;
+		if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(target.tagName))) return;
+		if (this.introPhase !== "COMPLETED") return;
+
+		if (event.key === "Escape") {
+			if (this.focusedActiveArea) {
+				event.preventDefault();
+				this.unfocusActiveArea();
+			}
+		} else if (event.key === "ArrowRight" || event.key === "PageDown") {
+			event.preventDefault();
+			this.flipNext();
+		} else if (event.key === "ArrowLeft" || event.key === "PageUp") {
+			event.preventDefault();
+			this.flipPrev();
+		}
+	};
 	private animationFrame = 0;
 	private loadingManager = new THREE.LoadingManager();
 	public get isReady() { return this.introPhase === "COMPLETED" && this.initCompleted; }
@@ -523,6 +543,8 @@ export default class Flipbook {
 		for (const pending of this.pendingFaceTextures.values()) pending.texture?.dispose();
 		this.pendingFaceTextures.clear();
 		window.removeEventListener("resize", this.resizeHandler);
+		document.removeEventListener("keydown", this.keydownHandler);
+		this.swipeHandler?.destroy();
 		cancelAnimationFrame(this.animationFrame);
 		this.progress.destroy();
 		this.cameraSideShift.destroy();

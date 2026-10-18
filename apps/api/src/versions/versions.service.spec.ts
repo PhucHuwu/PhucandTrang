@@ -24,6 +24,12 @@ describe('VersionsService Rollback Protection (Req 2, 3, 4, 14, 15, 16 & Prompt 
         deleteMany: jest.fn(),
         create: jest.fn(),
       },
+      layoutTemplate: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      audioTrack: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       $transaction: jest.fn(async (cb) => {
         return cb(prisma);
       }),
@@ -122,6 +128,51 @@ describe('VersionsService Rollback Protection (Req 2, 3, 4, 14, 15, 16 & Prompt 
 
     // Invalidate book cache without double bumping contentRevision
     expect(cacheService.invalidateBookCache).toHaveBeenCalledWith('book-1');
+  });
+
+  it('keeps page/element IDs and hidden elements, and drops references that no longer exist', async () => {
+    prisma.bookVersion.findUnique.mockResolvedValue({
+      id: 'ver-ids',
+      bookId: 'book-1',
+      version: 'v2.4',
+      snapshot: {
+        title: 'Snapshot',
+        backgroundMusicId: 'track-deleted',
+        pages: [
+          {
+            id: 'page-keep',
+            pageNumber: 1,
+            side: 'RIGHT',
+            order: 0,
+            layoutTemplateId: 'tpl-exists',
+            audioTrackId: 'track-deleted',
+            elements: [
+              { id: 'el-visible', type: 'TEXT', visible: true },
+              { id: 'el-hidden', type: 'IMAGE', visible: false },
+            ],
+          },
+          { id: 'page-2', pageNumber: 2, side: 'LEFT', order: 1, layoutTemplateId: 'tpl-deleted', elements: [] },
+        ],
+      },
+    });
+    prisma.book.findUnique.mockResolvedValue({ id: 'book-1' });
+    prisma.layoutTemplate.findMany.mockResolvedValue([{ id: 'tpl-exists' }]);
+    prisma.audioTrack.findMany.mockResolvedValue([]);
+
+    await service.rollbackToSnapshot('book-1', 'ver-ids');
+
+    expect(prisma.book.update.mock.calls[0][0].data.backgroundMusicId).toBeNull();
+
+    const firstPage = prisma.page.create.mock.calls[0][0].data;
+    expect(firstPage.id).toBe('page-keep');
+    expect(firstPage.layoutTemplateId).toBe('tpl-exists');
+    expect(firstPage.audioTrackId).toBeNull();
+    expect(firstPage.elements.create.map((e: any) => [e.id, e.visible])).toEqual([
+      ['el-visible', true],
+      ['el-hidden', false],
+    ]);
+
+    expect(prisma.page.create.mock.calls[1][0].data.layoutTemplateId).toBeNull();
   });
 
   it('should reject rollback if snapshot does not have valid pages array, without deleting current pages', async () => {

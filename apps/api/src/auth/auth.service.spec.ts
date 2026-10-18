@@ -55,8 +55,57 @@ describe('AuthService Security Hardening (Prompt 35 & Single Password Login)', (
     }
   });
 
+  it('should not lock out other clients when one client exceeds the attempt limit', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.findFirst.mockResolvedValue(null);
+
+    for (let i = 0; i < 5; i++) {
+      await expect(service.login({ pass: 'wrong-pass' }, '203.0.113.9')).rejects.toThrow(
+        UnauthorizedException,
+      );
+    }
+    await expect(service.login({ pass: 'wrong-pass' }, '203.0.113.9')).rejects.toMatchObject({
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+
+    // A different client is still evaluated on its password, not blocked
+    await expect(service.login({ pass: 'wrong-pass' }, '198.51.100.7')).rejects.toThrow(
+      UnauthorizedException,
+    );
+  });
+
+  it('should fully reset the counter once the lock expires', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.findFirst.mockResolvedValue(null);
+    const nowSpy = jest.spyOn(Date, 'now');
+    try {
+      let now = 1_000_000;
+      nowSpy.mockImplementation(() => now);
+
+      for (let i = 0; i < 5; i++) {
+        await expect(service.login({ pass: 'wrong-pass' }, 'client-a')).rejects.toThrow(
+          UnauthorizedException,
+        );
+      }
+      await expect(service.login({ pass: 'wrong-pass' }, 'client-a')).rejects.toMatchObject({
+        status: HttpStatus.TOO_MANY_REQUESTS,
+      });
+
+      // After 15 minutes a single wrong guess must not re-lock the client
+      now += 15 * 60 * 1000 + 1;
+      await expect(service.login({ pass: 'wrong-pass' }, 'client-a')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      await expect(service.login({ pass: 'wrong-pass' }, 'client-a')).rejects.toThrow(
+        UnauthorizedException,
+      );
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
   it('should authenticate single admin solely with password and reset failed attempt counter', async () => {
-    const passwordHash = await bcrypt.hash('Phuc3724@', 10);
+    const passwordHash = await bcrypt.hash('test-only-password', 10);
     const mockAdminUser = {
       id: 'admin-1',
       email: 'admin@phucandtrang.love',
@@ -68,7 +117,7 @@ describe('AuthService Security Hardening (Prompt 35 & Single Password Login)', (
     prisma.user.findUnique.mockResolvedValue(mockAdminUser);
     prisma.user.findFirst.mockResolvedValue(mockAdminUser);
 
-    const res = await service.login({ pass: 'Phuc3724@' });
+    const res = await service.login({ pass: 'test-only-password' });
     expect(res.accessToken).toBe('mock-jwt-token');
     expect(res.user.email).toBe('admin@phucandtrang.love');
     expect(res.user.role).toBe('ADMIN');

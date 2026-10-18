@@ -195,9 +195,12 @@ export class BooksService {
       backgroundMusicUpdate.backgroundMusicId = dto.backgroundMusicId;
     }
 
-    // Safe merge for partial JSON objects if PATCH (do NOT merge cover if fully provided, replace cover cleanly)
+    // PATCH: each provided cover side replaces that side wholesale (element arrays must not be
+    // deep-merged), while sides that were not sent are kept as they are.
     const cover = isPatch && dto.cover
-      ? (dto.cover.front || dto.cover.back ? dto.cover : safeDeepMerge(existingBook.cover as any, dto.cover))
+      ? (dto.cover.front || dto.cover.back
+          ? { ...((existingBook.cover as any) || {}), ...dto.cover }
+          : safeDeepMerge(existingBook.cover as any, dto.cover))
       : dto.cover;
 
     const settings = isPatch && dto.settings
@@ -314,6 +317,8 @@ export class BooksService {
       );
     }
 
+    // Hidden elements must be kept: this record doubles as the rollback source for BookVersion.
+    // compileBookDocument filters hidden elements out of the public snapshot itself.
     const book = await this.prisma.book.findUnique({
       where: { id },
       include: {
@@ -322,7 +327,6 @@ export class BooksService {
           orderBy: { order: 'asc' },
           include: {
             elements: {
-              where: { visible: true },
               orderBy: { zIndex: 'asc' },
             },
             layoutTemplate: true,

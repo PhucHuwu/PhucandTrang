@@ -42,15 +42,21 @@ export default class SwipeHandler extends EventEmitter {
 			this.triggerEvent("swipeMove", [this.curSwipe]);
 		});
 
-		this.targetElement.addEventListener("touchend", event => {
-			if (
-				event.changedTouches.length === 1 &&
-				event.touches.length === 0
-			) {
-				this.curSwipe = undefined;
-				this.triggerEvent("swipeEnd", [this.curSwipe]);
-			}
-		});
+		const endTouchSwipe = (event: TouchEvent) => {
+			if (!this.curSwipe || this.curSwipe.touchId === null) return;
+			const tracked = Array.from(event.changedTouches).some(
+				touch => touch.identifier === this.curSwipe?.touchId,
+			);
+			if (tracked || event.touches.length === 0) this.endSwipe();
+		};
+		this.targetElement.addEventListener("touchend", endTouchSwipe);
+		this.targetElement.addEventListener("touchcancel", endTouchSwipe);
+	}
+
+	private endSwipe() {
+		const finished = this.curSwipe;
+		this.curSwipe = undefined;
+		this.triggerEvent("swipeEnd", [finished]);
 	}
 
 	private addMouseListeners() {
@@ -70,8 +76,9 @@ export default class SwipeHandler extends EventEmitter {
 			}
 		});
 
+		// touchId 0 is a valid (first) finger, so mouse swipes are identified by null explicitly
 		this.targetElement.addEventListener("mousemove", event => {
-			if (this.curSwipe && !this.curSwipe.touchId) {
+			if (this.curSwipe && this.curSwipe.touchId === null) {
 				this.curSwipe.prevX = this.curSwipe.x;
 				this.curSwipe.prevY = this.curSwipe.y;
 
@@ -82,12 +89,18 @@ export default class SwipeHandler extends EventEmitter {
 			}
 		});
 
-		this.targetElement.addEventListener("mouseup", () => {
-			if (this.curSwipe && !this.curSwipe.touchId) {
-				this.curSwipe = undefined;
-				this.triggerEvent("swipeEnd", [this.curSwipe]);
-			}
-		});
+		// Listen on window so releasing the button outside the canvas still ends the swipe
+		window.addEventListener("mouseup", this.windowMouseUp);
+	}
+
+	private windowMouseUp = () => {
+		if (this.curSwipe && this.curSwipe.touchId === null) {
+			this.endSwipe();
+		}
+	};
+
+	public destroy() {
+		window.removeEventListener("mouseup", this.windowMouseUp);
 	}
 
 	public isPointerDown() {

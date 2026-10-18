@@ -42,6 +42,7 @@ export default function QbjectAuthenticExperience({
     if (!container) return;
 
     let destroyed = false;
+    let progressFrame = 0;
 
     const initOriginalFlipbook = async () => {
       try {
@@ -206,8 +207,10 @@ export default function QbjectAuthenticExperience({
         let warmingTextures = false;
         const checkProgress = () => {
           if (!destroyed && flipbook) {
-            const progress = Math.max(0.88, Math.min(1, flipbook.loadingProgress));
-            setLoadingProgress((prev) => (Math.abs(prev - progress) > 0.005 ? progress : prev));
+            if (!readyReported) {
+              const progress = Math.max(0.88, Math.min(1, flipbook.loadingProgress));
+              setLoadingProgress((prev) => (Math.abs(prev - progress) > 0.005 ? progress : prev));
+            }
             if (flipbook.isReady && !readyReported && !warmingTextures) {
               warmingTextures = true;
               flipbook.prepareOpeningTextures(initialFacesCount).then(() => {
@@ -232,10 +235,10 @@ export default function QbjectAuthenticExperience({
               // Prompt 27: Re-prioritize media preloading based on current spread
               mediaPreloader.updatePagePriorities(current);
             }
-            requestAnimationFrame(checkProgress);
+            progressFrame = requestAnimationFrame(checkProgress);
           }
         };
-        requestAnimationFrame(checkProgress);
+        progressFrame = requestAnimationFrame(checkProgress);
       } catch (err: any) {
         if (!destroyed) {
           console.error('[Flipbook] Initialization error:', err);
@@ -248,6 +251,7 @@ export default function QbjectAuthenticExperience({
 
     return () => {
       destroyed = true;
+      cancelAnimationFrame(progressFrame);
       if (autoFlipTimerRef.current) {
         clearInterval(autoFlipTimerRef.current);
         autoFlipTimerRef.current = null;

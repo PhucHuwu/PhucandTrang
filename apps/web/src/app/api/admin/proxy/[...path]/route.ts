@@ -6,9 +6,25 @@ const BACKEND_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   'http://localhost:4000/api';
 
+/**
+ * Next.js hands us already-decoded segments, so `%2F..%2F` arrives as a segment containing
+ * `/../`. Reject anything that could change the resolved path, then re-encode each segment.
+ */
+function buildTargetPath(path: string[]): string | null {
+  if (!Array.isArray(path) || path.length === 0) return null;
+  for (const segment of path) {
+    if (!segment || segment === '.' || segment === '..') return null;
+    if (/[\/\\]/.test(segment) || segment.includes('\0')) return null;
+  }
+  return path.map((segment) => encodeURIComponent(segment)).join('/');
+}
+
 async function handleProxy(request: Request, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;
-  const targetPath = path.join('/');
+  const targetPath = buildTargetPath(path);
+  if (!targetPath) {
+    return NextResponse.json({ message: 'Đường dẫn API không hợp lệ' }, { status: 400 });
+  }
 
   const url = new URL(request.url);
   const queryString = url.search;
@@ -39,6 +55,11 @@ async function handleProxy(request: Request, { params }: { params: Promise<{ pat
       body,
     });
 
+    // Responses with these statuses must not carry a body
+    if (backendRes.status === 204 || backendRes.status === 304) {
+      return new NextResponse(null, { status: backendRes.status });
+    }
+
     const resContentType = backendRes.headers.get('content-type');
     if (resContentType && resContentType.includes('application/json')) {
       const data = await backendRes.json();
@@ -53,8 +74,9 @@ async function handleProxy(request: Request, { params }: { params: Promise<{ pat
       },
     });
   } catch (error: any) {
+    console.error('[admin proxy] Backend request failed:', error?.message || error);
     return NextResponse.json(
-      { message: `Lỗi kết nối Backend API qua proxy: ${error.message}` },
+      { message: 'Không thể kết nối tới máy chủ. Vui lòng thử lại.' },
       { status: 502 }
     );
   }

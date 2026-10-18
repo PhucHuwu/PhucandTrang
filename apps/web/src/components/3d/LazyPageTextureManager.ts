@@ -82,6 +82,7 @@ export class LazyPageTextureManager {
     })
       .then((entry) => {
         if (this.destroyed) {
+          this.inFlightGenerations.delete(pageIndex);
           entry.canvasTexture?.dispose();
           return { dataUrl: this.placeholderDataUrl, lastAccessed: Date.now() };
         }

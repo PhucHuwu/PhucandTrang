@@ -23,6 +23,8 @@ export default class VideoOverlay {
 		this.dom.container.classList.add("video-overlay");
 		this.dom.backdrop.classList.add("backdrop");
 		this.dom.closeBtn.classList.add("closeBtn");
+		this.dom.closeBtn.type = "button";
+		this.dom.closeBtn.setAttribute("aria-label", "Đóng video");
 
 		this.dom.container.append(this.dom.backdrop);
 		this.dom.container.append(this.dom.closeBtn);
@@ -46,14 +48,14 @@ export default class VideoOverlay {
 	}
 
 	public close() {
-		if (this.activeVideo) {
-			this.activeVideo.pause();
-			this.activeVideo.parentElement?.classList.toggle("active", false);
-			this.activeVideo = null;
-		}
-		Object.values(this.dom.videos).forEach(v => {
+		this.activeVideo = null;
+		// Tear the elements down so the browser stops buffering closed videos
+		Object.entries(this.dom.videos).forEach(([src, v]) => {
 			v.pause();
-			v.parentElement?.classList.toggle("active", false);
+			v.removeAttribute("src");
+			v.load();
+			v.parentElement?.remove();
+			delete this.dom.videos[src];
 		});
 		this.dom.container.classList.toggle("active", false);
 	}
@@ -78,6 +80,11 @@ export default class VideoOverlay {
 		video.setAttribute("controlslist", "nodownload noremoteplayback noaudio");
 		video.setAttribute("disablepictureinpicture", "");
 		video.setAttribute("disableremoteplayback", "");
-		video.preload = "auto";
+		// Only opened on demand (open() plays it right away), so no speculative download
+		video.preload = "none";
+	}
+
+	public isOpen() {
+		return this.dom.container.classList.contains("active");
 	}
 }

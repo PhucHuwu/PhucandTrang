@@ -51,48 +51,28 @@ export default class Page {
 			this.zSegments = 32;
 		}
 
-		// Load front and back textures
-		const _texture = (url: string) => {
+		// Load each face texture exactly once. A face without a URL (e.g. the last back face
+		// of an odd face count) renders as plain paper instead of requesting `undefined`.
+		const _texture = (url?: string) => {
+			if (!url) return null;
 			const texture = this.textureLoader.load(url);
 			texture.colorSpace = THREE.SRGBColorSpace;
 			texture.minFilter = THREE.LinearFilter;
 			texture.generateMipmaps = false;
-			// texture.anisotropy = 16;
-			return { map: texture, vertexColors: !this.isCover };
+			return texture;
 		};
 		const _color = (hex: number) => ({
 			color: new THREE.Color(hex),
 		});
 
-		const textures: Record<
-			string,
-			{ map?: THREE.Texture; color?: THREE.Color }
-		> = {
-			front: _texture(this.textureUrls.front),
-			back: _texture(this.textureUrls.back),
-			edgeTop: _color(this.edgeColor),
-			edgeBottom: _color(this.edgeColor),
-			edgeLeft: _color(this.edgeColor),
-			edgeRight: _color(this.edgeColor),
-		};
-
-		if (this.textureUrls.edgeTB) {
-			textures.edgeTop = _texture(this.textureUrls.edgeTB);
-			textures.edgeBottom = _texture(this.textureUrls.edgeTB);
-		}
-		if (this.textureUrls.edgeLR) {
-			textures.edgeLeft = _texture(this.textureUrls.edgeLR);
-			textures.edgeRight = _texture(this.textureUrls.edgeLR);
-		}
-
 		const materials = [
 			new THREE.MeshStandardMaterial({
-				map: _texture(this.textureUrls.back).map,
+				map: _texture(this.textureUrls.back),
 				vertexColors: !this.isCover,
 				roughness: 0.8,
 			}),
 			new THREE.MeshStandardMaterial({
-				map: _texture(this.textureUrls.front).map,
+				map: _texture(this.textureUrls.front),
 				vertexColors: !this.isCover,
 				roughness: 0.8,
 			}),

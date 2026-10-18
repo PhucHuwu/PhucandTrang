@@ -419,14 +419,13 @@ export class PageTextureGenerator {
     // Opacity
     ctx.globalAlpha = el.opacity ?? 1.0;
 
-    // Translation & Rotation around element center
-    const centerX = boxX + boxW / 2;
-    const centerY = boxY + boxH / 2;
-    ctx.translate(centerX, centerY);
-
+    // Rotate around the box's top-left corner like Konva does in the editor, then move the
+    // origin to the (rotated) box centre that the drawing code below is relative to.
+    ctx.translate(boxX, boxY);
     if (t.rotation) {
       ctx.rotate((t.rotation * Math.PI) / 180);
     }
+    ctx.translate(boxW / 2, boxH / 2);
     if (t.scale && t.scale !== 1) {
       ctx.scale(t.scale, t.scale);
     }

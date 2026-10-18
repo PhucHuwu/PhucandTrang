@@ -25,16 +25,13 @@ export function useAutosavePage(
   // Reference to track initial loaded snapshot & avoid saving on mount
   const lastSavedStateRef = useRef<string | null>(null);
   const isInitialMountRef = useRef(true);
-  const isSavingRef = useRef(false);
-  const hasPendingUpdateRef = useRef(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Single-flight: the promise of the save currently on the wire, if any
+  const inFlightSaveRef = useRef<Promise<void> | null>(null);
 
   // Latest page ref to guarantee latest state wins (avoid stale closure)
   const latestPageRef = useRef<Page | null>(page);
   latestPageRef.current = page;
-
-  // Track request sequence to prevent stale out-of-order response overwriting newer state
-  const saveSequenceRef = useRef(0);
 
   // Serialize comparable state (background, metadata, elements data/transform/style)
   const serializePageState = (p: Page | null): string => {
@@ -66,20 +63,9 @@ export function useAutosavePage(
     });
   };
 
-  // Perform actual PATCH of changed data
-  const executeSave = useCallback(
-    async (targetPage: Page, shouldThrow = false): Promise<boolean> => {
-      if (isViewer) return false;
-
-      // If already in flight, mark pending update and let current cycle re-trigger
-      if (isSavingRef.current) {
-        hasPendingUpdateRef.current = true;
-        return false;
-      }
-
-      const currentSeq = ++saveSequenceRef.current;
-      isSavingRef.current = true;
-      hasPendingUpdateRef.current = false;
+  // Perform actual PATCH of changed data. Never call directly: use saveLatest().
+  const persist = useCallback(
+    async (targetPage: Page): Promise<void> => {
       setStatus('saving');
       setErrorMessage(null);
 
@@ -119,56 +105,90 @@ export function useAutosavePage(
 
         await batchUpdateElements(pageId, elementsPayload);
 
-        // Check if a newer save request has been queued while we were in flight
-        if (currentSeq === saveSequenceRef.current) {
-          lastSavedStateRef.current = serialized;
-          setStatus('saved');
-          setLastSavedTime(new Date());
-          setErrorMessage(null);
-        }
-        return true;
+        lastSavedStateRef.current = serialized;
+        setLastSavedTime(new Date());
+        const latest = latestPageRef.current;
+        setStatus(latest && serializePageState(latest) !== serialized ? 'unsaved' : 'saved');
       } catch (err: any) {
-        if (currentSeq === saveSequenceRef.current) {
-          setStatus('error');
-          setErrorMessage(err?.message || 'Không thể lưu tự động');
-        }
-        if (shouldThrow) {
-          throw err;
-        }
-        return false;
-      } finally {
-        isSavingRef.current = false;
-
-        // If changes arrived while saving or pending update flag was set, immediately trigger next save cycle
-        if (
-          hasPendingUpdateRef.current ||
-          (latestPageRef.current && serializePageState(latestPageRef.current) !== lastSavedStateRef.current)
-        ) {
-          setStatus('unsaved');
-          if (latestPageRef.current) {
-            executeSave(latestPageRef.current, false);
-          }
-        }
+        setStatus('error');
+        setErrorMessage(err?.message || 'Không thể lưu tự động');
+        throw err;
       }
     },
-    [pageId, isViewer]
+    [pageId]
   );
+
+  /**
+   * Saves the latest page state, waiting for any in-flight save first so the newest state
+   * always lands last. Resolves once everything is persisted; rejects if the save fails.
+   * Failures are not retried automatically: the next edit or an explicit retry triggers a new save.
+   */
+  const saveLatest = useCallback(async (): Promise<void> => {
+    if (isViewer) return;
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    while (inFlightSaveRef.current) {
+      try {
+        await inFlightSaveRef.current;
+      } catch {
+        // The previous attempt's failure is superseded by this attempt
+      }
+    }
+
+    const target = latestPageRef.current;
+    if (!target || serializePageState(target) === lastSavedStateRef.current) return;
+
+    const run = persist(target);
+    inFlightSaveRef.current = run;
+    try {
+      await run;
+    } finally {
+      if (inFlightSaveRef.current === run) inFlightSaveRef.current = null;
+    }
+
+    // Edits made while this request was on the wire get their own debounced save
+    const latest = latestPageRef.current;
+    if (latest && serializePageState(latest) !== lastSavedStateRef.current) {
+      debounceTimerRef.current = setTimeout(() => {
+        saveLatest().catch(() => {});
+      }, debounceMs);
+    }
+  }, [isViewer, persist, debounceMs]);
 
   // Manual retry trigger
   const retrySave = useCallback(() => {
-    if (latestPageRef.current && !isViewer) {
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-      executeSave(latestPageRef.current, false);
-    }
-  }, [executeSave, isViewer]);
+    saveLatest().catch(() => {});
+  }, [saveLatest]);
 
-  // Force immediate save (e.g. user clicks Save button): strictly throws on failure so caller doesn't show false success!
+  // Force immediate save (e.g. user clicks Save button): throws on failure so caller doesn't show false success
   const forceSave = useCallback(async () => {
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    if (latestPageRef.current && !isViewer) {
-      await executeSave(latestPageRef.current, true);
+    await saveLatest();
+  }, [saveLatest]);
+
+  /** Persists pending edits before leaving the editor, publishing or previewing. Returns false on failure. */
+  const flush = useCallback(async (): Promise<boolean> => {
+    try {
+      await saveLatest();
+      return true;
+    } catch {
+      return false;
     }
-  }, [executeSave, isViewer]);
+  }, [saveLatest]);
+
+  // Flush on unmount so in-app navigation within the debounce window does not drop edits
+  const saveLatestRef = useRef(saveLatest);
+  saveLatestRef.current = saveLatest;
+  useEffect(() => {
+    return () => {
+      const latest = latestPageRef.current;
+      if (latest && lastSavedStateRef.current !== null && serializePageState(latest) !== lastSavedStateRef.current) {
+        saveLatestRef.current().catch(() => {});
+      }
+    };
+  }, []);
 
   // Effect to watch changes on `page` and trigger debounced autosave
   useEffect(() => {
@@ -186,23 +206,21 @@ export function useAutosavePage(
 
     // Compare with last saved state
     if (currentSerialized === lastSavedStateRef.current) {
-      if (status !== 'saving') {
+      if (!inFlightSaveRef.current) {
         setStatus('saved');
       }
       return;
     }
 
-    // Page changed: mark unsaved and schedule debounce timer (500-1000ms)
-    setStatus('unsaved');
+    // Page changed: mark unsaved (unless a request is on the wire) and schedule debounce timer
+    if (!inFlightSaveRef.current) setStatus('unsaved');
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      if (latestPageRef.current) {
-        executeSave(latestPageRef.current, false);
-      }
+      saveLatest().catch(() => {});
     }, debounceMs);
 
     return () => {
@@ -210,7 +228,7 @@ export function useAutosavePage(
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [page, isViewer, debounceMs, executeSave]);
+  }, [page, isViewer, debounceMs, saveLatest]);
 
   // Browser beforeunload protection: warn leaving page if unsaved
   useEffect(() => {
@@ -234,5 +252,6 @@ export function useAutosavePage(
     errorMessage,
     retrySave,
     forceSave,
+    flush,
   };
 }
