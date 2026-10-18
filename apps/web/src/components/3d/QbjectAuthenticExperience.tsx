@@ -16,12 +16,10 @@ import { deriveFaceIndex, computeActiveAreaPageRect } from '@phucandtrang/shared
 
 interface QbjectAuthenticExperienceProps {
   customBookData?: Book;
-  isDraftPreview?: boolean;
 }
 
 export default function QbjectAuthenticExperience({
   customBookData,
-  isDraftPreview = false,
 }: QbjectAuthenticExperienceProps = {}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
@@ -378,14 +376,6 @@ export default function QbjectAuthenticExperience({
         id="flipbook-container"
         className="absolute inset-0 z-0"
       />
-
-      {/* Draft Preview Badge indicator */}
-      {isDraftPreview && (
-        <div className="absolute top-4 left-4 z-40 flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 backdrop-blur-md text-xs font-sans font-medium shadow-lg pointer-events-none">
-          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-          <span>CHẾ ĐỘ XEM TRƯỚC BẢN NHÁP (DRAFT PREVIEW)</span>
-        </div>
-      )}
 
       {/* Auto-flip Play/Pause Button (Minimalist Triangular Play/Pause Icon) */}
       {isReady && (

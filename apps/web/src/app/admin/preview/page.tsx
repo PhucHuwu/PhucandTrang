@@ -140,9 +140,10 @@ export default function AdminPreviewDraftDirectPage() {
             <span>Thoát xem trước</span>
           </button>
 
-          <div className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 backdrop-blur-md text-xs font-medium">
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 backdrop-blur-md text-xs font-medium">
             <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-            <span>Xem trước bản nháp (Draft Preview)</span>
+            <span className="sm:hidden">Bản nháp</span>
+            <span className="hidden sm:inline">Xem trước bản nháp (Draft Preview)</span>
           </div>
         </div>
 
@@ -170,10 +171,7 @@ export default function AdminPreviewDraftDirectPage() {
       </header>
 
       {/* 3D Authentic Flipbook Rendering the Draft */}
-      <QbjectAuthenticExperience
-        customBookData={draftBook}
-        isDraftPreview={true}
-      />
+      <QbjectAuthenticExperience customBookData={draftBook} />
     </div>
   );
 }
