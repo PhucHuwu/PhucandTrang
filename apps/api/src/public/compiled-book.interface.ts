@@ -90,7 +90,6 @@ export interface CompiledPage {
 
 export interface CompiledBookDocument {
   id: string;
-  slug: string;
   title: string;
   description: string | null;
   contentRevision: number;

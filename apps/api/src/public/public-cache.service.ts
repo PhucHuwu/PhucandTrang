@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+export const PUBLIC_JOURNAL_CACHE_KEY = 'journal';
+
 export interface CacheEntry<T = any> {
   document: T;
   etag: string;
@@ -45,24 +47,11 @@ export class PublicCacheService {
   }
 
   /**
-   * Invalidates memory cache for a specific book slug/id without touching the database counter.
+   * Invalidates the public journal cache without touching the database counter.
    * Used when an operation has already bumped contentRevision in an atomic transaction.
    */
-  async invalidateBookCache(bookId: string): Promise<void> {
-    try {
-      const book = await this.prisma.book.findUnique({
-        where: { id: bookId },
-        select: { slug: true },
-      });
-      if (book?.slug) {
-        this.invalidate(book.slug);
-      }
-      this.invalidate(bookId);
-      this.invalidate('phuc-and-trang');
-      this.invalidate('chung-minh');
-    } catch {
-      this.invalidate();
-    }
+  async invalidateBookCache(_bookId: string): Promise<void> {
+    this.invalidate();
   }
 
   /**
@@ -76,13 +65,10 @@ export class PublicCacheService {
         data: {
           contentRevision: { increment: 1 },
         },
-        select: { id: true, slug: true, contentRevision: true },
+        select: { contentRevision: true },
       });
 
-      this.invalidate(updated.slug);
-      this.invalidate(updated.id);
-      this.invalidate('phuc-and-trang');
-      this.invalidate('chung-minh');
+      this.invalidate();
 
       return updated.contentRevision;
     } catch {

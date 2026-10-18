@@ -2,7 +2,6 @@ export * from './coordinateConversion';
 export * from './cloudinaryCatalog';
 export * from './imageFitting';
 export * from './interactionContract';
-export * from './journalConfig';
 export * from './layoutPresets';
 export * from './pageUtils';
 export * from './safeMerge';

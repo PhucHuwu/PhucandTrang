@@ -42,7 +42,6 @@ export default function AdminPreviewDraftDirectPage() {
         const mappedBook: Book = {
           id: doc.id,
           title: doc.title,
-          slug: doc.slug,
           description: doc.description,
           version: doc.version || '2.0.0',
           contentRevision: doc.contentRevision || 1,

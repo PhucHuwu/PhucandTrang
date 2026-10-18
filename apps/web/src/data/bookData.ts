@@ -4,7 +4,7 @@
  * LEGACY / OFFLINE DEV FALLBACK ONLY (Prompt 25 Verified)
  * 
  * In Production, the application strictly streams canonical content from PostgreSQL & NestJS API:
- *   Database (PostgreSQL Neon) -> API (/api/public/books/:slug) -> Frontend (QbjectAuthenticExperience).
+ *   Database (PostgreSQL Neon) -> API (/api/public/journal) -> Frontend (QbjectAuthenticExperience).
  * 
  * This file is retained solely for local development offline mode when the backend is not running.
  */
@@ -77,7 +77,6 @@ function createBookPage(params: {
 export const PHUC_AND_TRANG_BOOK: Book = {
   id: 'phuc-and-trang-love-journey',
   title: 'Chúng Mình',
-  slug: 'chung-minh',
   description: 'Cuốn nhật ký tình yêu của hai mình từ ngày 20 tháng 10 năm 2022.',
   version: '2.0.0',
   couple: {

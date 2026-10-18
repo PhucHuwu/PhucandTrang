@@ -90,7 +90,7 @@ export class AudioService {
       include: {
         media: true,
         books: {
-          select: { id: true, title: true, slug: true },
+          select: { id: true, title: true },
         },
         pages: {
           select: {

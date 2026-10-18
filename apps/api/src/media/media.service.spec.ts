@@ -113,7 +113,7 @@ describe('MediaService', () => {
           page: {
             pageNumber: 1,
             bookId: 'book-1',
-            book: { title: 'Chúng Mình', slug: 'phuc-and-trang' },
+            book: { title: 'Chúng Mình' },
           },
         },
       ]);
@@ -134,7 +134,6 @@ describe('MediaService', () => {
         {
           id: 'book-1',
           title: 'Chúng Mình',
-          slug: 'phuc-and-trang',
           cover: {
             front: {
               backgroundUrl: 'other.jpg',
@@ -162,7 +161,6 @@ describe('MediaService', () => {
         {
           id: 'book-1',
           title: 'Chúng Mình',
-          slug: 'phuc-and-trang',
           cover: {
             front: {
               backgroundUrl: 'other.jpg',
@@ -216,7 +214,7 @@ describe('MediaService', () => {
           page: {
             pageNumber: 1,
             bookId: 'book-1',
-            book: { title: 'Chúng Mình', slug: 'phuc-and-trang' },
+            book: { title: 'Chúng Mình' },
           },
         },
       ]);
@@ -243,7 +241,7 @@ describe('MediaService', () => {
           page: {
             pageNumber: 1,
             bookId: 'book-1',
-            book: { title: 'Chúng Mình', slug: 'phuc-and-trang' },
+            book: { title: 'Chúng Mình' },
           },
         },
       ]);

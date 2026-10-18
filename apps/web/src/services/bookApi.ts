@@ -15,17 +15,15 @@ export interface FetchBookResult {
 
 /**
  * Fetches the compiled published book document from the NestJS Backend API.
- * Endpoint: GET /public/books/:slug
+ * Endpoint: GET /public/journal
  * 
  * Rules:
  * - In Development: Fallback to local PHUC_AND_TRANG_BOOK if backend is not started.
  * - In Production: Do NOT silently fallback to hardcoded mock data unless NEXT_PUBLIC_ENABLE_LOCAL_BOOK_FALLBACK=true.
  * - Null audio from API is respected: audio is null, no playback occurs.
  */
-export async function fetchPublishedBook(
-  slug: string = 'phuc-and-trang'
-): Promise<FetchBookResult> {
-  const url = `${API_BASE_URL}/public/books/${slug}`;
+export async function fetchPublishedBook(): Promise<FetchBookResult> {
+  const url = `${API_BASE_URL}/public/journal`;
   const isDevelopment = process.env.NODE_ENV !== 'production';
   const allowFallback =
     process.env.NEXT_PUBLIC_ENABLE_LOCAL_BOOK_FALLBACK === 'true' || isDevelopment;
@@ -54,7 +52,6 @@ export async function fetchPublishedBook(
       const book: Book = {
         id: data.id,
         title: data.title,
-        slug: data.slug,
         description: data.description,
         version: data.version || '2.0.0',
         contentRevision: data.contentRevision || 1,
@@ -72,7 +69,7 @@ export async function fetchPublishedBook(
       };
 
       console.log(
-        `[BookAPI] Successfully loaded book "${slug}" from backend API (revision: ${book.contentRevision}, ${book.pages.length} pages).`
+        `[BookAPI] Successfully loaded journal from backend API (revision: ${book.contentRevision}, ${book.pages.length} pages).`
       );
       return { book, source: 'api' };
     } else {

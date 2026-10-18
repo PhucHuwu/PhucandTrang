@@ -7,7 +7,7 @@ import {
   CompiledElement,
   CompiledMediaReferences,
 } from './compiled-book.interface';
-import { PublicCacheService } from './public-cache.service';
+import { PublicCacheService, PUBLIC_JOURNAL_CACHE_KEY } from './public-cache.service';
 import { derivePageSide } from '../utils/page-utils';
 
 @Injectable()
@@ -18,35 +18,21 @@ export class PublicService {
   ) {}
 
   /**
-   * Retrieves the compiled published book document by slug.
+   * Retrieves the published document of the site's single journal.
    * PROMPT 23 CORE RULE:
    * Public API MUST serve the frozen publishedSnapshot if present.
    * Any ongoing edits/drafts in the Admin relational tables do NOT leak into live public site.
    */
-  async getPublishedBook(slug: string): Promise<{ document: CompiledBookDocument; etag: string }> {
-    const cached = this.cacheService.get<CompiledBookDocument>(slug);
+  async getPublishedBook(): Promise<{ document: CompiledBookDocument; etag: string }> {
+    const cached = this.cacheService.get<CompiledBookDocument>(PUBLIC_JOURNAL_CACHE_KEY);
     if (cached) {
       return { document: cached.document, etag: cached.etag };
     }
 
-    let book = await this.prisma.book.findFirst({
-      where: {
-        slug,
-        status: BookStatus.PUBLISHED,
-      },
+    // The site hosts exactly one journal: the earliest created book (same rule as the admin CMS)
+    const book = await this.prisma.book.findFirst({
+      orderBy: { createdAt: 'asc' },
       include: {
-        backgroundMusic: true,
-        pages: {
-          orderBy: { order: 'asc' },
-          include: {
-            elements: {
-              where: { visible: true },
-              orderBy: { zIndex: 'asc' },
-            },
-            layoutTemplate: true,
-            audioTrack: true,
-          },
-        },
         versions: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -55,43 +41,15 @@ export class PublicService {
       },
     });
 
-    if (!book && (slug === 'phuc-and-trang' || slug === 'chung-minh')) {
-      book = await this.prisma.book.findFirst({
-        where: {
-          status: BookStatus.PUBLISHED,
-        },
-        orderBy: { createdAt: 'asc' },
-        include: {
-          backgroundMusic: true,
-          pages: {
-            orderBy: { order: 'asc' },
-            include: {
-              elements: {
-                where: { visible: true },
-                orderBy: { zIndex: 'asc' },
-              },
-              layoutTemplate: true,
-              audioTrack: true,
-            },
-          },
-          versions: {
-            orderBy: { createdAt: 'desc' },
-            take: 1,
-            select: { version: true },
-          },
-        },
-      });
-    }
-
-    if (!book) {
-      throw new NotFoundException(`Không tìm thấy cuốn sách đang xuất bản với slug: "${slug}"`);
+    if (!book || book.status !== BookStatus.PUBLISHED) {
+      throw new NotFoundException('Nhật ký hiện chưa được xuất bản công khai.');
     }
 
     // PROMPT 23 & 40.1: Strictly enforce publishedSnapshot isolation!
     // No fallback compile of draft relational data allowed on production.
     if (!book.publishedSnapshot || typeof book.publishedSnapshot !== 'object') {
       throw new NotFoundException(
-        `Cuốn sách "${slug}" chưa có bản phát hành đóng băng (publishedSnapshot). Vui lòng thực hiện Publish từ Admin CMS.`,
+        'Nhật ký chưa có bản phát hành đóng băng (publishedSnapshot). Vui lòng thực hiện Publish từ Admin CMS.',
       );
     }
 
@@ -101,28 +59,9 @@ export class PublicService {
     const publishedRev = book.publishedRevision || book.contentRevision || 1;
     const etag = `"${book.id}-rev${publishedRev}-v${latestVersion}"`;
 
-    this.cacheService.set(slug, document, etag);
+    this.cacheService.set(PUBLIC_JOURNAL_CACHE_KEY, document, etag);
 
     return { document, etag };
-  }
-
-  /**
-   * Retrieves the primary published book (e.g. for root / website home).
-   */
-  async getMasterBook(): Promise<{ document: CompiledBookDocument; etag: string }> {
-    const primary = await this.prisma.book.findFirst({
-      where: {
-        status: BookStatus.PUBLISHED,
-      },
-      orderBy: { createdAt: 'asc' },
-      select: { slug: true },
-    });
-
-    if (!primary) {
-      throw new NotFoundException('Hiện tại chưa có cuốn sách nào được xuất bản công khai.');
-    }
-
-    return this.getPublishedBook(primary.slug);
   }
 
   /**
@@ -463,7 +402,6 @@ export class PublicService {
 
     return {
       id: book.id,
-      slug: book.slug,
       title: book.title,
       description: book.description || null,
       contentRevision: book.publishedRevision || book.contentRevision || 1,

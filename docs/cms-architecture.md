@@ -9,7 +9,7 @@ Hệ thống đã hoàn tất chuyển đổi toàn diện từ mô hình **Mult
 
 ### A. Backend Architecture & API
 1. **Canonical Journal Resolver**:
-   - Tích hợp `BooksService.getCanonicalJournal()` và `BooksService.getCanonicalJournalId()` dựa trên `CANONICAL_JOURNAL_SLUG = 'phuc-and-trang'`.
+   - Tích hợp `BooksService.getCanonicalJournal()` và `BooksService.getCanonicalJournalId()`: nhật ký duy nhất là cuốn sách được tạo sớm nhất (không dùng slug).
    - Backend Controller chuyên biệt: `/api/journal`:
      - `GET /api/journal`: Lấy trực tiếp thông tin và cấu trúc cuốn nhật ký duy nhất.
      - `PATCH /api/journal`: Cập nhật cấu hình nhật ký an toàn (Safe PATCH semantics).
@@ -17,7 +17,7 @@ Hệ thống đã hoàn tất chuyển đổi toàn diện từ mô hình **Mult
      - `GET /api/journal/validate-publish`: Chạy kiểm toán trước xuất bản.
      - `POST /api/journal/publish`: Xuất bản bản snapshot mới.
      - `POST /api/journal/archive`: Lưu trữ nhật ký.
-   - Thêm alias public endpoint: `GET /api/public/journal`.
+   - Public endpoint duy nhất: `GET /api/public/journal`.
 2. **Loại Bỏ Phức Tạp RBAC**:
    - Giữ nguyên cấu trúc bảng quan hệ trong PostgreSQL mà không làm gián đoạn database schema.
    - Loại bỏ các điều kiện phân quyền rườm rà `RolesGuard`, chuyển về `AuthGuard('jwt')` bảo vệ tài khoản Quản trị viên duy nhất.

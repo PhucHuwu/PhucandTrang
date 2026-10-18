@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  Param,
   Req,
   Res,
   HttpStatus,
@@ -14,60 +13,14 @@ export class PublicController {
   constructor(private publicService: PublicService) {}
 
   /**
-   * Primary Public Book API endpoint
-   * GET /api/public/books/:slug
-   */
-  @Get('books/:slug')
-  async getPublishedBook(
-    @Param('slug') slug: string,
-    @Req() req: Request,
-    @Res() res: Response,
-  ) {
-    const { document, etag } = await this.publicService.getPublishedBook(slug);
-
-    // Check ETag for 304 Not Modified
-    const clientEtag = req.headers['if-none-match'];
-    if (clientEtag && clientEtag === etag) {
-      return res.status(HttpStatus.NOT_MODIFIED).send();
-    }
-
-    res.set({
-      'Content-Type': 'application/json',
-      'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=600',
-      ETag: etag,
-    });
-
-    return res.status(HttpStatus.OK).json(document);
-  }
-
-  /**
-   * Convenience alias: GET /api/public/book/:slug
-   */
-  @Get('book/:slug')
-  async getPublishedBookAlias(
-    @Param('slug') slug: string,
-    @Req() req: Request,
-    @Res() res: Response,
-  ) {
-    return this.getPublishedBook(slug, req, res);
-  }
-
-  /**
-   * Semantic Public Journal Endpoint: GET /api/public/journal
-   * Directly returns the primary published Love Journal for Phúc & Trang.
+   * Public Journal Endpoint: GET /api/public/journal
+   * Returns the published snapshot of the site's single love journal.
    */
   @Get('journal')
   async getPublishedJournal(@Req() req: Request, @Res() res: Response) {
-    return this.getMasterBook(req, res);
-  }
+    const { document, etag } = await this.publicService.getPublishedBook();
 
-  /**
-   * Convenience default endpoint: GET /api/public/book (returns master published book)
-   */
-  @Get('book')
-  async getMasterBook(@Req() req: Request, @Res() res: Response) {
-    const { document, etag } = await this.publicService.getMasterBook();
-
+    // Check ETag for 304 Not Modified
     const clientEtag = req.headers['if-none-match'];
     if (clientEtag && clientEtag === etag) {
       return res.status(HttpStatus.NOT_MODIFIED).send();

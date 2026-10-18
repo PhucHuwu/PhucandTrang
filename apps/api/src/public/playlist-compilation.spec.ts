@@ -37,7 +37,6 @@ describe('Global Music Playlist Compilation Contract Test', () => {
   it('compiles multi-track global playlist from book settings and resolves media URLs', async () => {
     const mockBook = {
       id: 'book-1',
-      slug: 'phuc-and-trang',
       title: 'Chúng Mình',
       contentRevision: 1,
       backgroundMusic: {

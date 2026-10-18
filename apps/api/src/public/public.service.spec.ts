@@ -36,7 +36,6 @@ describe('PublicService (Req 15, 19, 20 & Prompt 23/40.1 Draft Isolation)', () =
   it('Prompt 23 & 40.1: Live public site serves frozen publishedSnapshot directly so admin drafts do not bleed', async () => {
     const mockFrozenSnapshot = {
       id: 'book-1',
-      slug: 'phuc-and-trang',
       title: 'Tiêu Đề Đã Xuất Bản (Frozen)',
       contentRevision: 5,
       couple: { he: 'Phúc', she: 'Trang' },
@@ -55,7 +54,6 @@ describe('PublicService (Req 15, 19, 20 & Prompt 23/40.1 Draft Isolation)', () =
 
     const mockBookWithDraftDiff = {
       id: 'book-1',
-      slug: 'phuc-and-trang',
       title: 'Tiêu Đề Bản Nháp Mới Nhất Trong Admin (Draft)',
       status: BookStatus.PUBLISHED,
       publishedSnapshot: mockFrozenSnapshot,
@@ -74,7 +72,7 @@ describe('PublicService (Req 15, 19, 20 & Prompt 23/40.1 Draft Isolation)', () =
 
     prisma.book.findFirst.mockResolvedValue(mockBookWithDraftDiff);
 
-    const result = await service.getPublishedBook('phuc-and-trang');
+    const result = await service.getPublishedBook();
 
     // Live public result MUST be the frozen snapshot, not the live draft relation
     expect(result.document.title).toBe('Tiêu Đề Đã Xuất Bản (Frozen)');
@@ -85,7 +83,6 @@ describe('PublicService (Req 15, 19, 20 & Prompt 23/40.1 Draft Isolation)', () =
   it('Prompt 40.1: should throw NotFoundException when book has publishedSnapshot = null (strictly rejects draft compilation)', async () => {
     const mockBookWithoutSnapshot = {
       id: 'book-1',
-      slug: 'phuc-and-trang',
       title: 'Chúng Mình',
       status: BookStatus.PUBLISHED,
       publishedSnapshot: null,
@@ -95,7 +92,7 @@ describe('PublicService (Req 15, 19, 20 & Prompt 23/40.1 Draft Isolation)', () =
 
     prisma.book.findFirst.mockResolvedValue(mockBookWithoutSnapshot);
 
-    await expect(service.getPublishedBook('phuc-and-trang')).rejects.toThrow(
+    await expect(service.getPublishedBook()).rejects.toThrow(
       NotFoundException,
     );
   });
@@ -103,12 +100,10 @@ describe('PublicService (Req 15, 19, 20 & Prompt 23/40.1 Draft Isolation)', () =
   it('should respect audio null in publishedSnapshot without throwing error', async () => {
     const mockBook = {
       id: 'book-2',
-      slug: 'silent-book',
       title: 'Sách Không Nhạc',
       status: BookStatus.PUBLISHED,
       publishedSnapshot: {
         id: 'book-2',
-        slug: 'silent-book',
         title: 'Sách Không Nhạc',
         audio: null,
         pages: [],
@@ -120,7 +115,18 @@ describe('PublicService (Req 15, 19, 20 & Prompt 23/40.1 Draft Isolation)', () =
 
     prisma.book.findFirst.mockResolvedValue(mockBook);
 
-    const result = await service.getPublishedBook('silent-book');
+    const result = await service.getPublishedBook();
     expect(result.document.audio).toBeNull();
+  });
+
+  it('should not serve the journal while it is not published', async () => {
+    prisma.book.findFirst.mockResolvedValue({
+      id: 'book-1',
+      status: BookStatus.DRAFT,
+      publishedSnapshot: { id: 'book-1', pages: [] },
+      versions: [],
+    });
+
+    await expect(service.getPublishedBook()).rejects.toThrow(NotFoundException);
   });
 });

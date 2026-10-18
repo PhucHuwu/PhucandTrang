@@ -5,7 +5,6 @@ import { PublicCacheService } from '../public/public-cache.service';
 import { PublicService } from '../public/public.service';
 import { PublishValidationService } from './publish-validation.service';
 import { NotFoundException } from '@nestjs/common';
-import { CANONICAL_JOURNAL_SLUG } from '@phucandtrang/shared';
 
 describe('BooksService Canonical Single Love Journal (Prompt 40.2 Architecture)', () => {
   let service: BooksService;
@@ -52,38 +51,21 @@ describe('BooksService Canonical Single Love Journal (Prompt 40.2 Architecture)'
 
   const mockJournal = {
     id: 'journal-phuc-and-trang',
-    slug: CANONICAL_JOURNAL_SLUG,
     title: 'Chúng Mình',
     heName: 'Phúc',
     sheName: 'Trang',
     pages: [],
   };
 
-  it('getCanonicalJournal: strictly resolves the canonical single journal by slug phuc-and-trang', async () => {
+  it('getCanonicalJournal: resolves the single journal as the earliest created book', async () => {
     prisma.book.findFirst.mockResolvedValue(mockJournal);
 
     const journal = await service.getCanonicalJournal();
     expect(journal.id).toBe('journal-phuc-and-trang');
-    expect(journal.slug).toBe('phuc-and-trang');
-    expect(prisma.book.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          OR: [
-            { slug: 'phuc-and-trang' },
-            { slug: 'chung-minh' },
-          ],
-        },
-      }),
-    );
-  });
-
-  it('getCanonicalJournal: falls back to the earliest created book if slug not found', async () => {
-    prisma.book.findFirst
-      .mockResolvedValueOnce(null) // first query with slug returns null
-      .mockResolvedValueOnce(mockJournal); // fallback query returns earliest book
-
-    const journal = await service.getCanonicalJournal();
-    expect(journal.id).toBe('journal-phuc-and-trang');
+    expect(prisma.book.findFirst).toHaveBeenCalledTimes(1);
+    const query = prisma.book.findFirst.mock.calls[0][0];
+    expect(query.orderBy).toEqual({ createdAt: 'asc' });
+    expect(query.where).toBeUndefined();
   });
 
   it('getCanonicalJournal: throws NotFoundException when no journal exists in database', async () => {

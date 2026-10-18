@@ -45,7 +45,7 @@ PhucandTrang/
 │                            BACKEND (NestJS 10)                              │
 │                                                                             │
 │  - Single Journal Controller: /api/journal (GET, PATCH, publish, preview)   │
-│  - Canonical Journal Resolver: slug = 'phuc-and-trang'                      │
+│  - Single Journal Resolver: earliest created book (no slug)                 │
 │  - Single Admin Authentication (No multi-user RBAC overhead)                │
 │  - Public Registration Completely Disabled                                  │
 │  - Pre-Publish Validation Engine (10 Blocking Errors vs Warnings)           │

@@ -477,7 +477,6 @@ export interface BookCoverConfig {
 export interface Book {
   id: string;
   title: string;
-  slug: string;
   description?: string;
   version: string;
   contentRevision?: number;

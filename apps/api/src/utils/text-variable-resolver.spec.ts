@@ -9,7 +9,6 @@ describe('TextVariableResolver (Prompt 13 - Dynamic Text Variables)', () => {
   const mockContext = TextVariableResolver.createContext({
     book: {
       title: 'Chúng Mình',
-      slug: 'phuc-and-trang',
       couple: {
         he: 'Phúc',
         she: 'Trang',

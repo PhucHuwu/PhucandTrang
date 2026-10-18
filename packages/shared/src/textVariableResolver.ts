@@ -11,7 +11,6 @@ export interface VariableContext {
   currentDate?: string | Date;
   book?: {
     title?: string;
-    slug?: string;
     [key: string]: any;
   };
   page?: {
@@ -174,7 +173,6 @@ export class TextVariableResolver {
       currentDate: formatLoveDate(new Date()),
       book: {
         title: book.title || 'Chúng Mình',
-        slug: book.slug || 'phuc-and-trang',
       },
       page: {
         pageNumber: page.pageNumber,

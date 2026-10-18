@@ -31,7 +31,7 @@
      ```
      Bản Nháp (Draft) ➔ Kiểm Tra Toàn Vẹn (Pre-Publish Validation 10 Rules) ➔ Biên Dịch Snapshot Đóng Băng (publishedSnapshot) ➔ Public Site
      ```
-   - Độc giả công khai trên Internet (`/api/public/books/:slug`) chỉ đọc dữ liệu từ `publishedSnapshot`. Tuyệt đối không có đường tắt nào làm rò rỉ dữ liệu nháp đang sửa.
+   - Độc giả công khai trên Internet (`/api/public/journal`) chỉ đọc dữ liệu từ `publishedSnapshot`. Tuyệt đối không có đường tắt nào làm rò rỉ dữ liệu nháp đang sửa.
 
 2. **Rollback An Toàn**:
    - Khôi phục bản ghi từ `BookVersion` chỉ đưa dữ liệu về các bảng nháp quan hệ.

@@ -29,11 +29,6 @@ export class BooksController {
     return this.booksService.findOne(id);
   }
 
-  @Get('slug/:slug')
-  async findBySlug(@Param('slug') slug: string) {
-    return this.booksService.findBySlug(slug);
-  }
-
   /**
    * Prompt 34: Run pre-publish validation report without altering database
    */

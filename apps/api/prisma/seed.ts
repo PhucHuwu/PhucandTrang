@@ -326,8 +326,8 @@ async function main() {
     },
   };
 
-  const existingBook = await prisma.book.findUnique({
-    where: { slug: 'phuc-and-trang' },
+  const existingBook = await prisma.book.findFirst({
+    orderBy: { createdAt: 'asc' },
     include: { _count: { select: { pages: true } } },
   });
 
@@ -366,7 +366,6 @@ async function main() {
     } else {
       book = await prisma.book.create({
         data: {
-          slug: 'phuc-and-trang',
           title: 'Chúng Mình',
           description: 'Cuốn nhật ký tình yêu của hai mình từ ngày 20 tháng 10 năm 2022.',
           status: BookStatus.PUBLISHED,
@@ -381,7 +380,7 @@ async function main() {
           settings: canonicalSettings,
         },
       });
-      console.log(`✅ Book entity created: "${book.title}" (slug: ${book.slug})`);
+      console.log(`✅ Book entity created: "${book.title}"`);
     }
 
     shouldSeedPages = true;
@@ -994,7 +993,6 @@ async function main() {
 
   const compiledPublishedDoc = {
     id: book.id,
-    slug: book.slug,
     title: book.title,
     description: book.description,
     contentRevision: 1,

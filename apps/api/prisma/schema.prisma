@@ -61,7 +61,6 @@ model User {
 
 model Book {
   id                String        @id @default(uuid())
-  slug              String        @unique
   title             String
   description       String?
   status            BookStatus    @default(DRAFT)
@@ -85,7 +84,6 @@ model Book {
   updatedAt         DateTime      @updatedAt
 
   @@index([status])
-  @@index([slug])
   @@map("books")
 }
 

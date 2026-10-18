@@ -22,7 +22,6 @@ export interface MediaReferenceItem {
   targetType: 'BOOK_COVER' | 'PAGE_BACKGROUND' | 'PAGE_ELEMENT' | 'AUDIO_TRACK';
   bookId?: string;
   bookTitle?: string;
-  bookSlug?: string;
   pageId?: string;
   pageNumber?: number;
   chapter?: string;
@@ -305,7 +304,6 @@ export class MediaService {
           targetType: 'BOOK_COVER',
           bookId: book.id,
           bookTitle: book.title,
-          bookSlug: book.slug,
           field: 'cover.front.backgroundUrl',
           description: `Bìa trước sách "${book.title}" (Front Cover)`,
         });
@@ -316,7 +314,6 @@ export class MediaService {
           targetType: 'BOOK_COVER',
           bookId: book.id,
           bookTitle: book.title,
-          bookSlug: book.slug,
           field: 'cover.back.insideBackgroundUrl',
           description: `Mặt trong bìa sau sách "${book.title}" (Inside Back Cover)`,
         });
@@ -327,7 +324,6 @@ export class MediaService {
           targetType: 'BOOK_COVER',
           bookId: book.id,
           bookTitle: book.title,
-          bookSlug: book.slug,
           field: 'cover.back.outsideBackgroundUrl',
           description: `Mặt ngoài bìa sau sách "${book.title}" (Outside Back Cover)`,
         });
@@ -344,7 +340,6 @@ export class MediaService {
             targetType: 'BOOK_COVER',
             bookId: book.id,
             bookTitle: book.title,
-            bookSlug: book.slug,
             elementId: el.id,
             elementType: el.type,
             field: 'cover.front.elements.src',
@@ -357,7 +352,6 @@ export class MediaService {
             targetType: 'BOOK_COVER',
             bookId: book.id,
             bookTitle: book.title,
-            bookSlug: book.slug,
             elementId: el.id,
             elementType: el.type,
             field: 'cover.front.elements.poster',
@@ -376,7 +370,6 @@ export class MediaService {
             targetType: 'BOOK_COVER',
             bookId: book.id,
             bookTitle: book.title,
-            bookSlug: book.slug,
             elementId: el.id,
             elementType: el.type,
             field: 'cover.back.elements.src',
@@ -389,7 +382,6 @@ export class MediaService {
             targetType: 'BOOK_COVER',
             bookId: book.id,
             bookTitle: book.title,
-            bookSlug: book.slug,
             elementId: el.id,
             elementType: el.type,
             field: 'cover.back.elements.poster',
@@ -403,7 +395,6 @@ export class MediaService {
           targetType: 'AUDIO_TRACK',
           bookId: book.id,
           bookTitle: book.title,
-          bookSlug: book.slug,
           field: 'book.backgroundMusic',
           description: `Nhạc nền chính của sách "${book.title}"`,
         });
@@ -414,7 +405,7 @@ export class MediaService {
     const pages = await this.prisma.page.findMany({
       include: {
         book: {
-          select: { id: true, title: true, slug: true },
+          select: { id: true, title: true },
         },
         audioTrack: true,
       },
@@ -427,7 +418,6 @@ export class MediaService {
           targetType: 'PAGE_BACKGROUND',
           bookId: page.bookId,
           bookTitle: page.book?.title,
-          bookSlug: page.book?.slug,
           pageId: page.id,
           pageNumber: page.pageNumber,
           chapter: page.chapter || undefined,
@@ -441,7 +431,6 @@ export class MediaService {
           targetType: 'AUDIO_TRACK',
           bookId: page.bookId,
           bookTitle: page.book?.title,
-          bookSlug: page.book?.slug,
           pageId: page.id,
           pageNumber: page.pageNumber,
           field: 'page.audioTrack',
@@ -455,7 +444,7 @@ export class MediaService {
       include: {
         page: {
           include: {
-            book: { select: { id: true, title: true, slug: true } },
+            book: { select: { id: true, title: true } },
           },
         },
       },
@@ -472,7 +461,6 @@ export class MediaService {
           targetType: 'PAGE_ELEMENT',
           bookId: elem.page?.bookId,
           bookTitle: elem.page?.book?.title,
-          bookSlug: elem.page?.book?.slug,
           pageId: elem.pageId,
           pageNumber: elem.page?.pageNumber,
           elementId: elem.id,
@@ -488,7 +476,6 @@ export class MediaService {
           targetType: 'PAGE_ELEMENT',
           bookId: elem.page?.bookId,
           bookTitle: elem.page?.book?.title,
-          bookSlug: elem.page?.book?.slug,
           pageId: elem.pageId,
           pageNumber: elem.page?.pageNumber,
           elementId: elem.id,

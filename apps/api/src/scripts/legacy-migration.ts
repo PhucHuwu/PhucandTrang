@@ -59,7 +59,7 @@ async function main() {
 
     // 2. Fetch the target book
     const book = await prisma.book.findFirst({
-      where: { slug: 'phuc-and-trang' },
+      orderBy: { createdAt: 'asc' },
       include: {
         backgroundMusic: true,
         pages: {
@@ -74,7 +74,7 @@ async function main() {
     });
 
     if (!book) {
-      console.error('❌ Book "phuc-and-trang" not found.');
+      console.error('❌ No journal found in the database.');
       return;
     }
 
@@ -239,7 +239,6 @@ async function main() {
 
       const compiledDoc = {
         id: refreshedBook.id,
-        slug: refreshedBook.slug,
         title: refreshedBook.title,
         description: refreshedBook.description || null,
         contentRevision: refreshedBook.publishedRevision || 1,

@@ -11,7 +11,7 @@ import { UpdateBookDto } from './dto/update-book.dto';
 import { PublicCacheService } from '../public/public-cache.service';
 import { PublicService } from '../public/public.service';
 import { PublishValidationService } from './publish-validation.service';
-import { safeDeepMerge, CANONICAL_JOURNAL_SLUG, LEGACY_JOURNAL_SLUG } from '@phucandtrang/shared';
+import { safeDeepMerge } from '@phucandtrang/shared';
 
 @Injectable()
 export class BooksService {
@@ -23,17 +23,11 @@ export class BooksService {
   ) {}
 
   /**
-   * Resolves the canonical single Love Journal for Phúc & Trang.
-   * Auto-resolves by slug = 'phuc-and-trang', fallback to first book if not yet renamed.
+   * Resolves the site's single Love Journal: the earliest created book.
    */
   async getCanonicalJournal() {
-    let journal = await this.prisma.book.findFirst({
-      where: {
-        OR: [
-          { slug: CANONICAL_JOURNAL_SLUG },
-          { slug: LEGACY_JOURNAL_SLUG },
-        ],
-      },
+    const journal = await this.prisma.book.findFirst({
+      orderBy: { createdAt: 'asc' },
       include: {
         backgroundMusic: true,
         _count: { select: { pages: true } },
@@ -52,29 +46,6 @@ export class BooksService {
         },
       },
     });
-
-    if (!journal) {
-      journal = await this.prisma.book.findFirst({
-        orderBy: { createdAt: 'asc' },
-        include: {
-          backgroundMusic: true,
-          _count: { select: { pages: true } },
-          pages: {
-            orderBy: { order: 'asc' },
-            include: {
-              elements: { orderBy: { zIndex: 'asc' } },
-              layoutTemplate: true,
-              audioTrack: true,
-            },
-          },
-          versions: {
-            orderBy: { createdAt: 'desc' },
-            take: 1,
-            select: { version: true },
-          },
-        },
-      });
-    }
 
     if (!journal) {
       throw new NotFoundException('Không tìm thấy cuốn nhật ký tình yêu Phúc & Trang trong cơ sở dữ liệu.');
@@ -117,33 +88,7 @@ export class BooksService {
     return book;
   }
 
-  async findBySlug(slug: string) {
-    const book = await this.prisma.book.findUnique({
-      where: { slug },
-      include: {
-        backgroundMusic: true,
-        pages: {
-          orderBy: { order: 'asc' },
-          include: {
-            elements: { orderBy: { zIndex: 'asc' } },
-            layoutTemplate: true,
-            audioTrack: true,
-          },
-        },
-      },
-    });
-    if (!book) throw new NotFoundException(`Không tìm thấy cuốn sách với slug: ${slug}`);
-    return book;
-  }
-
   async create(dto: CreateBookDto, ownerId?: string) {
-    const existing = await this.prisma.book.findUnique({
-      where: { slug: dto.slug },
-    });
-    if (existing) {
-      throw new ConflictException(`Cuốn sách với slug "${dto.slug}" đã tồn tại.`);
-    }
-
     let backgroundMusicId: string | null = null;
     if ('backgroundMusicId' in dto) {
       backgroundMusicId = dto.backgroundMusicId ?? null;
@@ -151,7 +96,6 @@ export class BooksService {
 
     const book = await this.prisma.book.create({
       data: {
-        slug: dto.slug,
         title: dto.title,
         description: dto.description,
         status: BookStatus.DRAFT, // Enforce initial state is always DRAFT (Prompt 40.1 fix)
@@ -218,10 +162,9 @@ export class BooksService {
   }
 
   async remove(id: string) {
-    const book = await this.findOne(id);
+    await this.findOne(id);
     const result = await this.prisma.book.delete({ where: { id } });
-    this.cacheService.invalidate(book.slug);
-    this.cacheService.invalidate(id);
+    this.cacheService.invalidate();
     return result;
   }
 

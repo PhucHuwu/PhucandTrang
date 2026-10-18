@@ -42,7 +42,6 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
       collectAndResolveMedia: jest.fn().mockResolvedValue(new Map()),
       compileBookDocument: jest.fn().mockImplementation((book, mediaMap) => ({
         id: book.id,
-        slug: book.slug,
         title: book.title,
         contentRevision: 1,
         pages: book.pages || [],
@@ -73,7 +72,6 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
 
   const mockExistingBook = {
     id: 'book-1',
-    slug: 'phuc-and-trang',
     title: 'Chúng Mình',
     backgroundMusicId: 'track-1',
     publishedRevision: 1,

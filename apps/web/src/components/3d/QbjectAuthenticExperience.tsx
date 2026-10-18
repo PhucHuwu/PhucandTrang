@@ -54,7 +54,7 @@ export default function QbjectAuthenticExperience({
         if (customBookData) {
           book = customBookData;
         } else {
-          const { book: fetchedBook, error: fetchErr } = await fetchPublishedBook('phuc-and-trang');
+          const { book: fetchedBook, error: fetchErr } = await fetchPublishedBook();
           if (fetchErr && !fetchedBook) {
             throw new Error(fetchErr);
           }

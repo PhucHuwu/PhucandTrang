@@ -67,7 +67,6 @@ describe('Publish Bypass Protection Regression Suite (Prompt 40.1)', () => {
     prisma.book.create.mockImplementation((args) => Promise.resolve({ id: 'b-new', ...args.data }));
 
     const created = await booksService.create({
-      slug: 'new-book',
       title: 'Sách Mới',
       // Attacker attempts to bypass validation by providing status = PUBLISHED
       ...({ status: BookStatus.PUBLISHED } as any),
@@ -89,7 +88,6 @@ describe('Publish Bypass Protection Regression Suite (Prompt 40.1)', () => {
   it('UpdateBook: cannot arbitrarily set status = PUBLISHED via PATCH or PUT', async () => {
     const existingBook = {
       id: 'b-1',
-      slug: 'my-book',
       title: 'Bản Nháp',
       status: BookStatus.DRAFT,
       cover: {},
@@ -113,7 +111,6 @@ describe('Publish Bypass Protection Regression Suite (Prompt 40.1)', () => {
     // Book has status = PUBLISHED but publishedSnapshot = null (unauthorized bypass attempt)
     const illegitimatePublishedBook = {
       id: 'b-bypass',
-      slug: 'bypassed-book',
       title: 'Draft Lộ Ra Ngoài',
       status: BookStatus.PUBLISHED,
       publishedSnapshot: null,
@@ -123,7 +120,7 @@ describe('Publish Bypass Protection Regression Suite (Prompt 40.1)', () => {
 
     prisma.book.findFirst.mockResolvedValue(illegitimatePublishedBook);
 
-    await expect(publicService.getPublishedBook('bypassed-book')).rejects.toThrow(
+    await expect(publicService.getPublishedBook()).rejects.toThrow(
       NotFoundException,
     );
   });

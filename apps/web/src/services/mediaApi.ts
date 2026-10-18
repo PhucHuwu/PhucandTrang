@@ -21,7 +21,6 @@ export interface MediaReferenceItem {
   targetType: 'BOOK_COVER' | 'PAGE_BACKGROUND' | 'PAGE_ELEMENT' | 'AUDIO_TRACK';
   bookId?: string;
   bookTitle?: string;
-  bookSlug?: string;
   pageId?: string;
   pageNumber?: number;
   chapter?: string;
