@@ -22,6 +22,30 @@ const WING_DISPLACEMENT = 1.25;
 // packed left to right into one strip, head towards the top of each 256px cell.
 const BUTTERFLY_ATLAS_URL = '/butterflies/atlas.webp';
 const BUTTERFLY_ATLAS_COUNT = 4;
+// Watercolor blossoms (0-4) and autumn leaves (5-8), generated for this site, one 256px cell each.
+const FOLIAGE_ATLAS_URL = '/foliage/atlas.webp';
+const FOLIAGE_ATLAS_COUNT = 9;
+// Sizes in world units; butterflies span 52-72, so petals stay well below that.
+const FOLIAGE_KINDS = [
+  { indexes: [2, 3], minSize: 18, maxSize: 24, fallSpeed: 38, sway: 55 }, // loose petals
+  { indexes: [0, 1, 4], minSize: 24, maxSize: 32, fallSpeed: 46, sway: 40 }, // whole blossoms
+  { indexes: [2, 3], minSize: 18, maxSize: 24, fallSpeed: 38, sway: 55 },
+  { indexes: [5, 6, 7, 8], minSize: 34, maxSize: 46, fallSpeed: 58, sway: 70 }, // leaves
+];
+
+interface FoliageEntity {
+  position: THREE.Vector3;
+  rotation: THREE.Euler;
+  spin: THREE.Vector3;
+  size: number;
+  fallSpeed: number;
+  drift: number;
+  swayPhase: number;
+  swaySpeed: number;
+  swayAmount: number;
+  nearBook: boolean;
+}
+
 const FLIGHT = {
   homeRadiusInner: 220,
   homeRadiusOuter: 420,
@@ -36,7 +60,9 @@ export class AtmosphericSystem {
   scene: THREE.Scene;
   dustParticles: THREE.Points | null = null;
   glowingHearts: THREE.Group | null = null;
-  petals: THREE.Group | null = null;
+  foliageMesh: THREE.InstancedMesh | null = null;
+  private foliage: FoliageEntity[] = [];
+  private readonly shade = new THREE.Color();
   butterflies: ButterflyEntity[] = [];
   butterflyMesh: THREE.InstancedMesh | null = null;
   private wingPhaseAttribute: THREE.InstancedBufferAttribute | null = null;
@@ -133,71 +159,122 @@ export class AtmosphericSystem {
     this.scene.add(this.dustParticles);
   }
 
-  // 2. Realistic Organic Curved Rose & Cherry Blossom Petals
+  // 2. Falling blossoms, petals and autumn leaves: one instanced, slightly curled quad each
   initPetals() {
-    this.petals = new THREE.Group();
-    const petalCount = this.configuredPetalCount ?? (this.compact ? 16 : 34);
+    const count = this.configuredPetalCount ?? (this.compact ? 16 : 34);
+    if (count <= 0) return;
 
-    // Build real organic teardrop / cherry blossom petal curve with subtle notch
-    const petalShape = new THREE.Shape();
-    petalShape.moveTo(0, 0); // Petal base / stem point
-    petalShape.bezierCurveTo(8, 12, 18, 26, 16, 42); // Right outer curve
-    petalShape.bezierCurveTo(14, 54, 4, 60, 0, 56);   // Top curve with gentle dip
-    petalShape.bezierCurveTo(-4, 60, -14, 54, -16, 42);// Top left notch
-    petalShape.bezierCurveTo(-18, 26, -8, 12, 0, 0);  // Left curve returning to base
+    const geometry = new THREE.PlaneGeometry(1, 1, 4, 4);
+    const atlasIndexes = new Float32Array(count);
+    const curls = new Float32Array(count);
 
-    const basePetalGeo = new THREE.ShapeGeometry(petalShape, 12);
-    basePetalGeo.center();
+    const mesh = new THREE.InstancedMesh(geometry, undefined, count);
+    mesh.visible = false;
+    const atlas = new THREE.TextureLoader().load(FOLIAGE_ATLAS_URL, () => {
+      if (this.foliageMesh === mesh) mesh.visible = true;
+    });
+    atlas.colorSpace = THREE.SRGBColorSpace;
+    atlas.anisotropy = 4;
 
-    // Give 3D cup curvature to the petal so it doesn't look flat
-    const pos = basePetalGeo.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i);
-      const y = pos.getY(i);
-      // Cup depression along center line (y) and curl along edges
-      const cupZ = Math.sin((y / 30) * Math.PI) * 5 - (Math.abs(x) / 18) * 4;
-      pos.setZ(i, cupZ);
-    }
-    basePetalGeo.computeVertexNormals();
+    const material = new THREE.MeshBasicMaterial({
+      map: atlas,
+      side: THREE.DoubleSide,
+      transparent: true,
+      alphaTest: 0.4,
+    });
+    material.onBeforeCompile = (shader) => {
+      shader.defines = { ...shader.defines, ATLAS_COUNT: FOLIAGE_ATLAS_COUNT.toFixed(10) };
+      shader.vertexShader = `
+        attribute float aAtlasIndex;
+        attribute float aCurl;
+      ${shader.vertexShader}`
+        .replace(
+          '#include <uv_vertex>',
+          `#include <uv_vertex>
+          vMapUv.x = (aAtlasIndex + vMapUv.x) / ATLAS_COUNT;`,
+        )
+        .replace(
+          '#include <begin_vertex>',
+          `vec3 transformed = vec3(position);
+          // Cup the sprite so it reads as a real petal/leaf while tumbling
+          transformed.z += aCurl * (transformed.x * transformed.x + transformed.y * transformed.y * 0.4);`,
+        );
+    };
+    mesh.material = material;
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.frustumCulled = false;
+    this.foliageMesh = mesh;
 
-    const petalColors = [0xFFA6BA, 0xFFC2CD, 0xF9B4C4, 0xFFD8E2, 0xEFA0B0];
+    for (let i = 0; i < count; i++) {
+      const kind = FOLIAGE_KINDS[i % FOLIAGE_KINDS.length];
+      const index = kind.indexes[Math.floor(Math.random() * kind.indexes.length)];
+      atlasIndexes[i] = index;
+      curls[i] = (Math.random() * 0.5 + 0.15) * (Math.random() < 0.5 ? -1 : 1);
 
-    for (let i = 0; i < petalCount; i++) {
-      const col = petalColors[i % petalColors.length];
-      const mat = new THREE.MeshStandardMaterial({
-        color: col,
-        roughness: 0.65,
-        metalness: 0.05,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.85,
+      const nearBook = i % 3 === 0;
+      const position = new THREE.Vector3();
+      this.respawnFoliage(position, nearBook, Math.random() * 2200 - 600);
+      this.foliage.push({
+        position,
+        rotation: new THREE.Euler(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI),
+        spin: new THREE.Vector3((Math.random() - 0.5) * 1.6, (Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 1.4),
+        size: kind.minSize + Math.random() * (kind.maxSize - kind.minSize),
+        fallSpeed: kind.fallSpeed * (0.8 + Math.random() * 0.5),
+        drift: (Math.random() - 0.5) * 20,
+        swayPhase: Math.random() * Math.PI * 2,
+        swaySpeed: 0.9 + Math.random() * 0.9,
+        swayAmount: kind.sway * (0.7 + Math.random() * 0.6),
+        nearBook,
       });
-
-      const mesh = new THREE.Mesh(basePetalGeo, mat);
-      const side = Math.random() < 0.5 ? -1 : 1;
-      mesh.position.set(
-        side * (i % 3 === 0 ? 150 + Math.random() * 550 : 650 + Math.random() * 650),
-        Math.random() * 2200 - 600,
-        100 + Math.random() * 500
-      );
-      mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-      
-      const scale = 0.5 + Math.random() * 0.4;
-      mesh.scale.set(scale, scale, scale);
-
-      mesh.userData = {
-        nearBook: i % 3 === 0,
-        speedY: 1.0 + Math.random() * 1.5,
-        speedX: (Math.random() - 0.5) * 1.2,
-        rotSpeedX: (Math.random() - 0.5) * 0.02,
-        rotSpeedZ: (Math.random() - 0.5) * 0.02,
-        wobblePhase: Math.random() * Math.PI * 2,
-        wobbleSpeed: 0.02 + Math.random() * 0.02,
-      };
-      this.petals.add(mesh);
+      mesh.setColorAt(i, this.shade.setScalar(1));
     }
+    geometry.setAttribute('aAtlasIndex', new THREE.InstancedBufferAttribute(atlasIndexes, 1));
+    geometry.setAttribute('aCurl', new THREE.InstancedBufferAttribute(curls, 1));
 
-    this.scene.add(this.petals);
+    this.writeFoliageInstances();
+    this.scene.add(mesh);
+  }
+
+  private respawnFoliage(position: THREE.Vector3, nearBook: boolean, y: number) {
+    const side = Math.random() < 0.5 ? -1 : 1;
+    position.set(
+      side * (nearBook ? 150 + Math.random() * 550 : 650 + Math.random() * 650),
+      y,
+      100 + Math.random() * 500,
+    );
+  }
+
+  private stepFoliage(dt: number) {
+    for (const f of this.foliage) {
+      f.swayPhase += f.swaySpeed * dt;
+      const sway = Math.sin(f.swayPhase);
+      f.position.y -= f.fallSpeed * dt;
+      f.position.x += (sway * f.swayAmount + f.drift) * dt;
+      f.position.z += Math.cos(f.swayPhase) * f.swayAmount * 0.4 * dt;
+
+      f.rotation.x += f.spin.x * dt;
+      f.rotation.y += (f.spin.y + sway * 0.6) * dt;
+      f.rotation.z += f.spin.z * dt;
+
+      if (f.position.y < -1200) this.respawnFoliage(f.position, f.nearBook, 1400);
+    }
+    this.writeFoliageInstances();
+  }
+
+  private writeFoliageInstances() {
+    const mesh = this.foliageMesh;
+    if (!mesh) return;
+    this.foliage.forEach((f, i) => {
+      this.instanceQuaternion.setFromEuler(f.rotation);
+      this.instanceScale.setScalar(f.size);
+      this.instanceMatrix.compose(f.position, this.instanceQuaternion, this.instanceScale);
+      mesh.setMatrixAt(i, this.instanceMatrix);
+      // Fake lighting: darken as the sprite turns edge-on to the camera
+      this.scratch.set(0, 0, 1).applyQuaternion(this.instanceQuaternion);
+      mesh.setColorAt(i, this.shade.setScalar(0.72 + 0.28 * Math.abs(this.scratch.z)));
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }
 
   // 3. Floating Tiny Glowing Hearts
@@ -324,7 +401,7 @@ export class AtmosphericSystem {
         heading: velocity.clone().normalize(),
         home,
         wingPhase: Math.random() * Math.PI * 2,
-        size: 24 + Math.random() * 12,
+        size: 26 + Math.random() * 10,
         seed: Math.random() * 100,
       });
     }
@@ -411,26 +488,8 @@ export class AtmosphericSystem {
       this.dustParticles.geometry.attributes.position.needsUpdate = true;
     }
 
-    // 2. Petals floating down with natural leaf fluttering
-    if (this.petals) {
-      this.petals.children.forEach((mesh) => {
-        mesh.userData.wobblePhase += mesh.userData.wobbleSpeed * frame;
-        mesh.position.y -= mesh.userData.speedY * 0.4 * frame;
-        mesh.position.x += (Math.sin(mesh.userData.wobblePhase) * 1.5 + mesh.userData.speedX * 0.3) * frame;
-        mesh.position.z += Math.cos(mesh.userData.wobblePhase) * 0.8 * frame;
-
-        mesh.rotation.x += mesh.userData.rotSpeedX * frame;
-        mesh.rotation.y += Math.sin(mesh.userData.wobblePhase) * 0.02 * frame;
-        mesh.rotation.z += mesh.userData.rotSpeedZ * frame;
-
-        if (mesh.position.y < -1200) {
-          mesh.position.y = 1400;
-          const side = Math.random() < 0.5 ? -1 : 1;
-          mesh.position.x = side * (mesh.userData.nearBook ? 150 + Math.random() * 550 : 650 + Math.random() * 650);
-          mesh.position.z = 100 + Math.random() * 500;
-        }
-      });
-    }
+    // 2. Blossoms and leaves tumbling down
+    if (dt > 0) this.stepFoliage(dt);
 
     // 3. Floating Hearts bobbing
     if (this.glowingHearts) {
@@ -451,14 +510,16 @@ export class AtmosphericSystem {
       (this.dustParticles.material as THREE.Material).dispose();
       this.scene.remove(this.dustParticles);
     }
-    if (this.petals) {
-      this.petals.children.forEach((p) => {
-        const m = p as THREE.Mesh;
-        m.geometry.dispose();
-        (m.material as THREE.Material).dispose();
-      });
-      this.scene.remove(this.petals);
+    if (this.foliageMesh) {
+      const material = this.foliageMesh.material as THREE.MeshBasicMaterial;
+      material.map?.dispose();
+      material.dispose();
+      this.foliageMesh.geometry.dispose();
+      this.foliageMesh.dispose();
+      this.scene.remove(this.foliageMesh);
+      this.foliageMesh = null;
     }
+    this.foliage = [];
     if (this.glowingHearts) {
       this.glowingHearts.children.forEach((h) => {
         const m = h as THREE.Mesh;
