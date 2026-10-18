@@ -28,7 +28,6 @@ import {
   Video,
   Square,
   Sparkles,
-  Layers,
   ZoomIn,
   ZoomOut,
   Maximize2,
@@ -461,127 +460,167 @@ export default function BookCoverEditorPage() {
   }
 
   return (
-    <div className="editor-root flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-[#0C0609] select-none text-parchment-100 font-sans">
+    <div className="cover-editor editor-root flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-[#0C0609] select-none text-parchment-100 font-sans">
       {/* Top Application Bar */}
-      <div className="min-h-14 bg-[#160D12] border-b border-rosewood-900/50 p-2 flex flex-wrap gap-2 items-center justify-between shrink-0 z-30">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/admin"
-            className="p-1.5 rounded-lg bg-[#25151F] hover:bg-[#331C2A] text-stone-300 border border-rosewood-900/40 transition-colors"
-            title="Quay lại Dashboard"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
-          <div className="flex items-center gap-2">
-            <h1 className="font-serif font-bold text-sm tracking-wide text-parchment-100">
-              Biên Tập Bìa Nhật Ký: {journal?.title || 'Chúng Mình'}
-            </h1>
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-rosewood-950 text-champagne-300 border border-rosewood-800/40 uppercase">
-              {activeSide}
-            </span>
-          </div>
-        </div>
+      <div className="editor-header bg-[#160D12] border-b border-rosewood-900/50 px-2 py-1.5 lg:px-4 flex items-center gap-2 shrink-0 z-30">
+        <Link
+          href="/admin"
+          className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-[#25151F] hover:bg-[#331C2A] text-stone-300 border border-rosewood-900/40 transition-colors"
+          title="Quay lại Dashboard"
+          aria-label="Quay lại Dashboard"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </Link>
+        <h1 className="editor-header-label font-serif font-bold text-sm tracking-wide text-parchment-100 truncate min-w-0 shrink" title={journal?.title || ''}>
+          Bìa nhật ký
+        </h1>
 
-        {/* Center: Cover Sides Switcher */}
-        <div className="flex items-center gap-1 p-1 bg-[#20111A] rounded-xl border border-rosewood-900/50 text-xs">
-          <button
-            type="button"
-            onClick={() => handleSwitchSide('front')}
-            className={`px-3 py-1 rounded-lg transition ${
-              activeSide === 'front'
-                ? 'bg-rosewood-600 text-white font-semibold shadow'
-                : 'text-stone-400 hover:text-white'
-            }`}
-          >
-            Bìa trước (Front)
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSwitchSide('back-inside')}
-            className={`px-3 py-1 rounded-lg transition ${
-              activeSide === 'back-inside'
-                ? 'bg-rosewood-600 text-white font-semibold shadow'
-                : 'text-stone-400 hover:text-white'
-            }`}
-          >
-            Bìa sau trong (Inside)
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSwitchSide('back-outside')}
-            className={`px-3 py-1 rounded-lg transition ${
-              activeSide === 'back-outside'
-                ? 'bg-rosewood-600 text-white font-semibold shadow'
-                : 'text-stone-400 hover:text-white'
-            }`}
-          >
-            Bìa sau ngoài (Outside)
-          </button>
-        </div>
-
-        {/* Right Action: Undo/Redo & Save Cover */}
-        <div className="flex items-center gap-2">
-          {/* Undo/Redo */}
-          <div className="flex items-center gap-0.5 bg-[#20111A] p-1 rounded-xl border border-rosewood-900/40 text-xs">
+        <div role="tablist" aria-label="Mặt bìa" className="flex-1 min-w-0 max-w-md mr-auto flex items-center gap-0.5 p-0.5 bg-[#20111A] rounded-lg border border-rosewood-900/50 text-xs overflow-x-auto">
+          {([
+            ['front', 'Bìa trước', 'Trước'],
+            ['back-inside', 'Sau – trong', 'Trong'],
+            ['back-outside', 'Sau – ngoài', 'Ngoài'],
+          ] as const).map(([side, label, short]) => (
             <button
+              key={side}
               type="button"
-              onClick={() => performUndo()}
-              disabled={!canUndo}
-              className="p-1.5 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors disabled:opacity-30"
-              title="Hoàn tác (Ctrl+Z)"
+              role="tab"
+              aria-selected={activeSide === side}
+              onClick={() => handleSwitchSide(side)}
+              aria-label={label}
+              title={label}
+              className={`h-9 flex-1 min-w-max max-w-40 px-2.5 rounded-md whitespace-nowrap transition ${
+                activeSide === side ? 'bg-rosewood-600 text-white font-semibold shadow' : 'text-stone-400 hover:text-white'
+              }`}
             >
-              <Undo2 className="w-3.5 h-3.5" />
+              <span className="editor-header-label">{label}</span>
+              <span className="editor-header-short">{short}</span>
             </button>
-            <button
-              type="button"
-              onClick={() => performRedo()}
-              disabled={!canRedo}
-              className="p-1.5 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition-colors disabled:opacity-30"
-              title="Làm lại (Ctrl+Shift+Z)"
-            >
-              <Redo2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Snap toggle */}
-          <button
-            type="button"
-            onClick={() => setSnappingEnabled(!snappingEnabled)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-mono transition-all ${
-              snappingEnabled
-                ? 'bg-cyan-950/60 border-cyan-500/60 text-cyan-300 shadow-sm'
-                : 'bg-[#20111A] border-rosewood-900/40 text-stone-500 hover:text-stone-300'
-            }`}
-            title="Bật/tắt hít từ tính"
-          >
-            <Magnet className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Snap: {snappingEnabled ? 'BẬT' : 'TẮT'}</span>
-          </button>
-
-          {/* Save Button */}
-          <button
-            type="button"
-            onClick={handleSaveCover}
-            disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-semibold shadow-lg transition active:scale-95 disabled:opacity-50"
-          >
-            <Save className="w-3.5 h-3.5" />
-            <span>{saving ? 'Đang lưu...' : 'Lưu bìa'}</span>
-          </button>
+          ))}
         </div>
+
+        <button
+          type="button"
+          onClick={handleSaveCover}
+          disabled={saving}
+          className="shrink-0 h-10 flex items-center gap-1.5 px-3 rounded-lg bg-rosewood-600 hover:bg-rosewood-500 text-white text-xs font-semibold transition active:scale-95 disabled:opacity-50"
+        >
+          <Save className="w-4 h-4" />
+          <span>{saving ? 'Đang lưu...' : 'Lưu'}</span>
+        </button>
       </div>
 
       {toast && (
-        <div className="bg-emerald-950/80 border-b border-emerald-500/40 px-5 py-2 text-xs text-emerald-300 flex items-center justify-center gap-2 shrink-0">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+        <div
+          role="status"
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] max-w-[calc(100vw-2rem)] px-4 py-2 rounded-xl bg-emerald-950/95 border border-emerald-600/50 text-emerald-300 text-xs flex items-center gap-2 shadow-lg"
+        >
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>{toast}</span>
         </div>
       )}
 
       {/* Main 3-Column Studio Layout */}
-      <EditorWorkspace>
+      <EditorWorkspace
+        toolbar={
+          <>
+            <div className="editor-scroll flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto">
+              <div className="shrink-0 flex items-center gap-0.5 bg-[#20111A] p-0.5 rounded-lg border border-rosewood-900/40 text-xs" role="group" aria-label="Thêm phần tử">
+                {([
+                  ['TEXT', 'Chữ', Type, 'text-champagne-300'],
+                  ['IMAGE', 'Ảnh', ImageIcon, 'text-pink-400'],
+                  ['VIDEO', 'Video', Video, 'text-amber-400'],
+                  ['SHAPE', 'Đường kẻ', Square, 'text-rosewood-400'],
+                ] as const).map(([type, label, Icon, color]) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => handleAddElement(type)}
+                    className="h-9 min-w-9 flex items-center justify-center gap-1 px-2 rounded-md hover:bg-rosewood-800/60 text-parchment-200 transition"
+                    title={`Thêm ${label.toLowerCase()}`}
+                    aria-label={`Thêm ${label.toLowerCase()}`}
+                  >
+                    <Icon className={`w-4 h-4 ${color}`} />
+                    <span className="editor-label">{label}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="shrink-0 flex items-center gap-0.5 bg-[#20111A] p-0.5 rounded-lg border border-rosewood-900/40">
+                <button
+                  type="button"
+                  onClick={() => performUndo()}
+                  disabled={!canUndo}
+                  className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-rosewood-800/60 text-parchment-200 transition disabled:opacity-30"
+                  title="Hoàn tác (Ctrl+Z)"
+                  aria-label="Hoàn tác"
+                >
+                  <Undo2 className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => performRedo()}
+                  disabled={!canRedo}
+                  className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-rosewood-800/60 text-parchment-200 transition disabled:opacity-30"
+                  title="Làm lại (Ctrl+Shift+Z)"
+                  aria-label="Làm lại"
+                >
+                  <Redo2 className="w-4 h-4" />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSnappingEnabled(!snappingEnabled)}
+                aria-pressed={snappingEnabled}
+                className={`h-10 shrink-0 flex items-center gap-1.5 px-2.5 rounded-lg border text-xs transition-all ${
+                  snappingEnabled
+                    ? 'bg-cyan-950/60 border-cyan-500/60 text-cyan-300'
+                    : 'bg-[#20111A] border-rosewood-900/40 text-stone-500 hover:text-stone-300'
+                }`}
+                title="Bật/tắt hít từ tính"
+                aria-label="Hít từ tính"
+              >
+                <Magnet className="w-4 h-4" />
+                <span className="editor-label">Snap</span>
+              </button>
+            </div>
+
+            <div className="shrink-0 flex items-center gap-0.5 bg-[#20111A] p-0.5 rounded-lg border border-rosewood-900/40 text-stone-300">
+              <button
+                type="button"
+                onClick={() => setCanvasScale((s) => Math.max(0.2, parseFloat((s - 0.05).toFixed(2))))}
+                className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-rosewood-800 transition-colors"
+                title="Thu nhỏ canvas"
+                aria-label="Thu nhỏ canvas"
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+              <span className="font-mono w-10 text-center text-[11px]" aria-live="polite">{Math.round(canvasScale * 100)}%</span>
+              <button
+                type="button"
+                onClick={() => setCanvasScale((s) => Math.min(1.2, parseFloat((s + 0.05).toFixed(2))))}
+                className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-rosewood-800 transition-colors"
+                title="Phóng to canvas"
+                aria-label="Phóng to canvas"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={fitViewport}
+                className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-rosewood-800 transition-colors"
+                title="Vừa vùng làm việc"
+                aria-label="Vừa vùng làm việc"
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
+            </div>
+          </>
+        }
+      >
         {/* LEFT COLUMN: Layers Panel */}
-        <aside className="editor-layers bg-[#140B10] border-r border-rosewood-900/40 flex-col justify-between shrink-0 overflow-y-auto">
+        <aside className="editor-layers bg-[#140B10] border-r border-rosewood-900/40 flex-col justify-between shrink-0 overflow-y-auto min-h-0">
           <LayersPanel
             elements={virtualPage.elements}
             selectedElementId={selectedElementId}
@@ -611,85 +650,6 @@ export default function BookCoverEditorPage() {
 
         {/* CENTER COLUMN: Visual Konva Canvas Viewport */}
         <main className="editor-canvas flex-1 min-w-0 min-h-0 flex flex-col bg-[#0A0407] overflow-hidden relative">
-          {/* Top Quick Elements Add Bar */}
-          <div className="min-h-11 bg-[#140B10] border-b border-rosewood-900/40 px-2 flex flex-wrap gap-2 items-center justify-between text-xs shrink-0">
-            <div className="flex items-center gap-1.5 font-mono text-[11px] text-stone-400">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span>Bìa Canvas 1024 × 1360px</span>
-              <span className="text-stone-600">|</span>
-              <span>Tỉ lệ: {Math.round(canvasScale * 100)}%</span>
-            </div>
-
-            {/* Add Elements buttons */}
-            <div className="flex items-center gap-1 bg-[#20111A] p-0.5 rounded-lg border border-rosewood-900/40">
-              <button
-                type="button"
-                onClick={() => handleAddElement('TEXT')}
-                className="flex items-center gap-1 px-2.5 py-1 rounded hover:bg-rosewood-800/60 text-parchment-200 transition"
-                title="Thêm khối chữ"
-              >
-                <Type className="w-3.5 h-3.5 text-champagne-300" />
-                <span>Text</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAddElement('IMAGE')}
-                className="flex items-center gap-1 px-2.5 py-1 rounded hover:bg-rosewood-800/60 text-parchment-200 transition"
-                title="Thêm ảnh"
-              >
-                <ImageIcon className="w-3.5 h-3.5 text-pink-400" />
-                <span>Ảnh</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAddElement('VIDEO')}
-                className="flex items-center gap-1 px-2.5 py-1 rounded hover:bg-rosewood-800/60 text-parchment-200 transition"
-                title="Thêm video"
-              >
-                <Video className="w-3.5 h-3.5 text-amber-400" />
-                <span>Video</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAddElement('SHAPE')}
-                className="flex items-center gap-1 px-2.5 py-1 rounded hover:bg-rosewood-800/60 text-parchment-200 transition"
-                title="Thêm đường kẻ"
-              >
-                <Square className="w-3.5 h-3.5 text-rosewood-400" />
-                <span>Shape</span>
-              </button>
-            </div>
-
-            {/* Zoom Controls */}
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setCanvasScale((s) => Math.max(0.2, parseFloat((s - 0.05).toFixed(2))))}
-                className="p-1 rounded bg-[#20111A] hover:bg-rosewood-800 text-stone-300"
-                title="Thu nhỏ"
-              >
-                <ZoomOut className="w-3.5 h-3.5" />
-              </button>
-              <span className="font-mono w-10 text-center text-[11px]">{Math.round(canvasScale * 100)}%</span>
-              <button
-                type="button"
-                onClick={() => setCanvasScale((s) => Math.min(1.2, parseFloat((s + 0.05).toFixed(2))))}
-                className="p-1 rounded bg-[#20111A] hover:bg-rosewood-800 text-stone-300"
-                title="Phóng to"
-              >
-                <ZoomIn className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={fitViewport}
-                className="p-1 rounded bg-[#20111A] hover:bg-rosewood-800 text-stone-300"
-                title="Vừa vùng làm việc"
-              >
-                <Maximize2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-
           {/* Konva Canvas Rendering Virtual Cover Page */}
           <div ref={viewportRef} className="editor-viewport flex-1 min-h-0 min-w-0 flex items-center justify-center p-4 overflow-auto">
             <KonvaPageCanvas
@@ -710,11 +670,11 @@ export default function BookCoverEditorPage() {
         <aside className="editor-properties bg-[#140B10] border-l border-rosewood-900/40 flex-col justify-between shrink-0 overflow-y-auto">
           <div className="flex flex-col h-full">
             {/* Inspector Tab Switcher */}
-            <div className="p-2.5 bg-[#1C0F16] border-b border-rosewood-900/40 flex items-center gap-1.5 shrink-0">
+            <div className="p-2 bg-[#1C0F16] border-b border-rosewood-900/40 grid grid-cols-3 gap-1 shrink-0 text-[11px]">
               <button
                 type="button"
                 onClick={() => setInspectorTab('element')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`min-h-11 min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-lg font-medium leading-tight transition-all ${
                   inspectorTab === 'element'
                     ? 'bg-rosewood-600 text-white font-semibold shadow'
                     : 'text-stone-400 hover:text-white hover:bg-[#25151F]'
@@ -727,7 +687,7 @@ export default function BookCoverEditorPage() {
               <button
                 type="button"
                 onClick={() => setInspectorTab('interaction')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`min-h-11 min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-lg font-medium leading-tight transition-all ${
                   inspectorTab === 'interaction'
                     ? 'bg-rosewood-600 text-white font-semibold shadow'
                     : 'text-stone-400 hover:text-white hover:bg-[#25151F]'
@@ -740,7 +700,7 @@ export default function BookCoverEditorPage() {
               <button
                 type="button"
                 onClick={() => setInspectorTab('background')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`min-h-11 min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-lg font-medium leading-tight transition-all ${
                   inspectorTab === 'background'
                     ? 'bg-rosewood-600 text-white font-semibold shadow'
                     : 'text-stone-400 hover:text-white hover:bg-[#25151F]'

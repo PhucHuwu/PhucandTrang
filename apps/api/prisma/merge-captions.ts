@@ -32,10 +32,14 @@ async function main() {
 
   for (const page of pages) {
     const plans = planCaptionMerge(page.elements as any);
-    const captionCount = page.elements.filter(
+    const captions = page.elements.filter(
       (el: any) => el.type === 'TEXT' && (el.data?.variant === 'caption' || el.slot?.endsWith('-caption')),
-    ).length;
-    unmatched += captionCount - plans.length;
+    );
+    for (const el of captions) {
+      if (plans.some((plan) => plan.captionId === el.id)) continue;
+      unmatched++;
+      console.log(`Trang ${page.pageNumber}: KHÔNG KHỚP "${(el.data as any)?.text ?? ''}" (${el.id}, slot=${(el as any).slot ?? '-'})`);
+    }
     if (!plans.length) continue;
 
     for (const plan of plans) {

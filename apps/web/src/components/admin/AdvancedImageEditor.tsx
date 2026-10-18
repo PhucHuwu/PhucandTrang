@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ImageElement, ImageElementData, ElementStyle } from '@/types/book';
 import MediaPickerModal from '@/components/admin/MediaPickerModal';
+import { fitFrameToImage, loadImageAspect } from '@/components/admin/fitFrameToImage';
 import { safeParseFloat } from '@phucandtrang/shared';
 import {
   Image as ImageIcon,
@@ -32,6 +33,30 @@ export default function AdvancedImageEditor({
   const t = element.transform;
 
   const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [fitting, setFitting] = useState(false);
+  const [fitError, setFitError] = useState<string | null>(null);
+
+  const handleFitFrame = async () => {
+    if (!d.src) return;
+    setFitting(true);
+    setFitError(null);
+    try {
+      const aspect = d.aspectRatio || (await loadImageAspect(d.src));
+      onChange((el) => ({
+        ...el,
+        data: { ...el.data, objectFit: 'contain', aspectRatio: aspect },
+        transform: fitFrameToImage(el.transform, aspect, {
+          polaroid: el.style?.polaroidFrame !== false,
+          padding: el.style?.padding,
+          hasCaption: Boolean((el.data as ImageElementData)?.caption),
+        }),
+      }));
+    } catch (err: any) {
+      setFitError(err?.message || 'Không khớp được khung');
+    } finally {
+      setFitting(false);
+    }
+  };
 
   // When image is chosen from Media Library or newly uploaded
   const handleMediaSelect = (selected: { mediaId: string; url: string; alt?: string; width?: number | null; height?: number | null }) => {
@@ -169,6 +194,21 @@ export default function AdvancedImageEditor({
               </button>
             ))}
           </div>
+        </div>
+
+        <div>
+          <button
+            type="button"
+            disabled={disabled || fitting || !d.src}
+            onClick={handleFitFrame}
+            className="w-full h-10 flex items-center justify-center gap-1.5 rounded-lg bg-[#25151F] hover:bg-[#331C2A] border border-rosewood-800/60 text-champagne-300 text-xs font-medium transition disabled:opacity-50"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+            <span>{fitting ? 'Đang khớp...' : 'Khớp khung với ảnh'}</span>
+          </button>
+          <p className="mt-1 text-[10px] text-stone-500">
+            {fitError || 'Thu khung ôm sát ảnh, bỏ khoảng trống thừa. Ảnh giữ nguyên kích thước.'}
+          </p>
         </div>
 
         {/* FocalPoint X / Y (Only applicable when objectFit = cover) */}

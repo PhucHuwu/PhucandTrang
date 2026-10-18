@@ -287,5 +287,14 @@ Hai Vercel projects phải cho phép npm cài dependency từ root workspace đ�
 
 ---
 
-## 📄 Bản Quyền & Giấy Phép (License)
-Dự án được xây dựng với tình yêu dành riêng cho **Phúc & Trang**. Mọi quyền được bảo lưu © 2026.
+## 📄 Bản quyền & Giấy phép (License)
+
+Dự án được xây dựng với tình yêu dành riêng cho **Phúc & Trang**. © 2026. Mọi quyền được bảo lưu, ngoại trừ các quyền được cho phép rõ ràng dưới đây.
+
+- **Được phép:** Sử dụng, chỉnh sửa mã nguồn và phát triển thành sản phẩm cá nhân.
+- **Điều kiện:** Khi sử dụng hoặc chỉnh sửa mã nguồn, phải giữ lại thông tin bản quyền và ghi rõ tên tác giả gốc cùng liên kết GitHub của tác giả trong file `README.md`.
+- **Không được phép:** Tự nhận mình là tác giả gốc hoặc xóa bỏ thông tin ghi nhận tác giả ban đầu.
+
+Việc sử dụng mã nguồn phải tuân thủ các điều kiện trên.
+
+**Tác giả gốc:** [PhucHuwu](https://github.com/PhucHuwu)

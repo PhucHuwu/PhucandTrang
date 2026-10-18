@@ -77,6 +77,8 @@
 .editor-header-label { display: none; }
 @container editor-root (min-width: 720px) {
   .editor-header-label { display: inline; }
+  h1.editor-header-label { display: block; }
+  .editor-header-short { display: none; }
 }
 @container editor-root (max-width: 559px) {
   .editor-header { flex-wrap: wrap; }
