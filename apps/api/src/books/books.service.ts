@@ -178,18 +178,6 @@ export class BooksService {
   async update(id: string, dto: UpdateBookDto, isPatch: boolean = false) {
     const existingBook = await this.findOne(id);
 
-    if (dto.slug && dto.slug !== existingBook.slug) {
-      const existing = await this.prisma.book.findFirst({
-        where: {
-          slug: dto.slug,
-          NOT: { id },
-        },
-      });
-      if (existing) {
-        throw new ConflictException(`Slug "${dto.slug}" đã được sử dụng bởi cuốn sách khác.`);
-      }
-    }
-
     const backgroundMusicUpdate: Record<string, any> = {};
     if ('backgroundMusicId' in dto) {
       backgroundMusicUpdate.backgroundMusicId = dto.backgroundMusicId;
@@ -210,7 +198,6 @@ export class BooksService {
     const updated = await this.prisma.book.update({
       where: { id },
       data: {
-        ...(dto.slug ? { slug: dto.slug } : {}),
         ...(dto.title !== undefined ? { title: dto.title } : {}),
         ...(dto.description !== undefined ? { description: dto.description } : {}),
         ...(dto.heName !== undefined ? { heName: dto.heName } : {}),

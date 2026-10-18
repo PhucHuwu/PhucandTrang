@@ -4,19 +4,11 @@ import {
   IsEnum,
   IsObject,
   IsDateString,
-  Matches,
   ValidateIf,
 } from 'class-validator';
 import { BookStatus } from '@prisma/client';
 
 export class UpdateBookDto {
-  @IsString()
-  @IsOptional()
-  @Matches(/^[a-z0-9-]+$/, {
-    message: 'Slug chỉ được chứa chữ thường, số và dấu gạch ngang (kebab-case)',
-  })
-  slug?: string;
-
   @IsString()
   @IsOptional()
   title?: string;

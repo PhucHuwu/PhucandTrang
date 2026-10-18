@@ -76,7 +76,6 @@ export default function JournalSettingsDirectPage() {
 
   // 1. General Info states
   const [title, setTitle] = useState('');
-  const [slug, setSlug] = useState('');
   const [status, setStatus] = useState('PUBLISHED');
   const [description, setDescription] = useState('');
   const [heName, setHeName] = useState('Phúc');
@@ -120,7 +119,6 @@ export default function JournalSettingsDirectPage() {
     if (journal) {
       const jAny = journal as any;
       setTitle(journal.title || '');
-      setSlug(journal.slug || '');
       setStatus(jAny.status || 'PUBLISHED');
       setDescription(journal.description || '');
       setHeName(journal.couple?.he || jAny.heName || 'Phúc');
@@ -171,7 +169,6 @@ export default function JournalSettingsDirectPage() {
     try {
       await updateJournal({
         title,
-        slug,
         description,
         heName,
         sheName,
@@ -238,7 +235,7 @@ export default function JournalSettingsDirectPage() {
               <Settings className="w-6 h-6 text-rosewood-400" />
               <span>Cài Đặt Nhật Ký Tình Yêu</span>
             </h1>
-            <p className="text-xs text-stone-400">Đường dẫn: /{slug} • {journal?.title}</p>
+            <p className="text-xs text-stone-400">{journal?.title}</p>
           </div>
         </div>
 
@@ -351,16 +348,6 @@ export default function JournalSettingsDirectPage() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white focus:outline-none focus:border-rosewood-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1.5">Đường dẫn slug</label>
-              <input
-                type="text"
-                value={slug}
-                onChange={(e) => setSlug(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-rosewood-500"
               />
             </div>
 
