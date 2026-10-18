@@ -59,10 +59,28 @@ test('tools and save-layout dialog work on tablet and close with Escape', async 
   await page.goto('/admin/pages/page-test');
   await expect(page.locator('.editor-workspace')).toBeVisible();
   await page.getByText('Công cụ', { exact: true }).click();
+  const menuBox = await page.locator('.editor-tools-menu').boundingBox();
+  expect(menuBox!.x).toBeGreaterThanOrEqual(0);
   await page.getByRole('button', { name: 'Lưu Template', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Lưu bố cục' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Lưu bố cục' })).toHaveCount(0);
+});
+
+test('tools menu is not covered by desktop sidebar', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/admin/pages/page-test');
+  await page.getByText('Công cụ', { exact: true }).click();
+  const sidebar = await page.locator('aside').first().boundingBox();
+  const menu = await page.locator('.editor-tools-menu').boundingBox();
+  expect(menu!.x).toBeGreaterThanOrEqual(sidebar!.x + sidebar!.width);
+});
+
+test('layout picker is reachable from the page header', async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await page.goto('/admin/pages/page-test');
+  await page.getByRole('button', { name: 'Đổi bố cục', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Chọn bố cục' })).toBeVisible();
 });
 
 test('rotation retains edited text and selected properties panel', async ({ page }) => {

@@ -46,7 +46,8 @@
 .editor-canvas > div:last-child { align-items: safe center; justify-content: safe center; }
 .editor-canvas canvas { touch-action: none; }
 .editor-root > div:first-of-type { flex-wrap: wrap; gap: 8px; height: auto; }
-.editor-tools-menu { position: absolute; top: 100%; right: 0; width: min(560px, 90vw); max-height: 60dvh; overflow-y: auto; z-index: 40; border: 1px solid #542030; border-radius: 12px; }
+.editor-tools[open] { flex-basis: 100%; }
+.editor-tools-menu { margin-top: 8px; border: 1px solid #542030; border-radius: 12px; }
 @container (min-width: 900px) {
   .editor-workspace[data-panel="layers"] .editor-layers,
   .editor-workspace[data-panel="properties"] .editor-properties {

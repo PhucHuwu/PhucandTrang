@@ -515,8 +515,17 @@ export default function VisualPageEditorDirectPage() {
           </div>
         </div>
 
-        {/* Center Quick Action Bar (Undo/Redo + Snap + Add Elements + Layout Preset Picker) */}
-        <details className="editor-tools relative">
+        <button
+          type="button"
+          onClick={() => setShowLayoutPicker(true)}
+          className="min-h-11 flex items-center gap-1.5 px-3 rounded-lg bg-[#2A1220] hover:border-champagne-400 text-champagne-300 text-sm font-medium border border-rosewood-700/60 transition-colors"
+          title="Đổi bố cục trang"
+        >
+          <LayoutGrid className="w-4 h-4 text-champagne-400" />
+          <span>Đổi bố cục</span>
+        </button>
+
+        <details className="editor-tools">
           <summary className="min-h-11 px-3 flex items-center cursor-pointer rounded-lg bg-[#25151F] text-sm">Công cụ</summary>
           <div className="editor-tools-menu flex flex-wrap items-center gap-2 min-w-0 p-2 bg-[#160D12]">
           {/* Undo & Redo */}
@@ -554,17 +563,6 @@ export default function VisualPageEditorDirectPage() {
           >
             <Magnet className={`w-3.5 h-3.5 ${snappingEnabled ? 'text-cyan-400' : 'text-stone-500'}`} />
             <span className="hidden sm:inline">Snap: {snappingEnabled ? 'BẬT' : 'TẮT'}</span>
-          </button>
-
-          {/* Layout Picker Button */}
-          <button
-            type="button"
-            onClick={() => setShowLayoutPicker(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-rosewood-900/80 to-[#2A1220] hover:border-champagne-400 text-champagne-300 text-xs font-medium border border-rosewood-700/60 shadow-md transition-all active:scale-95"
-            title="Đổi bố cục trang"
-          >
-            <LayoutGrid className="w-3.5 h-3.5 text-champagne-400" />
-            <span>Đổi Bố Cục</span>
           </button>
 
           {/* Save As Custom Layout Template */}

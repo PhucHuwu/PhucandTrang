@@ -12,6 +12,7 @@ describe('LayoutTemplatesService (Prompt 17 — Custom Layout Templates)', () =>
     prisma = {
       layoutTemplate: {
         findMany: jest.fn(),
+        createMany: jest.fn(),
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),

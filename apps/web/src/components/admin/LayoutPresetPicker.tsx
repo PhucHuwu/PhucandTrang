@@ -117,8 +117,12 @@ export default function LayoutPresetPicker({
               <div className="w-8 h-8 rounded-full border-2 border-rosewood-500 border-t-transparent animate-spin mb-3" />
               <span>Đang tải các mẫu bố cục từ cơ sở dữ liệu...</span>
             </div>
+          ) : templates.length === 0 ? (
+            <p className="py-16 text-center text-sm text-stone-400">
+              Chưa tải được mẫu bố cục nào. Hãy đóng cửa sổ này và thử lại.
+            </p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,200px),1fr))] gap-4">
               {templates.map((tpl) => {
                 const isSelected = tpl.id === selectedId;
                 const isCurrent = tpl.id === currentTemplateId;

@@ -8,12 +8,24 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateLayoutTemplateDto } from './dto/create-layout-template.dto';
 import { UpdateLayoutTemplateDto } from './dto/update-layout-template.dto';
 import { Role } from '@prisma/client';
+import { LAYOUT_PRESETS } from '@phucandtrang/shared';
 
 @Injectable()
 export class LayoutTemplatesService {
   constructor(private prisma: PrismaService) {}
 
   async findAll() {
+    await this.prisma.layoutTemplate.createMany({
+      data: Object.values(LAYOUT_PRESETS).map((preset) => ({
+        id: preset.id,
+        name: preset.name,
+        description: preset.description,
+        slots: preset.slots as any,
+        prototypes: preset.elementPrototypes as any,
+        isSystem: true,
+      })),
+      skipDuplicates: true,
+    });
     return this.prisma.layoutTemplate.findMany({
       orderBy: [{ isSystem: 'desc' }, { createdAt: 'asc' }],
     });

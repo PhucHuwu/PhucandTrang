@@ -180,7 +180,8 @@ function KonvaElementItem({
   const usePolaroid = s.polaroidFrame !== false;
   const padding = usePolaroid ? (s.padding ?? 14) : 0;
   const captionText = d?.caption ? (varContext ? TextVariableResolver.resolve(d.caption, varContext) : d.caption) : '';
-  const captionSpace = usePolaroid && captionText ? 36 : usePolaroid ? 20 : 0;
+  // Polaroid always keeps a bottom strip for the caption, even before one is written.
+  const captionSpace = usePolaroid ? 38 : 0;
 
   // Image fitting
   const rawSrcW = imageObj?.naturalWidth || imageObj?.width || 400;
@@ -196,6 +197,11 @@ function KonvaElementItem({
     d?.objectFit || (element.type === 'IMAGE' ? 'contain' : 'cover'),
     d?.focalPoint || { x: 0.5, y: 0.5 }
   );
+  // Same as PageTextureGenerator: the card hugs the fitted photo, centred in the element box.
+  const cardW = imageObj ? imgFit.dw + padding * 2 : t.width;
+  const cardH = imageObj ? imgFit.dh + padding * 2 + captionSpace : t.height;
+  const cardX = (t.width - cardW) / 2;
+  const cardY = (t.height - cardH) / 2;
 
   return (
     <Group
@@ -293,8 +299,10 @@ function KonvaElementItem({
         <Group width={t.width} height={t.height}>
           {usePolaroid && (
             <Rect
-              width={t.width}
-              height={t.height}
+              x={cardX}
+              y={cardY}
+              width={cardW}
+              height={cardH}
               fill={s.backgroundColor || '#FFFFFF'}
               stroke={s.borderColor || 'rgba(180, 160, 140, 0.3)'}
               strokeWidth={s.borderWidth || 1}
@@ -310,8 +318,8 @@ function KonvaElementItem({
           {imageObj ? (
             <KonvaImage
               image={imageObj}
-              x={padding + imgFit.dx}
-              y={padding + imgFit.dy}
+              x={cardX + padding}
+              y={cardY + padding}
               width={imgFit.dw}
               height={imgFit.dh}
               crop={{
@@ -335,7 +343,7 @@ function KonvaElementItem({
           {usePolaroid && s.washiTape !== false && (
             <Rect
               x={t.width / 2 - 38}
-              y={-7}
+              y={cardY - 7}
               width={76}
               height={16}
               fill="rgba(235, 225, 205, 0.85)"
@@ -348,7 +356,9 @@ function KonvaElementItem({
           {captionText && (
             <KonvaText
               x={0}
-              y={t.height - captionSpace + 4}
+              y={cardY + cardH - captionSpace}
+              height={captionSpace || 38}
+              verticalAlign="middle"
               width={t.width}
               text={captionText}
               fontFamily="Dancing Script"
@@ -786,8 +796,8 @@ export default function KonvaPageCanvas({
               return newBox;
             }}
             anchorCornerRadius={3}
-            anchorSize={Math.max(8, 20 / scale)}
-            anchorHitStrokeWidth={24 / scale}
+            anchorSize={9}
+            anchorStyleFunc={(anchor) => anchor.hitStrokeWidth(16)}
             anchorStroke="#8C2437"
             anchorFill="#FFE5B4"
             borderStroke="#8C2437"
