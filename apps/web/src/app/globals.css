@@ -35,29 +35,52 @@
 @tailwind utilities;
 
 .cms-content { container-type: inline-size; }
-.editor-workspace { container-type: inline-size; }
+/* Editor: page header sizes against .editor-root, panels/toolbar against .editor-workspace. */
+.editor-root { container: editor-root / inline-size; }
+.editor-workspace { container: editor / inline-size; }
 .editor-layers, .editor-properties { display: none; width: 320px; max-width: 100%; }
 .editor-workspace[data-panel="layers"] .editor-layers,
 .editor-workspace[data-panel="properties"] .editor-properties {
   display: flex; position: absolute; inset: 0 0 0 auto; z-index: 25;
   width: min(100%, 360px); box-shadow: -8px 0 24px #0008;
 }
+.editor-workspace[data-panel="layers"] .editor-layers { inset: 0 auto 0 0; box-shadow: 8px 0 24px #0008; }
+.editor-backdrop { display: none; }
+.editor-workspace:not([data-panel="canvas"]) .editor-backdrop {
+  display: block; position: absolute; inset: 0; z-index: 24; background: #0009;
+}
 .editor-canvas { display: flex; }
-.editor-canvas > div:last-child { align-items: safe center; justify-content: safe center; }
+.editor-canvas > .editor-viewport { align-items: safe center; justify-content: safe center; }
 .editor-canvas canvas { touch-action: none; }
-.editor-root > div:first-of-type { flex-wrap: wrap; gap: 8px; height: auto; }
-.editor-tools[open] { flex-basis: 100%; }
-.editor-tools-menu { margin-top: 8px; border: 1px solid #542030; border-radius: 12px; }
-@container (min-width: 900px) {
+.editor-scroll { scrollbar-width: none; }
+.editor-scroll::-webkit-scrollbar { display: none; }
+.editor-label { display: none; }
+@container editor (max-width: 639px) {
+  .editor-toolbar { flex-wrap: wrap; }
+  .editor-toolbar > .editor-toolbar-main { flex-basis: 100%; order: 2; justify-content: space-between; }
+}
+@container editor (min-width: 760px) {
+  .editor-label { display: inline; }
+}
+@container editor (min-width: 900px) {
   .editor-workspace[data-panel="layers"] .editor-layers,
   .editor-workspace[data-panel="properties"] .editor-properties {
     position: static; width: 300px; box-shadow: none;
   }
+  .editor-workspace:not([data-panel="canvas"]) .editor-backdrop, .editor-overlay-only { display: none; }
 }
-@container (min-width: 1200px) {
-  .editor-panel-nav { display: none; }
+@container editor (min-width: 1200px) {
+  .editor-panel-nav, .editor-toolbar--nav-only, .editor-compact-only { display: none; }
   .editor-columns > .editor-layers { display: flex; position: static; width: 256px; box-shadow: none; }
   .editor-columns > .editor-properties { display: flex; position: static; width: 320px; box-shadow: none; }
+}
+.editor-header-label { display: none; }
+@container editor-root (min-width: 720px) {
+  .editor-header-label { display: inline; }
+}
+@container editor-root (max-width: 559px) {
+  .editor-header { flex-wrap: wrap; }
+  .editor-header > .editor-header-actions { flex-basis: 100%; justify-content: flex-end; }
 }
 .cms-shell :is(button, a, input, select, textarea):focus-visible {
   outline: 2px solid #ffe5b4; outline-offset: 2px;
@@ -81,6 +104,7 @@
   .cms-shell button { min-width: 44px; }
 .cms-shell :is(input, select, textarea) { font-size: 16px; }
   .cms-shell .opacity-0 { opacity: 1; }
+  .cms-shell .layer-row .layer-actions button { min-width: 36px; min-height: 36px; }
 }
 
 @layer base {

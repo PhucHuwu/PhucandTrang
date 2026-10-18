@@ -54,26 +54,41 @@ test('existing text edits clear legacy lines and accept empty content', async ({
   await expect(input).toHaveValue('');
 });
 
-test('tools and save-layout dialog work on tablet and close with Escape', async ({ page }) => {
+test('save-layout dialog works on tablet and closes with Escape', async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 1024 });
   await page.goto('/admin/pages/page-test');
   await expect(page.locator('.editor-workspace')).toBeVisible();
-  await page.getByText('Công cụ', { exact: true }).click();
-  const menuBox = await page.locator('.editor-tools-menu').boundingBox();
-  expect(menuBox!.x).toBeGreaterThanOrEqual(0);
   await page.getByRole('button', { name: 'Lưu Template', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Lưu bố cục' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Lưu bố cục' })).toHaveCount(0);
 });
 
-test('tools menu is not covered by desktop sidebar', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
+for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 }, { width: 1024, height: 768 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
+  test(`page editor chrome stays compact ${viewport.width}x${viewport.height}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.goto('/admin/pages/page-test');
+    await expect(page.locator('.editor-workspace')).toBeVisible();
+    const header = await page.locator('.editor-header').boundingBox();
+    const toolbarBottom = await page.locator('.editor-canvas').evaluate((el) => el.getBoundingClientRect().top);
+    const shellTop = await page.locator('.page-editor').evaluate((el) => el.getBoundingClientRect().top);
+    expect(header!.height).toBeLessThanOrEqual(viewport.width < 560 ? 112 : 64);
+    expect(toolbarBottom - shellTop).toBeLessThanOrEqual(viewport.width < 640 ? 220 : 130);
+    for (const name of ['Đổi bố cục', 'Thêm ảnh', 'Hoàn tác', 'Vừa vùng làm việc']) {
+      const box = await page.getByRole('button', { name, exact: true }).boundingBox();
+      expect(box!.height).toBeGreaterThanOrEqual(36);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+}
+
+test('tapping outside an overlay panel closes it', async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 1024 });
   await page.goto('/admin/pages/page-test');
-  await page.getByText('Công cụ', { exact: true }).click();
-  const sidebar = await page.locator('aside').first().boundingBox();
-  const menu = await page.locator('.editor-tools-menu').boundingBox();
-  expect(menu!.x).toBeGreaterThanOrEqual(sidebar!.x + sidebar!.width);
+  await page.getByRole('button', { name: 'Lớp', exact: true }).click();
+  await expect(page.locator('.editor-layers')).toBeVisible();
+  await page.mouse.click(740, 900);
+  await expect(page.locator('.editor-layers')).toBeHidden();
 });
 
 test('layout picker is reachable from the page header', async ({ page }) => {

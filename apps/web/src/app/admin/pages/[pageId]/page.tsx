@@ -81,7 +81,7 @@ import LayersPanel from '@/components/admin/LayersPanel';
 const KonvaPageCanvas = dynamic(() => import('@/components/admin/KonvaPageCanvas'), {
   ssr: false,
   loading: () => (
-    <div className="w-[430px] h-[570px] rounded-2xl bg-[#140B10] border border-rosewood-900/40 flex flex-col items-center justify-center text-stone-500 text-xs">
+    <div className="w-[min(430px,90%)] aspect-[1024/1360] rounded-2xl bg-[#140B10] border border-rosewood-900/40 flex flex-col items-center justify-center text-stone-500 text-xs">
       <div className="w-8 h-8 rounded-full border-2 border-rosewood-500 border-t-transparent animate-spin mb-3" />
       <span>Khởi tạo Visual Canvas...</span>
     </div>
@@ -474,37 +474,26 @@ export default function VisualPageEditorDirectPage() {
 
   return (
     <div className="page-editor editor-root flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-[#0C0609] select-none text-parchment-100 font-sans">
-      <style jsx global>{`
-        .page-editor button:focus-visible, .page-editor a:focus-visible {
-          outline: 2px solid #FFE5B4;
-          outline-offset: 2px;
-        }
-        @media (max-width: 1279px) {
-          .page-editor button, .page-editor a { min-height: 44px; }
-          .page-editor button { min-width: 44px; }
-          .page-editor input:not([type="checkbox"]):not([type="range"]),
-          .page-editor select { min-height: 44px; }
-        }
-      `}</style>
       {/* Top Application Bar */}
-      <div className="bg-[#160D12] border-b border-rosewood-900/50 p-2 lg:px-5 flex flex-wrap items-center justify-between gap-2 shrink-0 z-30">
-        <div className="flex items-center gap-3 min-w-0 w-full">
-          <Link
-            href="/admin/pages"
-            className="p-1.5 rounded-lg bg-[#25151F] hover:bg-[#331C2A] text-stone-300 border border-rosewood-900/40 transition-colors"
-            title="Quay lại danh sách trang"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
-          <div className="flex flex-wrap items-center gap-2 min-w-0">
-            <h1 className="font-serif font-bold text-sm tracking-wide text-parchment-100 break-words">
-              Trang {page.pageNumber === 0 ? 'Lời ngỏ' : page.pageNumber}: {page.title || '(Không tiêu đề)'}
-            </h1>
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-rosewood-950 text-champagne-300 border border-rosewood-800/40">
+      <div className="editor-header bg-[#160D12] border-b border-rosewood-900/50 px-2 py-1.5 lg:px-4 flex items-center gap-2 shrink-0 z-30">
+        <Link
+          href="/admin/pages"
+          className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-[#25151F] hover:bg-[#331C2A] text-stone-300 border border-rosewood-900/40 transition-colors"
+          title="Quay lại danh sách trang"
+          aria-label="Quay lại danh sách trang"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </Link>
+        <div className="flex-1 min-w-0">
+          <h1 className="font-serif font-bold text-sm tracking-wide text-parchment-100 truncate" title={page.title || ''}>
+            {page.pageNumber === 0 ? 'Lời ngỏ' : `Trang ${page.pageNumber}`}: {page.title || '(Không tiêu đề)'}
+          </h1>
+          <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+            <span className="px-1.5 rounded text-[10px] font-mono bg-rosewood-950 text-champagne-300 border border-rosewood-800/40">
               {page.side}
             </span>
             <span
-              className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
+              className={`px-1.5 rounded text-[10px] font-mono border truncate ${
                 page.isCustomized
                   ? 'bg-amber-950/70 text-amber-300 border-amber-500/40'
                   : 'bg-emerald-950/70 text-emerald-300 border-emerald-500/40'
@@ -515,111 +504,7 @@ export default function VisualPageEditorDirectPage() {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowLayoutPicker(true)}
-          className="min-h-11 flex items-center gap-1.5 px-3 rounded-lg bg-[#2A1220] hover:border-champagne-400 text-champagne-300 text-sm font-medium border border-rosewood-700/60 transition-colors"
-          title="Đổi bố cục trang"
-        >
-          <LayoutGrid className="w-4 h-4 text-champagne-400" />
-          <span>Đổi bố cục</span>
-        </button>
-
-        <details className="editor-tools">
-          <summary className="min-h-11 px-3 flex items-center cursor-pointer rounded-lg bg-[#25151F] text-sm">Công cụ</summary>
-          <div className="editor-tools-menu flex flex-wrap items-center gap-2 min-w-0 p-2 bg-[#160D12]">
-          {/* Undo & Redo */}
-          <div className="flex items-center gap-0.5 bg-[#20111A] p-1 rounded-xl border border-rosewood-900/40 text-xs">
-            <button
-              type="button"
-              onClick={() => performUndo()}
-              disabled={!canUndo}
-              className="p-1.5 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition disabled:opacity-30"
-              title="Hoàn tác (Ctrl+Z)"
-            >
-              <Undo2 className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => performRedo()}
-              disabled={!canRedo}
-              className="p-1.5 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition disabled:opacity-30"
-              title="Làm lại (Ctrl+Shift+Z)"
-            >
-              <Redo2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Snap toggle */}
-          <button
-            type="button"
-            onClick={() => setSnappingEnabled(!snappingEnabled)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-mono transition-all ${
-              snappingEnabled
-                ? 'bg-cyan-950/60 border-cyan-500/60 text-cyan-300 shadow-sm'
-                : 'bg-[#20111A] border-rosewood-900/40 text-stone-500 hover:text-stone-300'
-            }`}
-            title="Bật/tắt hít từ tính"
-          >
-            <Magnet className={`w-3.5 h-3.5 ${snappingEnabled ? 'text-cyan-400' : 'text-stone-500'}`} />
-            <span className="hidden sm:inline">Snap: {snappingEnabled ? 'BẬT' : 'TẮT'}</span>
-          </button>
-
-          {/* Save As Custom Layout Template */}
-          <button
-            type="button"
-            onClick={() => setShowSaveAsLayout(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#22101A] hover:bg-[#2D1623] hover:border-rosewood-600 text-parchment-200 text-xs font-medium border border-rosewood-800/60 shadow-md transition-all active:scale-95"
-            title="Lưu bố cục hiện tại thành template tùy biến"
-          >
-            <BookmarkPlus className="w-3.5 h-3.5 text-pink-400" />
-            <span className="hidden sm:inline">Lưu Template</span>
-          </button>
-
-          {/* Add Elements Group */}
-          <div className="flex items-center gap-1 bg-[#20111A] p-1 rounded-xl border border-rosewood-900/40 text-xs">
-            <button
-              type="button"
-              onClick={() => handleAddElement('TEXT')}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition"
-              title="Thêm khối chữ"
-            >
-              <Type className="w-3.5 h-3.5 text-champagne-300" />
-              <span>Text</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleAddElement('IMAGE')}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition"
-              title="Thêm ảnh"
-            >
-              <ImageIcon className="w-3.5 h-3.5 text-pink-400" />
-              <span>Ảnh</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleAddElement('VIDEO')}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition"
-              title="Thêm video"
-            >
-              <Video className="w-3.5 h-3.5 text-amber-400" />
-              <span>Video</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleAddElement('SHAPE')}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rosewood-800/60 text-parchment-200 transition"
-              title="Thêm đường kẻ"
-            >
-              <Square className="w-3.5 h-3.5 text-rosewood-400" />
-              <span>Shape</span>
-            </button>
-          </div>
-          </div>
-        </details>
-
-        {/* Right Action: Autosave Indicator, Preview & Publish & Save Buttons */}
-        <div className="flex flex-wrap items-center gap-2 min-w-0">
+        <div className="editor-header-actions flex items-center gap-1.5 shrink-0">
           <AutosaveIndicator
             status={autosaveStatus}
             lastSavedTime={lastSavedTime}
@@ -627,45 +512,38 @@ export default function VisualPageEditorDirectPage() {
             onRetry={retrySave}
           />
 
-          {toast && (
-            <span className="text-xs text-emerald-400 font-mono flex items-center gap-1 animate-fade-in mr-2">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>{toast}</span>
-            </span>
-          )}
-
-          {/* Version History Button */}
           <button
             type="button"
             onClick={() => setShowHistoryModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#20111A] hover:bg-[#2C1923] text-amber-300 border border-rosewood-900/40 text-xs font-medium transition shadow-sm"
+            className="h-10 flex items-center gap-1.5 px-2.5 rounded-lg bg-[#20111A] hover:bg-[#2C1923] text-amber-300 border border-rosewood-900/40 text-xs font-medium transition"
             title="Lịch sử phiên bản và Rollback"
+            aria-label="Lịch sử phiên bản"
           >
-            <History className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden lg:inline">Lịch sử</span>
+            <History className="w-4 h-4 text-amber-400" />
+            <span className="editor-header-label">Lịch sử</span>
           </button>
 
-          {/* Preview Draft Button */}
           <Link
             href="/admin/preview"
             target="_blank"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 border border-amber-800/40 text-xs font-medium transition shadow-sm"
+            className="h-10 flex items-center gap-1.5 px-2.5 rounded-lg bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 border border-amber-800/40 text-xs font-medium transition"
             title="Xem trước bản nháp trên 3D Flipbook"
+            aria-label="Xem trước bản nháp"
           >
-            <Eye className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden md:inline">Preview Draft</span>
+            <Eye className="w-4 h-4 text-amber-400" />
+            <span className="editor-header-label">Preview</span>
           </Link>
 
-          {/* Publish Button */}
           <button
             type="button"
             onClick={handlePublishClick}
             disabled={publishing}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-700/80 hover:bg-emerald-600 text-white text-xs font-medium shadow-md transition disabled:opacity-50"
+            className="h-10 flex items-center gap-1.5 px-2.5 rounded-lg bg-emerald-700/80 hover:bg-emerald-600 text-white text-xs font-medium transition disabled:opacity-50"
             title="Đóng gói snapshot và xuất bản công khai"
+            aria-label="Publish"
           >
-            <Send className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">{publishing ? 'Đang xuất bản...' : 'Publish'}</span>
+            <Send className="w-4 h-4" />
+            <span className="editor-header-label">{publishing ? 'Đang xuất bản...' : 'Publish'}</span>
           </button>
 
           <button
@@ -683,16 +561,146 @@ export default function VisualPageEditorDirectPage() {
               }
             }}
             disabled={saving || autosaveStatus === 'saving'}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-rosewood-600 to-rosewood-700 hover:from-rosewood-500 hover:to-rosewood-600 text-white text-xs font-semibold shadow-lg shadow-rosewood-950/50 transition active:scale-95 disabled:opacity-50"
+            className="h-10 flex items-center gap-1.5 px-3 rounded-lg bg-rosewood-600 hover:bg-rosewood-500 text-white text-xs font-semibold transition active:scale-95 disabled:opacity-50"
           >
-            <Save className="w-3.5 h-3.5" />
-            <span>{saving || autosaveStatus === 'saving' ? 'Đang lưu...' : 'Lưu trang'}</span>
+            <Save className="w-4 h-4" />
+            <span>{saving || autosaveStatus === 'saving' ? 'Đang lưu...' : 'Lưu'}</span>
           </button>
         </div>
       </div>
 
+      {toast && (
+        <div
+          role="status"
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] max-w-[calc(100vw-2rem)] px-4 py-2 rounded-xl bg-emerald-950/95 border border-emerald-600/50 text-emerald-300 text-xs flex items-center gap-2 shadow-lg"
+        >
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span>{toast}</span>
+        </div>
+      )}
+
       {/* 3-Column Visual Layout */}
-      <EditorWorkspace panel={mobilePanel} onPanelChange={setMobilePanel}>
+      <EditorWorkspace
+        panel={mobilePanel}
+        onPanelChange={setMobilePanel}
+        toolbar={
+          <>
+            <div className="editor-scroll flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setShowLayoutPicker(true)}
+                className="h-10 shrink-0 flex items-center gap-1.5 px-3 rounded-lg bg-[#2A1220] hover:border-champagne-400 text-champagne-300 text-xs font-medium border border-rosewood-700/60 transition-colors"
+                title="Đổi bố cục trang"
+              >
+                <LayoutGrid className="w-4 h-4 text-champagne-400" />
+                <span>Đổi bố cục</span>
+              </button>
+
+              <div className="shrink-0 flex items-center gap-0.5 bg-[#20111A] p-0.5 rounded-lg border border-rosewood-900/40 text-xs" role="group" aria-label="Thêm phần tử">
+                {([
+                  ['TEXT', 'Chữ', Type, 'text-champagne-300'],
+                  ['IMAGE', 'Ảnh', ImageIcon, 'text-pink-400'],
+                  ['VIDEO', 'Video', Video, 'text-amber-400'],
+                  ['SHAPE', 'Đường kẻ', Square, 'text-rosewood-400'],
+                ] as const).map(([type, label, Icon, color]) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => handleAddElement(type)}
+                    className="h-9 min-w-9 flex items-center justify-center gap-1 px-2 rounded-md hover:bg-rosewood-800/60 text-parchment-200 transition"
+                    title={`Thêm ${label.toLowerCase()}`}
+                    aria-label={`Thêm ${label.toLowerCase()}`}
+                  >
+                    <Icon className={`w-4 h-4 ${color}`} />
+                    <span className="editor-label">{label}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="shrink-0 flex items-center gap-0.5 bg-[#20111A] p-0.5 rounded-lg border border-rosewood-900/40">
+                <button
+                  type="button"
+                  onClick={() => performUndo()}
+                  disabled={!canUndo}
+                  className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-rosewood-800/60 text-parchment-200 transition disabled:opacity-30"
+                  title="Hoàn tác (Ctrl+Z)"
+                  aria-label="Hoàn tác"
+                >
+                  <Undo2 className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => performRedo()}
+                  disabled={!canRedo}
+                  className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-rosewood-800/60 text-parchment-200 transition disabled:opacity-30"
+                  title="Làm lại (Ctrl+Shift+Z)"
+                  aria-label="Làm lại"
+                >
+                  <Redo2 className="w-4 h-4" />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSnappingEnabled(!snappingEnabled)}
+                aria-pressed={snappingEnabled}
+                className={`h-10 shrink-0 flex items-center gap-1.5 px-2.5 rounded-lg border text-xs transition-all ${
+                  snappingEnabled
+                    ? 'bg-cyan-950/60 border-cyan-500/60 text-cyan-300'
+                    : 'bg-[#20111A] border-rosewood-900/40 text-stone-500 hover:text-stone-300'
+                }`}
+                title="Bật/tắt hít từ tính"
+                aria-label="Hít từ tính"
+              >
+                <Magnet className="w-4 h-4" />
+                <span className="editor-label">Snap</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowSaveAsLayout(true)}
+                className="h-10 shrink-0 flex items-center gap-1.5 px-2.5 rounded-lg bg-[#22101A] hover:bg-[#2D1623] text-parchment-200 text-xs font-medium border border-rosewood-800/60 transition"
+                title="Lưu bố cục hiện tại thành template tùy biến"
+                aria-label="Lưu Template"
+              >
+                <BookmarkPlus className="w-4 h-4 text-pink-400" />
+                <span className="editor-label">Lưu Template</span>
+              </button>
+            </div>
+
+            <div className="shrink-0 flex items-center gap-0.5 bg-[#20111A] p-0.5 rounded-lg border border-rosewood-900/40 text-stone-300">
+              <button
+                type="button"
+                onClick={() => setCanvasScale((s) => Math.max(0.2, parseFloat((s - 0.05).toFixed(2))))}
+                className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-rosewood-800 transition-colors"
+                title="Thu nhỏ canvas"
+                aria-label="Thu nhỏ canvas"
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+              <span className="font-mono w-10 text-center text-[11px]" aria-live="polite">{Math.round(canvasScale * 100)}%</span>
+              <button
+                type="button"
+                onClick={() => setCanvasScale((s) => Math.min(1.2, parseFloat((s + 0.05).toFixed(2))))}
+                className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-rosewood-800 transition-colors"
+                title="Phóng to canvas"
+                aria-label="Phóng to canvas"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={fitViewport}
+                className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-rosewood-800 transition-colors"
+                title="Vừa vùng làm việc"
+                aria-label="Vừa vùng làm việc"
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
+            </div>
+          </>
+        }
+      >
         {/* LEFT COLUMN: Layers Panel */}
         <aside className="editor-layers bg-[#140B10] border-r border-rosewood-900/40 flex-col justify-between shrink-0 overflow-y-auto min-h-0">
           <LayersPanel
@@ -761,47 +769,7 @@ export default function VisualPageEditorDirectPage() {
 
         {/* CENTER COLUMN: React Konva Visual Canvas (Flex-1) */}
         <main className="editor-canvas flex flex-1 min-w-0 min-h-0 flex-col bg-[#0A0407] overflow-hidden relative">
-          {/* Canvas Viewport Toolbar */}
-          <div className="min-h-11 bg-[#140B10] border-b border-rosewood-900/40 px-2 flex flex-wrap gap-2 items-center justify-between text-xs text-stone-400 z-10 shrink-0">
-            <div className="flex items-center gap-2 font-mono text-[11px]">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span>Canvas 1024 × 1360px</span>
-              <span className="text-stone-600">|</span>
-              <span>Tỉ lệ: {Math.round(canvasScale * 100)}%</span>
-            </div>
-
-            {/* Zoom Controls */}
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setCanvasScale((s) => Math.max(0.2, parseFloat((s - 0.05).toFixed(2))))}
-                className="p-1 rounded bg-[#20111A] hover:bg-rosewood-800 text-stone-300 transition-colors"
-                title="Thu nhỏ canvas"
-              >
-                <ZoomOut className="w-3.5 h-3.5" />
-              </button>
-              <span className="font-mono w-10 text-center text-[11px]">{Math.round(canvasScale * 100)}%</span>
-              <button
-                type="button"
-                onClick={() => setCanvasScale((s) => Math.min(1.2, parseFloat((s + 0.05).toFixed(2))))}
-                className="p-1 rounded bg-[#20111A] hover:bg-rosewood-800 text-stone-300 transition-colors"
-                title="Phóng to canvas"
-              >
-                <ZoomIn className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={fitViewport}
-                className="p-1 rounded bg-[#20111A] hover:bg-rosewood-800 text-stone-300 transition-colors"
-                title="Vừa vùng làm việc"
-              >
-                <Maximize2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Interactive Konva Canvas Viewport */}
-          <div ref={canvasViewportRef} className="flex-1 min-h-0 min-w-0 flex items-center justify-center p-4 overflow-auto">
+          <div ref={canvasViewportRef} className="editor-viewport flex-1 min-h-0 min-w-0 flex items-center justify-center p-4 overflow-auto">
             <KonvaPageCanvas
               page={page}
               book={journal}
@@ -813,19 +781,19 @@ export default function VisualPageEditorDirectPage() {
               scale={canvasScale}
               snappingEnabled={snappingEnabled}
             />
-            {selectedElement?.type === 'TEXT' && (
-              <button
-                type="button"
-                onClick={() => {
-                  setInspectorTab('element');
-                  setMobilePanel('properties');
-                }}
-                className="absolute bottom-4 right-4 z-20 min-h-11 px-4 rounded-lg bg-rosewood-700 text-white text-sm font-medium xl:hidden"
-              >
-                Sửa nội dung chữ
-              </button>
-            )}
           </div>
+          {selectedElement?.type === 'TEXT' && mobilePanel !== 'properties' && (
+            <button
+              type="button"
+              onClick={() => {
+                setInspectorTab('element');
+                setMobilePanel('properties');
+              }}
+              className="editor-compact-only absolute bottom-3 right-3 z-20 h-10 px-4 rounded-full bg-rosewood-600 text-white text-sm font-medium shadow-lg shadow-black/40"
+            >
+              Sửa nội dung chữ
+            </button>
+          )}
         </main>
 
         {/* RIGHT COLUMN: Properties Panel (width: 320px) */}
@@ -836,7 +804,7 @@ export default function VisualPageEditorDirectPage() {
               <button
                 type="button"
                 onClick={() => setInspectorTab('element')}
-                className={`flex items-center justify-center gap-1 py-1.5 rounded-lg font-medium transition-all ${
+                className={`min-h-11 min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-lg font-medium leading-tight transition-all ${
                   inspectorTab === 'element'
                     ? 'bg-rosewood-600 text-white font-semibold shadow'
                     : 'text-stone-400 hover:text-white hover:bg-[#25151F]'
@@ -850,7 +818,7 @@ export default function VisualPageEditorDirectPage() {
               <button
                 type="button"
                 onClick={() => setInspectorTab('interaction')}
-                className={`flex items-center justify-center gap-1 py-1.5 rounded-lg font-medium transition-all ${
+                className={`min-h-11 min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-lg font-medium leading-tight transition-all ${
                   inspectorTab === 'interaction'
                     ? 'bg-rosewood-600 text-white font-semibold shadow'
                     : 'text-stone-400 hover:text-white hover:bg-[#25151F]'
@@ -858,13 +826,13 @@ export default function VisualPageEditorDirectPage() {
                 title="Tương tác phần tử"
               >
                 <Sparkles className="w-3 h-3 text-amber-400" />
-                <span className="truncate">T.Tác</span>
+                <span className="truncate">Tương tác</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setInspectorTab('background')}
-                className={`flex items-center justify-center gap-1 py-1.5 rounded-lg font-medium transition-all ${
+                className={`min-h-11 min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-lg font-medium leading-tight transition-all ${
                   inspectorTab === 'background'
                     ? 'bg-rosewood-600 text-white font-semibold shadow'
                     : 'text-stone-400 hover:text-white hover:bg-[#25151F]'
@@ -878,7 +846,7 @@ export default function VisualPageEditorDirectPage() {
               <button
                 type="button"
                 onClick={() => setInspectorTab('metadata')}
-                className={`flex items-center justify-center gap-1 py-1.5 rounded-lg font-medium transition-all ${
+                className={`min-h-11 min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-lg font-medium leading-tight transition-all ${
                   inspectorTab === 'metadata'
                     ? 'bg-rosewood-600 text-white font-semibold shadow'
                     : 'text-stone-400 hover:text-white hover:bg-[#25151F]'
@@ -891,7 +859,7 @@ export default function VisualPageEditorDirectPage() {
             </div>
 
             {/* Inspector Tab Content */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-5">
+            <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-3 space-y-4">
               {inspectorTab === 'metadata' && (
                 <div className="space-y-4 text-xs">
                   <div className="pb-2 border-b border-rosewood-900/40 flex items-center justify-between">

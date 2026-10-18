@@ -213,7 +213,7 @@ export default function AdvancedTextEditor({
         </div>
 
         {/* Bold, Italic & Text Alignment */}
-        <div className="grid grid-cols-2 gap-2.5 pt-1">
+        <div className="flex flex-wrap gap-x-4 gap-y-2.5 pt-1">
           {/* Bold & Italic Toggles */}
           <div>
             <label className="block text-[10px] text-stone-400 mb-1">Định dạng chữ</label>

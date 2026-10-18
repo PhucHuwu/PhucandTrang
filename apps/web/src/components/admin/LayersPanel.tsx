@@ -259,7 +259,7 @@ export default function LayersPanel({
               role="button"
               tabIndex={0}
               onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onSelectElement(el.id); } }}
-              className={`group relative flex flex-wrap gap-2 items-center justify-between px-2 py-1.5 rounded-xl text-xs cursor-pointer select-none transition-all ${
+              className={`layer-row group relative flex flex-wrap gap-x-2 gap-y-1 items-center justify-between px-2 py-1.5 rounded-xl text-xs cursor-pointer select-none transition-all ${
                 isSelected
                   ? 'bg-rosewood-600 text-white font-medium shadow-md'
                   : 'bg-[#1E1119] text-stone-400 hover:text-white hover:bg-[#2A1622]'
@@ -268,7 +268,7 @@ export default function LayersPanel({
               }`}
             >
               {/* Left Handle & Label */}
-              <div className="flex items-center gap-1.5 truncate flex-1 pr-2">
+              <div className="flex items-center gap-1.5 min-w-0 flex-1 basis-32">
                 {!isViewer && (
                   <span
                     className="cursor-grab active:cursor-grabbing text-stone-600 group-hover:text-stone-400"
@@ -320,7 +320,7 @@ export default function LayersPanel({
 
               {/* Action Buttons */}
               {!isViewer && (
-                <div className="flex flex-wrap items-center gap-1 text-stone-400 shrink-0 max-w-full">
+                <div className={`layer-actions flex items-center gap-0.5 shrink-0 ${isSelected ? 'text-white/80' : 'text-stone-400'}`}>
                   {/* Rename label button */}
                   {!isEditing && (
                     <button

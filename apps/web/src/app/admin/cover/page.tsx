@@ -691,7 +691,7 @@ export default function BookCoverEditorPage() {
           </div>
 
           {/* Konva Canvas Rendering Virtual Cover Page */}
-          <div ref={viewportRef} className="flex-1 min-h-0 min-w-0 flex items-center justify-center p-4 overflow-auto">
+          <div ref={viewportRef} className="editor-viewport flex-1 min-h-0 min-w-0 flex items-center justify-center p-4 overflow-auto">
             <KonvaPageCanvas
               page={virtualPage}
               book={journal}
