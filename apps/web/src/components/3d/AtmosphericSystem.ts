@@ -1,18 +1,161 @@
 import * as THREE from 'three';
+import { ImprovedNoise } from 'three/examples/jsm/math/ImprovedNoise.js';
+
+const noise = new ImprovedNoise();
 
 export interface ButterflyEntity {
-  group: THREE.Group;
-  leftWing: THREE.Group;
-  rightWing: THREE.Group;
-  baseY: number;
-  baseX: number;
-  baseZ: number;
-  phase: number;
-  speed: number;
-  radiusX: number;
-  radiusZ: number;
-  wingSpeed: number;
-  color: string;
+  position: THREE.Vector3;
+  velocity: THREE.Vector3;
+  heading: THREE.Vector3;
+  home: THREE.Vector3;
+  wingPhase: number;
+  size: number;
+  seed: number;
+}
+
+// Wing motion follows klevron/threejs-toys "butterflies": a single subdivided quad per butterfly,
+// wings bent in the vertex shader by a wave travelling from the body to the wing tips,
+// steered by a noise flow field and pulled back towards a home area.
+const WING_SEGMENTS = 8;
+const WING_DISPLACEMENT = 1.25;
+const WING_VARIANTS = [
+  { inner: '#FFF0F3', outer: '#F28FA8', border: '#6E2A3E' },
+  { inner: '#FFF6DF', outer: '#F0B25C', border: '#55311D' },
+  { inner: '#F7EDFF', outer: '#B78BE0', border: '#432762' },
+  { inner: '#FFF0E6', outer: '#F4A58A', border: '#663024' },
+  { inner: '#FFFFFF', outer: '#EED6C2', border: '#7E5F4C' },
+  { inner: '#EEF8FF', outer: '#8DC3EC', border: '#22476A' },
+];
+const FLIGHT = {
+  homeRadiusInner: 220,
+  homeRadiusOuter: 420,
+  noiseScale: 1 / 220,
+  noiseAccel: 90,
+  attractAccel: 260,
+  maxSpeed: 150,
+  minSpeed: 45,
+};
+
+function bezierPoint(p0: number[], p1: number[], p2: number[], p3: number[], t: number) {
+  const u = 1 - t;
+  return [
+    u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0],
+    u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1],
+  ];
+}
+
+/** Top-down butterfly sprites (head towards the top), one 256px cell per colour variant. */
+function createButterflyAtlas(): THREE.CanvasTexture {
+  const cell = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = cell * WING_VARIANTS.length;
+  canvas.height = cell;
+  const ctx = canvas.getContext('2d')!;
+
+  // Left-side wing outlines as cubic segments; the right side is mirrored.
+  const fore = [
+    [[122, 112], [100, 70], [50, 28], [20, 38]],
+    [[20, 38], [6, 60], [18, 110], [44, 130]],
+    [[44, 130], [70, 140], [100, 136], [122, 128]],
+  ];
+  const hind = [
+    [[122, 130], [90, 132], [52, 140], [44, 170]],
+    [[44, 170], [36, 206], [70, 234], [96, 222]],
+    [[96, 222], [112, 212], [120, 180], [124, 150]],
+  ];
+  const tracePath = (segments: number[][][]) => {
+    const path = new Path2D();
+    path.moveTo(segments[0][0][0], segments[0][0][1]);
+    for (const [, c1, c2, end] of segments) path.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], end[0], end[1]);
+    path.closePath();
+    return path;
+  };
+  const forePath = tracePath(fore);
+  const hindPath = tracePath(hind);
+
+  const drawWing = (path: Path2D, segments: number[][][], variant: typeof WING_VARIANTS[number]) => {
+    ctx.save();
+    ctx.clip(path);
+
+    const gradient = ctx.createRadialGradient(122, 128, 6, 122, 128, 125);
+    gradient.addColorStop(0, variant.inner);
+    gradient.addColorStop(0.55, variant.outer);
+    gradient.addColorStop(1, variant.outer);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, cell, cell);
+
+    // Veins radiating from the wing root
+    ctx.strokeStyle = variant.border;
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = 1.6;
+    for (let t = 0.1; t < 1; t += 0.16) {
+      for (const segment of segments.slice(0, 2)) {
+        const [x, y] = bezierPoint(segment[0], segment[1], segment[2], segment[3], t);
+        ctx.beginPath();
+        ctx.moveTo(122, 128);
+        ctx.quadraticCurveTo((122 + x) / 2, (128 + y) / 2 + 6, x, y);
+        ctx.stroke();
+      }
+    }
+
+    // Dark margin with pale spots
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 16;
+    ctx.stroke(path);
+    ctx.fillStyle = 'rgba(255, 250, 240, 0.9)';
+    for (const segment of segments.slice(0, 2)) {
+      for (let t = 0.12; t < 0.95; t += 0.14) {
+        const [x, y] = bezierPoint(segment[0], segment[1], segment[2], segment[3], t);
+        const dx = 122 - x;
+        const dy = 128 - y;
+        const len = Math.hypot(dx, dy) || 1;
+        ctx.beginPath();
+        ctx.arc(x + (dx / len) * 4, y + (dy / len) * 4, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  };
+
+  WING_VARIANTS.forEach((variant, index) => {
+    ctx.save();
+    ctx.translate(index * cell, 0);
+    for (const mirrored of [false, true]) {
+      ctx.save();
+      if (mirrored) {
+        ctx.translate(cell, 0);
+        ctx.scale(-1, 1);
+      }
+      drawWing(hindPath, hind, variant);
+      drawWing(forePath, fore, variant);
+      ctx.restore();
+    }
+
+    ctx.fillStyle = '#2E1E19';
+    ctx.beginPath();
+    ctx.ellipse(128, 140, 5, 42, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(128, 96, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#2E1E19';
+    ctx.lineWidth = 2;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(128 + side * 2, 90);
+      ctx.quadraticCurveTo(128 + side * 8, 64, 128 + side * 22, 50);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(128 + side * 22, 50, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  });
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
 }
 
 export class AtmosphericSystem {
@@ -21,6 +164,15 @@ export class AtmosphericSystem {
   glowingHearts: THREE.Group | null = null;
   petals: THREE.Group | null = null;
   butterflies: ButterflyEntity[] = [];
+  butterflyMesh: THREE.InstancedMesh | null = null;
+  private wingPhaseAttribute: THREE.InstancedBufferAttribute | null = null;
+  private readonly instanceMatrix = new THREE.Matrix4();
+  private readonly rotationMatrix = new THREE.Matrix4();
+  private readonly instanceQuaternion = new THREE.Quaternion();
+  private readonly instanceScale = new THREE.Vector3();
+  private readonly cameraFacingUp = new THREE.Vector3(0, 0, 1);
+  private readonly origin = new THREE.Vector3();
+  private readonly scratch = new THREE.Vector3();
   butterflyCount = 12;
   private configuredButterflyCount?: number;
   private configuredPetalCount?: number;
@@ -213,194 +365,148 @@ export class AtmosphericSystem {
     this.scene.add(this.glowingHearts);
   }
 
-  // 4. Realistic Ornate 3D Butterflies with forewings, hindwings, antenna, body, and glowing wing patterns
+  // 4. Butterflies: one instanced, shader-bent quad per butterfly (after klevron/threejs-toys)
   initButterflies() {
-    // 1. Forewing (Cánh trên: rộng, vuốt nhọn kiêu sa)
-    const forewingShape = new THREE.Shape();
-    forewingShape.moveTo(0, 0);
-    forewingShape.bezierCurveTo(8, 15, 20, 38, 48, 48); // Top arched ridge
-    forewingShape.bezierCurveTo(58, 42, 54, 26, 42, 12); // Outer scalloped margin
-    forewingShape.bezierCurveTo(32, 0, 16, -6, 0, 0);
+    const count = this.butterflyCount;
+    if (count <= 0) return;
 
-    const forewingGeo = new THREE.ShapeGeometry(forewingShape, 12);
-    // Offset pivot to body hinge
-    forewingGeo.translate(0.8, 3, 0);
+    // Wings span x in [-1, 1], body runs along z with the head at +z (texture top), flapping displaces y.
+    const geometry = new THREE.PlaneGeometry(2, 2, WING_SEGMENTS, WING_SEGMENTS).rotateX(Math.PI / 2);
+    const wingPhases = new Float32Array(count);
+    const atlasIndexes = new Float32Array(count);
+    for (let i = 0; i < count; i++) atlasIndexes[i] = i % WING_VARIANTS.length;
+    this.wingPhaseAttribute = new THREE.InstancedBufferAttribute(wingPhases, 1);
+    this.wingPhaseAttribute.setUsage(THREE.DynamicDrawUsage);
+    geometry.setAttribute('aWingPhase', this.wingPhaseAttribute);
+    geometry.setAttribute('aAtlasIndex', new THREE.InstancedBufferAttribute(atlasIndexes, 1));
 
-    // 2. Hindwing (Cánh dưới: tròn lượn sóng)
-    const hindwingShape = new THREE.Shape();
-    hindwingShape.moveTo(0, 0);
-    hindwingShape.bezierCurveTo(10, -4, 28, -8, 34, -22); // Outer bulb
-    hindwingShape.bezierCurveTo(30, -36, 14, -42, 0, -28); // Lower rounded curve
-    hindwingShape.bezierCurveTo(-4, -18, -2, -6, 0, 0);
-
-    const hindwingGeo = new THREE.ShapeGeometry(hindwingShape, 12);
-    hindwingGeo.translate(0.8, -2, -0.3);
-
-    // ShapeGeometry uses world coordinates as UVs; normalize each wing once.
-    for (const geometry of [forewingGeo, hindwingGeo]) {
-      geometry.computeBoundingBox();
-      const bounds = geometry.boundingBox!;
-      const positions = geometry.attributes.position;
-      const uv = geometry.attributes.uv;
-      for (let v = 0; v < positions.count; v++) {
-        uv.setXY(v,
-          (positions.getX(v) - bounds.min.x) / (bounds.max.x - bounds.min.x),
-          (positions.getY(v) - bounds.min.y) / (bounds.max.y - bounds.min.y));
-      }
-      uv.needsUpdate = true;
-    }
-
-    // Procedural Butterfly Wing Texture Canvas with veins and iridescent borders
-    const createWingTexture = (baseColor: string, patternColor: string): THREE.CanvasTexture => {
-      const cvs = document.createElement('canvas');
-      cvs.width = 256;
-      cvs.height = 256;
-      const ctx = cvs.getContext('2d')!;
-
-      // Base gradient
-      const grad = ctx.createRadialGradient(40, 128, 10, 128, 128, 140);
-      grad.addColorStop(0, '#998773');
-      grad.addColorStop(0.4, baseColor);
-      grad.addColorStop(0.85, patternColor);
-      grad.addColorStop(1, '#645648');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 256, 256);
-
-      // Delicate veins
-      ctx.strokeStyle = 'rgba(89, 72, 53, 0.22)';
-      ctx.lineWidth = 0.9;
-      for (let angle = -0.6; angle <= 0.6; angle += 0.22) {
-        ctx.beginPath();
-        ctx.moveTo(30, 128);
-        const endX = 30 + Math.cos(angle) * 180;
-        const endY = 128 + Math.sin(angle) * 140;
-        ctx.quadraticCurveTo(100, 128 + angle * 50, endX, endY);
-        ctx.stroke();
-      }
-
-      // Fairy dots on margin
-      ctx.fillStyle = 'rgba(255, 244, 218, 0.65)';
-      for (let d = 0; d < 12; d++) {
-        const dotX = 205 + Math.sin(d * Math.PI / 11) * 20;
-        const dotY = 50 + d * 14;
-        ctx.beginPath();
-        ctx.ellipse(dotX, dotY, 2.2, 3.5, -0.2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      const tex = new THREE.CanvasTexture(cvs);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      return tex;
+    const material = new THREE.MeshBasicMaterial({
+      map: createButterflyAtlas(),
+      side: THREE.DoubleSide,
+      transparent: true,
+      alphaTest: 0.5,
+    });
+    material.onBeforeCompile = (shader) => {
+      shader.defines = {
+        ...shader.defines,
+        WINGS_DX: (2 / WING_SEGMENTS).toFixed(10),
+        WINGS_DZ: (2 / WING_SEGMENTS).toFixed(10),
+        WING_DISPLACEMENT: WING_DISPLACEMENT.toFixed(10),
+        ATLAS_COUNT: WING_VARIANTS.length.toFixed(10),
+      };
+      shader.vertexShader = `
+        attribute float aWingPhase;
+        attribute float aAtlasIndex;
+      ${shader.vertexShader}`
+        .replace(
+          '#include <uv_vertex>',
+          `#include <uv_vertex>
+          vMapUv.x = (aAtlasIndex + vMapUv.x) / ATLAS_COUNT;`,
+        )
+        .replace(
+          '#include <begin_vertex>',
+          `vec3 transformed = vec3(position);
+          float dx = abs(transformed.x);
+          if (dx > 0.0) {
+            // Wave travels from the body to the tips and from head to tail
+            float sdx = smoothstep(0.0, 1.0 + WINGS_DX, dx);
+            float sdz = smoothstep(0.0, 2.0 + WINGS_DZ, transformed.z + 1.0);
+            transformed.y = sin(aWingPhase - sdx + sdz) * sdx * WING_DISPLACEMENT;
+          }`,
+        );
     };
 
-    const butterflyThemes = [
-      { base: '#F0DFC0', border: '#AB8F69' },
-      { base: '#EBDDCB', border: '#AD9882' },
-      { base: '#DEC8A1', border: '#9D805E' },
-      { base: '#E6D0C7', border: '#AF9486' },
-      { base: '#EFE5CF', border: '#B9A583' },
-      { base: '#E9DDC6', border: '#AD9878' },
-    ];
+    const mesh = new THREE.InstancedMesh(geometry, material, count);
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.frustumCulled = false;
+    this.butterflyMesh = mesh;
 
-    for (let i = 0; i < this.butterflyCount; i++) {
-      const bGroup = new THREE.Group();
-      const theme = butterflyThemes[i % butterflyThemes.length];
-      const wingTexture = createWingTexture(theme.base, theme.border);
-
-      const wingMat = new THREE.MeshStandardMaterial({
-        map: wingTexture,
-        roughness: 0.95,
-        metalness: 0,
-        side: THREE.DoubleSide,
-        transparent: false,
-      });
-
-      // Left wing assembly (forewing + hindwing)
-      const leftWingGroup = new THREE.Group();
-      const leftFore = new THREE.Mesh(forewingGeo, wingMat);
-      const leftHind = new THREE.Mesh(hindwingGeo, wingMat);
-      leftWingGroup.add(leftFore);
-      leftWingGroup.add(leftHind);
-
-      // Right wing assembly
-      const rightWingGroup = new THREE.Group();
-      const rightFore = new THREE.Mesh(forewingGeo, wingMat);
-      const rightHind = new THREE.Mesh(hindwingGeo, wingMat);
-      rightWingGroup.add(rightFore);
-      rightWingGroup.add(rightHind);
-      rightWingGroup.scale.x = -1;
-
-      bGroup.add(leftWingGroup);
-      bGroup.add(rightWingGroup);
-
-      // Detailed Slender Butterfly Body (Head, Thorax, Abdomen)
-      const bodyGroup = new THREE.Group();
-
-      // Thorax / Abdomen
-      const abdomenGeo = new THREE.CylinderGeometry(1.4, 0.6, 26, 8);
-      const bodyMat = new THREE.MeshStandardMaterial({
-        color: 0x615347,
-        roughness: 1,
-        metalness: 0,
-      });
-      const abdomenMesh = new THREE.Mesh(abdomenGeo, bodyMat);
-      abdomenMesh.position.y = -5;
-      bodyGroup.add(abdomenMesh);
-
-      // Head
-      const headGeo = new THREE.SphereGeometry(2.2, 8, 8);
-      const headMesh = new THREE.Mesh(headGeo, bodyMat);
-      headMesh.position.set(0, 13, 0);
-      bodyGroup.add(headMesh);
-
-      // Curved Antennas
-      const antennaMat = new THREE.MeshBasicMaterial({ color: 0x38161E });
-      const leftAntenna = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 14, 4), antennaMat);
-      leftAntenna.position.set(3.5, 21, 0);
-      leftAntenna.rotation.z = -Math.PI / 6;
-
-      const rightAntenna = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 14, 4), antennaMat);
-      rightAntenna.position.set(-3.5, 21, 0);
-      rightAntenna.rotation.z = Math.PI / 6;
-
-      bodyGroup.add(leftAntenna);
-      bodyGroup.add(rightAntenna);
-
-      bGroup.add(bodyGroup);
-
-      const scale = 0.4 + Math.random() * 0.2;
-      bGroup.scale.set(scale, scale, scale);
-
-      const startAngle = (i / this.butterflyCount) * Math.PI * 2;
+    for (let i = 0; i < count; i++) {
+      const side = i % 2 ? -1 : 1;
       const nearBook = i % 3 !== 2;
-      const radiusX = nearBook ? 180 + Math.random() * 120 : 100 + Math.random() * 170;
-      const radiusZ = 80 + Math.random() * 120;
-      const baseY = (Math.random() - 0.5) * 1200;
-
-      const bEntity: ButterflyEntity = {
-        group: bGroup,
-        leftWing: leftWingGroup,
-        rightWing: rightWingGroup,
-        baseY,
-        baseX: (i % 2 ? -1 : 1) * (nearBook ? 620 + Math.random() * 220 : 1000 + Math.random() * 260),
-        baseZ: nearBook ? 180 + Math.random() * 180 : 250 + Math.random() * 350,
-        phase: startAngle,
-        speed: 0.0016 + Math.random() * 0.002,
-        radiusX,
-        radiusZ,
-        wingSpeed: 8 + Math.random() * 3,
-        color: theme.base,
-      };
-
-      bGroup.position.set(
-        bEntity.baseX + Math.cos(startAngle) * radiusX,
-        baseY + Math.sin(startAngle * 2) * 160,
-        Math.sin(startAngle * 0.9) * radiusZ + bEntity.baseZ
+      const home = new THREE.Vector3(
+        side * (nearBook ? 640 + Math.random() * 200 : 980 + Math.random() * 260),
+        (Math.random() - 0.5) * 1100,
+        nearBook ? 200 + Math.random() * 160 : 260 + Math.random() * 260,
       );
+      const position = home.clone().add(
+        new THREE.Vector3((Math.random() - 0.5) * 300, (Math.random() - 0.5) * 300, (Math.random() - 0.5) * 80),
+      );
+      const angle = Math.random() * Math.PI * 2;
+      const velocity = new THREE.Vector3(Math.cos(angle), Math.sin(angle), 0).multiplyScalar(FLIGHT.minSpeed * 1.5);
 
-      this.butterflies.push(bEntity);
-      this.scene.add(bGroup);
+      this.butterflies.push({
+        position,
+        velocity,
+        heading: velocity.clone().normalize(),
+        home,
+        wingPhase: Math.random() * Math.PI * 2,
+        size: 18 + Math.random() * 10,
+        seed: Math.random() * 100,
+      });
     }
+
+    this.writeButterflyInstances();
+    this.scene.add(mesh);
+  }
+
+  private stepButterflies(dt: number, time: number) {
+    const t = time * 0.12;
+    for (const b of this.butterflies) {
+      const p = b.position;
+      const s = FLIGHT.noiseScale;
+
+      // Smooth wandering flow field
+      this.scratch.set(
+        noise.noise(p.x * s, p.y * s, t + b.seed),
+        noise.noise(p.x * s + 31.7, p.y * s, t + b.seed),
+        noise.noise(p.x * s, p.y * s + 57.3, t + b.seed) * 0.35,
+      );
+      b.velocity.addScaledVector(this.scratch, FLIGHT.noiseAccel * dt * 2);
+
+      // Soft pull back towards the butterfly's home area
+      this.scratch.subVectors(b.home, p);
+      const distance = this.scratch.length();
+      const pull = THREE.MathUtils.smoothstep(distance, FLIGHT.homeRadiusInner, FLIGHT.homeRadiusOuter);
+      if (distance > 0) b.velocity.addScaledVector(this.scratch.normalize(), pull * FLIGHT.attractAccel * dt);
+
+      // Keep flight mostly parallel to the screen so the wings stay readable
+      b.velocity.z = THREE.MathUtils.clamp(b.velocity.z, -FLIGHT.minSpeed * 0.5, FLIGHT.minSpeed * 0.5);
+
+      const speed = b.velocity.length();
+      if (speed > FLIGHT.maxSpeed) b.velocity.multiplyScalar(FLIGHT.maxSpeed / speed);
+      else if (speed < FLIGHT.minSpeed && speed > 0) b.velocity.multiplyScalar(FLIGHT.minSpeed / speed);
+
+      p.addScaledVector(b.velocity, dt);
+
+      // Bank smoothly towards the flight direction instead of snapping
+      this.scratch.copy(b.velocity).normalize();
+      b.heading.lerp(this.scratch, 1 - Math.exp(-3 * dt)).normalize();
+
+      // Faster flight -> faster flaps, with a brief glide now and then
+      const speedRatio = THREE.MathUtils.clamp(b.velocity.length() / FLIGHT.maxSpeed, 0, 1);
+      const glide = THREE.MathUtils.smoothstep(Math.sin(time * 0.5 + b.seed), 0.75, 0.95);
+      b.wingPhase = (b.wingPhase + dt * (5 + speedRatio * 9) * (1 - glide * 0.8)) % (Math.PI * 2);
+    }
+    this.writeButterflyInstances();
+  }
+
+  private writeButterflyInstances() {
+    const mesh = this.butterflyMesh;
+    const phases = this.wingPhaseAttribute;
+    if (!mesh || !phases) return;
+
+    this.butterflies.forEach((b, i) => {
+      // Forward (+z of the wing quad) along the heading, back of the wings facing the camera (+z world)
+      this.rotationMatrix.lookAt(b.heading, this.origin, this.cameraFacingUp);
+      this.instanceQuaternion.setFromRotationMatrix(this.rotationMatrix);
+      this.instanceScale.setScalar(b.size);
+      this.instanceMatrix.compose(b.position, this.instanceQuaternion, this.instanceScale);
+      mesh.setMatrixAt(i, this.instanceMatrix);
+      phases.setX(i, b.wingPhase);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    phases.needsUpdate = true;
   }
 
   update(time: number, mouseParallax: { x: number; y: number }) {
@@ -452,34 +558,8 @@ export class AtmosphericSystem {
       });
     }
 
-    // 4. Butterflies dancing & wing flapping
-    this.butterflies.forEach((b) => {
-      b.phase += b.speed * frame;
-      const glide = THREE.MathUtils.smoothstep(Math.sin(time * 0.65 + b.baseY), 0.55, 0.9);
-      const flap = 0.2 + (0.5 + 0.5 * Math.sin(time * b.wingSpeed + b.baseY)) * (1 - glide) * 0.95;
-
-      b.leftWing.rotation.y = flap * 0.75;
-      b.rightWing.rotation.y = -flap * 0.75;
-
-      const nextX = b.baseX + Math.cos(b.phase) * b.radiusX;
-      const nextZ = b.baseZ + Math.sin(b.phase * 0.9) * b.radiusZ;
-      const nextY = b.baseY + Math.sin(b.phase * 2) * 160;
-
-      const dx = nextX - b.group.position.x;
-      const dz = nextZ - b.group.position.z;
-      const targetAngle = Math.atan2(dx, dz);
-
-      b.group.position.x = nextX;
-      b.group.position.z = nextZ;
-      b.group.position.y = nextY;
-      // Head follows the projected flight tangent; never spin broadside abruptly.
-      const vx = -Math.sin(b.phase) * b.radiusX;
-      const vy = Math.cos(b.phase * 2) * 320;
-      const heading = Math.atan2(-vx, vy);
-      const difference = Math.atan2(Math.sin(heading - b.group.rotation.z), Math.cos(heading - b.group.rotation.z));
-      b.group.rotation.z += difference * (1 - Math.exp(-1.5 * dt));
-      b.group.rotation.y = Math.sin(b.phase * 0.9) * 0.22;
-    });
+    // 4. Butterflies wandering along the noise field
+    if (dt > 0) this.stepButterflies(dt, time);
   }
 
   destroy() {
@@ -504,8 +584,15 @@ export class AtmosphericSystem {
       });
       this.scene.remove(this.glowingHearts);
     }
-    this.butterflies.forEach((b) => {
-      this.scene.remove(b.group);
-    });
+    if (this.butterflyMesh) {
+      const material = this.butterflyMesh.material as THREE.MeshBasicMaterial;
+      material.map?.dispose();
+      material.dispose();
+      this.butterflyMesh.geometry.dispose();
+      this.butterflyMesh.dispose();
+      this.scene.remove(this.butterflyMesh);
+      this.butterflyMesh = null;
+    }
+    this.butterflies = [];
   }
 }
