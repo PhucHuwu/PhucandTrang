@@ -679,7 +679,7 @@ export class PageTextureGenerator {
         ? TextVariableResolver.resolve(rawCaption, varContext)
         : rawCaption
       : undefined;
-    const captionSpace = usePolaroid ? 38 : 0;
+    const captionSpace = usePolaroid || captionText ? 38 : 0;
 
     const srcW = img.naturalWidth || img.width;
     const srcH = img.naturalHeight || img.height;
@@ -742,7 +742,7 @@ export class PageTextureGenerator {
       ctx.font = CAPTION_FONT;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(captionText, 0, cardH / 2 - captionSpace / 2);
+      ctx.fillText(captionText, 0, cardH / 2 - captionSpace / 2, Math.max(10, cardW - 16));
     }
   }
 

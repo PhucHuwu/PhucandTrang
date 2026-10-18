@@ -94,6 +94,29 @@ export default function AdvancedImageEditor({
           </div>
         </div>
 
+        <div>
+          <label htmlFor={`caption-${element.id}`} className="block text-[11px] text-stone-300 font-medium mb-1">
+            Tiêu đề ảnh
+          </label>
+          <input
+            id={`caption-${element.id}`}
+            type="text"
+            disabled={disabled}
+            value={d.caption || ''}
+            onChange={(e) =>
+              onChange((el) => ({
+                ...el,
+                data: { ...el.data, caption: e.target.value },
+              }))
+            }
+            placeholder="Ví dụ: Đà Lạt, mùa đông 2023"
+            className="w-full px-3 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white text-xs placeholder-stone-600"
+          />
+          <p className="mt-1 text-[10px] text-stone-500">
+            Hiện ở dải dưới ảnh và di chuyển cùng ảnh.
+          </p>
+        </div>
+
         {/* Alt Text */}
         <div>
           <label className="block text-[11px] text-stone-300 font-medium mb-1">

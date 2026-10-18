@@ -181,7 +181,7 @@ function KonvaElementItem({
   const padding = usePolaroid ? (s.padding ?? 14) : 0;
   const captionText = d?.caption ? (varContext ? TextVariableResolver.resolve(d.caption, varContext) : d.caption) : '';
   // Polaroid always keeps a bottom strip for the caption, even before one is written.
-  const captionSpace = usePolaroid ? 38 : 0;
+  const captionSpace = usePolaroid || captionText ? 38 : 0;
 
   // Image fitting
   const rawSrcW = imageObj?.naturalWidth || imageObj?.width || 400;
@@ -355,11 +355,13 @@ function KonvaElementItem({
           {/* Polaroid caption text */}
           {captionText && (
             <KonvaText
-              x={0}
+              x={cardX + 8}
               y={cardY + cardH - captionSpace}
-              height={captionSpace || 38}
+              height={captionSpace}
               verticalAlign="middle"
-              width={t.width}
+              width={Math.max(10, cardW - 16)}
+              wrap="none"
+              ellipsis
               text={captionText}
               fontFamily="Dancing Script"
               fontSize={19}

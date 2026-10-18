@@ -183,7 +183,7 @@ export function extractLayoutDefinitionFromPage(
  *
  * Rules:
  * - Each PageElement has top-level `zIndex` as single source of truth.
- * - Captions become independent `TEXT` elements with `variant: 'caption'`.
+ * - Captions stay on the image/video element (`data.caption`) and render inside its polaroid card.
  * - Video elements separate `src` (video) from `thumbnailUrl` (poster).
  * - Preserves existing text & media content when applying new layout.
  */
@@ -387,6 +387,7 @@ export function applyLayoutTemplate(
             data: {
               src: videoSrc,
               thumbnailUrl: posterUrl,
+              caption: mediaItem.caption,
               aspectRatio: mediaItem.aspectRatio,
               mediaId: mediaItem.mediaId,
               posterMediaId: mediaItem.posterMediaId,
@@ -416,48 +417,10 @@ export function applyLayoutTemplate(
               aspectRatio: mediaItem.aspectRatio,
               objectFit: 'contain',
               mediaId: mediaItem.mediaId,
+              caption: mediaItem.caption,
             },
             style: { polaroidFrame: true, washiTape: true },
           } as ImageElement);
-        }
-
-        // Requirement 10: Caption becomes an independent TEXT element
-        if (mediaItem.caption) {
-          const captionHeight = 0.035;
-          const captionY = Math.min(
-            0.94,
-            cleanTransform.y + cleanTransform.height + 0.008
-          );
-
-          elements.push({
-            id: `el-cap-${pageNum}-${imageSlotIndex}`,
-            type: 'TEXT',
-            slot: `${slot}-caption`,
-            order: imageSlotIndex * 2 + 1,
-            zIndex: protoZ + 1,
-            visible: true,
-            locked: false,
-            opacity: 1,
-            transform: {
-              x: cleanTransform.x,
-              y: captionY,
-              width: cleanTransform.width,
-              height: captionHeight,
-              rotation: cleanTransform.rotation || 0,
-              scale: cleanTransform.scale || 1,
-            },
-            data: {
-              text: mediaItem.caption,
-              variant: 'caption',
-            },
-            style: {
-              textAlign: 'center',
-              color: '#4A1523',
-              fontFamily: '"Dancing Script", "Playfair Display", Georgia, cursive',
-              fontSize: 19,
-              fontStyle: 'italic',
-            },
-          } as TextElement);
         }
       }
       continue;

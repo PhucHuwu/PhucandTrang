@@ -875,6 +875,7 @@ async function main() {
             thumbnailUrl: item.thumbnailUrl || item.src,
             mediaId: mediaRecordId,
             posterMediaId: posterRecordId,
+            caption: item.caption,
           },
           interaction: {
             enabled: true,
@@ -896,39 +897,7 @@ async function main() {
             src: item.src,
             mediaId: mediaRecordId,
             objectFit: 'cover',
-          },
-        });
-      }
-
-      // Requirement 10: Caption becomes an independent TEXT element
-      if (item.caption) {
-        const captionZ = mediaZ + 1;
-        const captionHeight = 0.035;
-        const captionY = Math.min(0.94, mediaTransform.y + mediaTransform.height + 0.008);
-
-        elementsToCreate.push({
-          type: ElementType.TEXT,
-          slot: `${slotProto.slot}-caption`,
-          order: captionZ,
-          zIndex: captionZ,
-          transform: {
-            x: mediaTransform.x,
-            y: captionY,
-            width: mediaTransform.width,
-            height: captionHeight,
-            rotation: mediaTransform.rotation || 0,
-            scale: mediaTransform.scale || 1,
-          },
-          style: {
-            textAlign: 'center',
-            color: '#4A1523',
-            fontFamily: '"Dancing Script", "Playfair Display", Georgia, cursive',
-            fontSize: 19,
-            fontStyle: 'italic',
-          },
-          data: {
-            text: item.caption,
-            variant: 'caption',
+            caption: item.caption,
           },
         });
       }
