@@ -18,19 +18,19 @@ export interface ButterflyEntity {
 // steered by a noise flow field and pulled back towards a home area.
 const WING_SEGMENTS = 8;
 const WING_DISPLACEMENT = 1.25;
-// Butterfly photos from klevron/threejs-toys (packages/toys/public/b1-b4.png, ISC),
-// packed left to right into one strip, head towards the top of each 256px cell.
+// Pastel watercolor butterflies generated for this site (same style as the foliage atlas),
+// packed left to right into one strip, head towards the top and body centred in each 256px cell.
 const BUTTERFLY_ATLAS_URL = '/butterflies/atlas.webp';
-const BUTTERFLY_ATLAS_COUNT = 4;
+const BUTTERFLY_ATLAS_COUNT = 6;
 // Watercolor blossoms (0-4) and autumn leaves (5-8), generated for this site, one 256px cell each.
 const FOLIAGE_ATLAS_URL = '/foliage/atlas.webp';
 const FOLIAGE_ATLAS_COUNT = 9;
-// Sizes in world units; butterflies span 52-72, so petals stay well below that.
+// Sizes in world units; butterflies span 84-112, so petals stay well below that.
 const FOLIAGE_KINDS = [
-  { indexes: [2, 3], minSize: 18, maxSize: 24, fallSpeed: 38, sway: 55 }, // loose petals
-  { indexes: [0, 1, 4], minSize: 24, maxSize: 32, fallSpeed: 46, sway: 40 }, // whole blossoms
-  { indexes: [2, 3], minSize: 18, maxSize: 24, fallSpeed: 38, sway: 55 },
-  { indexes: [5, 6, 7, 8], minSize: 34, maxSize: 46, fallSpeed: 58, sway: 70 }, // leaves
+  { indexes: [2, 3], minSize: 28, maxSize: 38, fallSpeed: 42, sway: 60 }, // loose petals
+  { indexes: [0, 1, 4], minSize: 38, maxSize: 50, fallSpeed: 50, sway: 45 }, // whole blossoms
+  { indexes: [2, 3], minSize: 28, maxSize: 38, fallSpeed: 42, sway: 60 },
+  { indexes: [5, 6, 7, 8], minSize: 54, maxSize: 70, fallSpeed: 64, sway: 75 }, // leaves
 ];
 
 interface FoliageEntity {
@@ -401,7 +401,7 @@ export class AtmosphericSystem {
         heading: velocity.clone().normalize(),
         home,
         wingPhase: Math.random() * Math.PI * 2,
-        size: 26 + Math.random() * 10,
+        size: 42 + Math.random() * 14,
         seed: Math.random() * 100,
       });
     }
