@@ -23,7 +23,14 @@ const dancingScript = Dancing_Script({
   display: 'swap',
 });
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://love.phuchuwu.io.vn';
+// Cloudinary-resized to the 1.91:1 size social networks expect (the original is 4032x2268, ~1.6 MB)
+const OG_IMAGE =
+  'https://res.cloudinary.com/dlvpiesfj/image/upload/c_fill,g_auto,w_1200,h_630,q_auto:good,f_jpg/v1789389673/phuc_trang_memories/21-08-2026_3.jpg';
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  alternates: { canonical: '/' },
   title: 'Phúc & Trang — Hành Trình Bên Nhau',
   description: 'Cuốn nhật ký tình yêu của hai mình từ ngày 20 tháng 10 năm 2022.',
   icons: {
@@ -32,13 +39,14 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Phúc & Trang — Chúng Mình (Our Love Journal)',
     description: 'Cuốn nhật ký tình yêu của hai mình từ ngày 20 tháng 10 năm 2022.',
-    url: 'https://phucandtrang.vercel.app',
+    url: '/',
     siteName: 'Chúng Mình - Phúc & Trang',
     images: [
       {
-        url: 'https://res.cloudinary.com/dlvpiesfj/image/upload/v1789389673/phuc_trang_memories/21-08-2026_3.jpg',
+        url: OG_IMAGE,
         width: 1200,
-        height: 675,
+        height: 630,
+        type: 'image/jpeg',
         alt: 'Phúc & Trang • Kỷ niệm ngày 21.08',
       },
     ],
@@ -49,7 +57,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Phúc & Trang — Chúng Mình',
     description: 'Cuốn nhật ký tình yêu của hai mình từ ngày 20 tháng 10 năm 2022.',
-    images: ['https://res.cloudinary.com/dlvpiesfj/image/upload/v1789389673/phuc_trang_memories/21-08-2026_3.jpg'],
+    images: [OG_IMAGE],
   },
 };
 
