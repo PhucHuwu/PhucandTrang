@@ -13,6 +13,14 @@ import {
 } from 'lucide-react';
 import { AudioTrack } from '@/types/book';
 
+function canControlVolume(audio: HTMLAudioElement) {
+  const previous = audio.volume;
+  audio.volume = previous === 0.5 ? 0.4 : 0.5;
+  const writable = audio.volume !== previous;
+  audio.volume = previous;
+  return writable;
+}
+
 interface VintageMusicPlayerProps {
   autoPlayTrigger?: boolean;
   audioTrack?: AudioTrack | null;
@@ -69,69 +77,62 @@ export default function VintageMusicPlayer({
 
   // Smooth fade-in volume transition
   const applyFadeIn = useCallback(() => {
-    if (!audioRef.current) return;
+    const audio = audioRef.current;
+    if (!audio) return;
     clearFade();
 
-    if (fadeIn <= 0) {
-      audioRef.current.volume = targetVolume;
+    if (fadeIn <= 0 || !canControlVolume(audio)) {
+      audio.volume = targetVolume;
       return;
     }
 
     const steps = 20;
-    const stepTime = (fadeIn * 1000) / steps;
-    const volumeIncrement = targetVolume / steps;
+    let step = 0;
+    audio.volume = 0.05;
 
-    audioRef.current.volume = 0.05;
-
+    // Step counter instead of reading audio.volume back, so the fade always terminates
     fadeIntervalRef.current = setInterval(() => {
-      if (!audioRef.current) {
+      const current = audioRef.current;
+      step += 1;
+      if (!current || step >= steps) {
+        if (current) current.volume = targetVolume;
         clearFade();
         return;
       }
-
-      const nextVol = audioRef.current.volume + volumeIncrement;
-      if (nextVol >= targetVolume) {
-        audioRef.current.volume = targetVolume;
-        clearFade();
-      } else {
-        audioRef.current.volume = Math.min(1, Math.max(0, nextVol));
-      }
-    }, stepTime);
+      current.volume = Math.min(1, Math.max(0, (targetVolume * step) / steps));
+    }, (fadeIn * 1000) / steps);
   }, [clearFade, fadeIn, targetVolume]);
 
   // Smooth fade-out volume transition before pause
   const applyFadeOutAndPause = useCallback(() => {
-    if (!audioRef.current) return;
+    const audio = audioRef.current;
+    if (!audio) return;
     clearFade();
+    setIsPlaying(false);
 
-    if (fadeOut <= 0) {
-      audioRef.current.pause();
-      setIsPlaying(false);
+    // iOS Safari ignores audio.volume (always reads 1), so a volume fade can never finish there
+    if (fadeOut <= 0 || !canControlVolume(audio)) {
+      audio.pause();
       return;
     }
 
     const steps = 15;
-    const stepTime = (fadeOut * 1000) / steps;
-    const currentVol = audioRef.current.volume;
-    const volumeDecrement = currentVol / steps;
+    let step = 0;
+    const startVolume = audio.volume;
 
     fadeIntervalRef.current = setInterval(() => {
-      if (!audioRef.current) {
+      const current = audioRef.current;
+      step += 1;
+      if (!current || step >= steps) {
+        if (current) {
+          current.pause();
+          current.volume = targetVolume;
+        }
         clearFade();
         return;
       }
-
-      const nextVol = audioRef.current.volume - volumeDecrement;
-      if (nextVol <= 0.05) {
-        audioRef.current.volume = 0;
-        audioRef.current.pause();
-        audioRef.current.volume = targetVolume;
-        setIsPlaying(false);
-        clearFade();
-      } else {
-        audioRef.current.volume = Math.max(0, nextVol);
-      }
-    }, stepTime);
+      current.volume = Math.max(0, startVolume * (1 - step / steps));
+    }, (fadeOut * 1000) / steps);
   }, [clearFade, fadeOut, targetVolume]);
 
   // Handle Play Request with Browser Autoplay Policy Resilience
@@ -147,6 +148,11 @@ export default function VintageMusicPlayer({
     if (playPromise !== undefined) {
       playPromise
         .then(() => {
+          // The reader may have paused while play() was still pending
+          if (isManuallyPausedRef.current) {
+            audio.pause();
+            return;
+          }
           setIsPlaying(true);
           setShowToast(true);
           setTimeout(() => setShowToast(false), 4500);
@@ -252,7 +258,7 @@ export default function VintageMusicPlayer({
   const togglePlay = () => {
     if (!audioRef.current || !songSrc) return;
 
-    if (isPlaying) {
+    if (!audioRef.current.paused) {
       isManuallyPausedRef.current = true;
       applyFadeOutAndPause();
     } else {
@@ -274,6 +280,8 @@ export default function VintageMusicPlayer({
         loop={loop}
         preload="auto"
         onEnded={handleSongEnded}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
       />
 
       {/* Floating mini music controller */}
