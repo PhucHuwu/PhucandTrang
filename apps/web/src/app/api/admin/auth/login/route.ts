@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { isSameOriginRequest } from '../../sameOrigin';
 
 const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 export async function POST(request: Request) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ message: 'Yêu cầu không hợp lệ' }, { status: 403 });
+  }
   try {
     const body = await request.json();
     const { pass } = body;
@@ -60,7 +64,7 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     return NextResponse.json(
-      { message: `Lỗi kết nối máy chủ xác thực: ${error.message}` },
+      { message: 'Lỗi kết nối máy chủ xác thực' },
       { status: 500 }
     );
   }

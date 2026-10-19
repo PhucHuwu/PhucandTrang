@@ -7,6 +7,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsSafeInteraction } from '../../common/dto/element-interaction.dto';
 
 export class LayoutSlotDto {
   @IsString()
@@ -43,6 +44,7 @@ export class TemplateElementPrototypeDto {
   defaultData?: Record<string, any>;
 
   @IsOptional()
+  @IsSafeInteraction()
   interaction?: Record<string, any>;
 }
 

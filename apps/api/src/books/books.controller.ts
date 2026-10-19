@@ -7,14 +7,13 @@ import {
   Delete,
   Body,
   Param,
-  UseGuards,
   Request,
 } from '@nestjs/common';
 import { BooksService } from './books.service';
 import { UpdateBookDto } from './dto/update-book.dto';
-import { AuthGuard } from '@nestjs/passport';
+import { Roles } from '../auth/roles.decorator';
+import { Role } from '@prisma/client';
 
-@UseGuards(AuthGuard('jwt'))
 @Controller('books')
 export class BooksController {
   constructor(private booksService: BooksService) {}
@@ -48,6 +47,7 @@ export class BooksController {
   /**
    * Prompt 23, 24 & 34: Publishes current draft to live public site with validation check
    */
+  @Roles(Role.ADMIN)
   @Post(':id/publish')
   async publishBook(
     @Param('id') id: string,
@@ -57,6 +57,7 @@ export class BooksController {
     return this.booksService.publishBook(id, body?.changelog, req.user?.id);
   }
 
+  @Roles(Role.ADMIN)
   @Post(':id/archive')
   async archiveBook(@Param('id') id: string) {
     return this.booksService.updateStatus(id, 'ARCHIVED' as any);

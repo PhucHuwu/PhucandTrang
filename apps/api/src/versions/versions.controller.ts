@@ -4,13 +4,12 @@ import {
   Post,
   Param,
   Body,
-  UseGuards,
   Request,
 } from '@nestjs/common';
 import { VersionsService } from './versions.service';
-import { AuthGuard } from '@nestjs/passport';
+import { Roles } from '../auth/roles.decorator';
+import { Role } from '@prisma/client';
 
-@UseGuards(AuthGuard('jwt'))
 @Controller('versions')
 export class VersionsController {
   constructor(private versionsService: VersionsService) {}
@@ -39,6 +38,7 @@ export class VersionsController {
     );
   }
 
+  @Roles(Role.ADMIN)
   @Post('book/:bookId/rollback/:versionId')
   async rollbackToSnapshot(
     @Param('bookId') bookId: string,

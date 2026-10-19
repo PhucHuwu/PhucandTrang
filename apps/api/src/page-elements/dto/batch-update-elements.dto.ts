@@ -12,6 +12,7 @@ import {
   Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsSafeInteraction } from '../../common/dto/element-interaction.dto';
 
 export class BatchElementUpdateItemDto {
   @IsString()
@@ -53,6 +54,7 @@ export class BatchElementUpdateItemDto {
   data?: Record<string, any>;
 
   @IsObject()
+  @IsSafeInteraction()
   @IsOptional()
   interaction?: Record<string, any>;
 }

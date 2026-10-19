@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { isSameOriginRequest } from '../../sameOrigin';
 
 const BACKEND_URL =
   process.env.BACKEND_INTERNAL_URL ||
@@ -24,6 +25,10 @@ async function handleProxy(request: Request, { params }: { params: Promise<{ pat
   const targetPath = buildTargetPath(path);
   if (!targetPath) {
     return NextResponse.json({ message: 'Đường dẫn API không hợp lệ' }, { status: 400 });
+  }
+
+  if (request.method !== 'GET' && !isSameOriginRequest(request)) {
+    return NextResponse.json({ message: 'Yêu cầu không hợp lệ' }, { status: 403 });
   }
 
   const url = new URL(request.url);

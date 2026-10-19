@@ -27,6 +27,8 @@ export class AuthService {
 
   // Thresholds: max 5 failed attempts in 5 minutes -> lock that client for 15 minutes
   private readonly MAX_ATTEMPTS = 5;
+  // Per connecting address: the BFF shares one address across all browsers, so it gets more room
+  private readonly MAX_SOURCE_ATTEMPTS = 30;
   private readonly BLOCK_DURATION_MS = 15 * 60 * 1000;
   private readonly ATTEMPT_WINDOW_MS = 5 * 60 * 1000;
   private readonly MAX_TRACKED_CLIENTS = 5000;
@@ -63,12 +65,16 @@ export class AuthService {
     }
   }
 
+  private limitFor(key: string) {
+    return key.startsWith('source:') ? this.MAX_SOURCE_ATTEMPTS : this.MAX_ATTEMPTS;
+  }
+
   private recordFailedAttempt(key: string) {
     const now = Date.now();
     const record = this.getActiveRecord(key, now) || { attempts: 0, windowStartedAt: now };
 
     record.attempts++;
-    if (record.attempts >= this.MAX_ATTEMPTS) {
+    if (record.attempts >= this.limitFor(key)) {
       record.blockedUntil = now + this.BLOCK_DURATION_MS;
     }
     this.loginAttempts.set(key, record);
@@ -97,16 +103,10 @@ export class AuthService {
       where: { email: canonicalAdminEmail },
     });
 
-    // 2. Fallback to latest admin account if canonical email is not found
+    // 2. Fallback to latest admin account if canonical email is not found (never to a non-admin)
     if (!user) {
       user = await this.prisma.user.findFirst({
         where: { role: Role.ADMIN },
-        orderBy: { createdAt: 'desc' },
-      });
-    }
-
-    if (!user) {
-      user = await this.prisma.user.findFirst({
         orderBy: { createdAt: 'desc' },
       });
     }
@@ -118,13 +118,16 @@ export class AuthService {
     return null;
   }
 
-  async login(dto: LoginDto, clientId = 'unknown') {
+  async login(dto: LoginDto, clientId = 'unknown', sourceId = clientId) {
     const rateLimitKey = `login:${clientId}`;
+    const sourceKey = `source:${sourceId}`;
     this.checkRateLimit(rateLimitKey);
+    this.checkRateLimit(sourceKey);
 
     const user = await this.validateUser(dto.pass);
     if (!user) {
       this.recordFailedAttempt(rateLimitKey);
+      this.recordFailedAttempt(sourceKey);
       throw new UnauthorizedException('Mật khẩu không chính xác');
     }
 

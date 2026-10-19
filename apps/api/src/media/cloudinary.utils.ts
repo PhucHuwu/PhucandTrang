@@ -73,12 +73,22 @@ export function getResourceTypeForType(type?: MediaType): string {
       return 'video';
     case MediaType.AUDIO:
       return 'video'; // Cloudinary handles audio files under video resource_type
-    case MediaType.BACKGROUND:
-    case MediaType.IMAGE:
-    case MediaType.TEXTURE:
-    case MediaType.DECORATION:
-      return 'image';
     default:
-      return 'auto';
+      return 'image';
+  }
+}
+
+const IMAGE_FORMATS = 'jpg,jpeg,png,webp,gif,avif,heic,heif';
+const VIDEO_FORMATS = 'mp4,mov,webm,m4v';
+const AUDIO_FORMATS = 'mp3,m4a,aac,wav,ogg,oga,flac,opus';
+
+export function getAllowedFormatsForType(type?: MediaType): string {
+  switch (type) {
+    case MediaType.VIDEO:
+      return VIDEO_FORMATS;
+    case MediaType.AUDIO:
+      return AUDIO_FORMATS;
+    default:
+      return IMAGE_FORMATS;
   }
 }

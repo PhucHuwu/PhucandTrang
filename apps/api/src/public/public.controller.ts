@@ -7,7 +7,9 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { PublicService } from './public.service';
+import { Public } from '../auth/admin-access.guard';
 
+@Public()
 @Controller('public')
 export class PublicController {
   constructor(private publicService: PublicService) {}

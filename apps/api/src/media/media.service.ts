@@ -15,6 +15,7 @@ import {
   generateCloudinarySignature,
   getUploadFolderForType,
   getResourceTypeForType,
+  getAllowedFormatsForType,
   CloudinarySignedConfig,
 } from './cloudinary.utils';
 
@@ -85,18 +86,15 @@ export class MediaService {
     const resourceType = getResourceTypeForType(dto.type);
     const timestamp = Math.floor(Date.now() / 1000);
 
+    // Only server-chosen values are signed: the client cannot pick a public_id (which would let it
+    // overwrite an existing file) or upload formats outside the expected type.
     const paramsToSign: Record<string, any> = {
       folder,
       timestamp,
+      overwrite: false,
+      unique_filename: true,
+      allowed_formats: getAllowedFormatsForType(dto.type),
     };
-
-    if (dto.publicId) {
-      paramsToSign.public_id = dto.publicId;
-    }
-
-    if (dto.tags && dto.tags.length > 0) {
-      paramsToSign.tags = dto.tags.join(',');
-    }
 
     const signature = generateCloudinarySignature(paramsToSign, effectiveSecret);
     const uploadUrl = `https://api.cloudinary.com/v1_1/${effectiveCloudName}/${resourceType}/upload`;

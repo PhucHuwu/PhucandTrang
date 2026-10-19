@@ -7,16 +7,15 @@ import {
   Body,
   Param,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import { MediaService } from './media.service';
-import { AuthGuard } from '@nestjs/passport';
 import { CreateMediaDto } from './dto/create-media.dto';
 import { UpdateMediaDto } from './dto/update-media.dto';
 import { QueryMediaDto } from './dto/query-media.dto';
 import { SignedUploadRequestDto } from './dto/signed-upload.dto';
+import { Roles } from '../auth/roles.decorator';
+import { Role } from '@prisma/client';
 
-@UseGuards(AuthGuard('jwt'))
 @Controller('media')
 export class MediaController {
   constructor(private mediaService: MediaService) {}
@@ -26,11 +25,6 @@ export class MediaController {
    */
   @Post('signature')
   getSignedUploadConfigPost(@Body() dto: SignedUploadRequestDto) {
-    return this.mediaService.getSignedUploadConfig(dto);
-  }
-
-  @Get('signature')
-  getSignedUploadConfigGet(@Query() dto: SignedUploadRequestDto) {
     return this.mediaService.getSignedUploadConfig(dto);
   }
 
@@ -45,6 +39,7 @@ export class MediaController {
   /**
    * Sync legacy cloudinaryUrls.json map into the database.
    */
+  @Roles(Role.ADMIN)
   @Post('sync-legacy')
   syncLegacy(@Body() legacyMap: Record<string, string>) {
     return this.mediaService.syncLegacyMedia(legacyMap);
@@ -94,6 +89,7 @@ export class MediaController {
    * Safely deletes media.
    * If media is in use, rejects with 409 Conflict unless force=true.
    */
+  @Roles(Role.ADMIN)
   @Delete(':id')
   remove(
     @Param('id') id: string,

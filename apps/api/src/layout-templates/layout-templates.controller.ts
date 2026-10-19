@@ -6,15 +6,12 @@ import {
   Delete,
   Body,
   Param,
-  UseGuards,
   Request,
 } from '@nestjs/common';
 import { LayoutTemplatesService } from './layout-templates.service';
-import { AuthGuard } from '@nestjs/passport';
 import { CreateLayoutTemplateDto } from './dto/create-layout-template.dto';
 import { UpdateLayoutTemplateDto } from './dto/update-layout-template.dto';
 
-@UseGuards(AuthGuard('jwt'))
 @Controller('layout-templates')
 export class LayoutTemplatesController {
   constructor(private templatesService: LayoutTemplatesService) {}
@@ -31,7 +28,7 @@ export class LayoutTemplatesController {
 
   @Post()
   async create(@Body() dto: CreateLayoutTemplateDto, @Request() req: any) {
-    return this.templatesService.create(dto, req.user?.role || 'ADMIN');
+    return this.templatesService.create(dto, req.user.role);
   }
 
   @Put(':id')
@@ -40,7 +37,7 @@ export class LayoutTemplatesController {
     @Body() dto: UpdateLayoutTemplateDto,
     @Request() req: any,
   ) {
-    return this.templatesService.update(id, dto, req.user?.role || 'ADMIN');
+    return this.templatesService.update(id, dto, req.user.role);
   }
 
   @Post(':id/duplicate')
@@ -53,6 +50,6 @@ export class LayoutTemplatesController {
 
   @Delete(':id')
   async remove(@Param('id') id: string, @Request() req: any) {
-    return this.templatesService.remove(id, req.user?.role || 'ADMIN');
+    return this.templatesService.remove(id, req.user.role);
   }
 }

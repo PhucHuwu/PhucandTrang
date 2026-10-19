@@ -169,6 +169,7 @@ export default class Flipbook {
 		this.wrapperLinkEl.draggable = false;
 		this.wrapperLinkEl.classList.add("wrapper-link");
 		this.wrapperLinkEl.setAttribute("target", "_blank");
+		this.wrapperLinkEl.setAttribute("rel", "noopener noreferrer");
 		this.containerEl.appendChild(this.wrapperLinkEl);
 		this.wrapperLinkEl.appendChild(this.renderer.domElement);
 
@@ -475,7 +476,8 @@ export default class Flipbook {
 		// applying cursor, href and title
 		this.wrapperLinkEl.style.cursor = cursor;
 		this.wrapperLinkEl.title = title;
-		if (href) {
+		// setAttribute bypasses React's javascript: URL protection, so only allow web links
+		if (href && /^https?:\/\//i.test(href)) {
 			this.wrapperLinkEl.setAttribute("href", href);
 		} else {
 			this.wrapperLinkEl.removeAttribute("href");

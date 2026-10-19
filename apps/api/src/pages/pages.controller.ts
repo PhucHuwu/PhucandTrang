@@ -7,7 +7,6 @@ import {
   Delete,
   Body,
   Param,
-  UseGuards,
 } from '@nestjs/common';
 import { PagesService } from './pages.service';
 import { CreatePageDto } from './dto/create-page.dto';
@@ -15,9 +14,7 @@ import { UpdatePageDto } from './dto/update-page.dto';
 import { ReorderPagesDto } from './dto/reorder-pages.dto';
 import { DuplicatePageDto } from './dto/duplicate-page.dto';
 import { ApplyLayoutDto } from './dto/apply-layout.dto';
-import { AuthGuard } from '@nestjs/passport';
 
-@UseGuards(AuthGuard('jwt'))
 @Controller('pages')
 export class PagesController {
   constructor(private pagesService: PagesService) {}

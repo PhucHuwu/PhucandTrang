@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsNumber, IsObject } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsNumber, IsObject, IsUrl } from 'class-validator';
 import { MediaType } from '@prisma/client';
 
 export class CreateMediaDto {
@@ -10,7 +10,7 @@ export class CreateMediaDto {
   provider?: string;
 
   @IsNotEmpty()
-  @IsString()
+  @IsUrl({ protocols: ['https'], require_protocol: true })
   url: string;
 
   @IsOptional()

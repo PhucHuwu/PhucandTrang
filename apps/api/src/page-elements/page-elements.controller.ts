@@ -7,7 +7,6 @@ import {
   Delete,
   Body,
   Param,
-  UseGuards,
 } from '@nestjs/common';
 import { PageElementsService } from './page-elements.service';
 import { CreatePageElementDto } from './dto/create-page-element.dto';
@@ -15,9 +14,7 @@ import { UpdatePageElementDto } from './dto/update-page-element.dto';
 import { BatchUpdateElementsDto } from './dto/batch-update-elements.dto';
 import { ReorderElementsDto } from './dto/reorder-elements.dto';
 import { DuplicateElementDto } from './dto/duplicate-element.dto';
-import { AuthGuard } from '@nestjs/passport';
 
-@UseGuards(AuthGuard('jwt'))
 @Controller()
 export class PageElementsController {
   constructor(private elementsService: PageElementsService) {}

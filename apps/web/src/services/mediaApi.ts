@@ -70,8 +70,6 @@ export interface QueryMediaResult {
 export async function requestSignedUploadConfig(params: {
   type?: MediaType;
   folder?: string;
-  publicId?: string;
-  tags?: string[];
 }): Promise<SignedUploadConfig> {
   const res = await fetch(`${API_BASE_URL}/media/signature`, {
     method: 'POST',

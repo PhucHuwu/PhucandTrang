@@ -5,9 +5,9 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const isProduction = process.env.NODE_ENV === 'production';
 
-  // Production security check: enforce dedicated JWT_SECRET
-  if (isProduction && (!process.env.JWT_SECRET || process.env.JWT_SECRET.includes('super_secret_romantic_jwt_key'))) {
-    console.error('FATAL: JWT_SECRET environment variable must be properly configured in production!');
+  // Every environment needs its own JWT_SECRET; there is no built-in fallback
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.includes('super_secret_romantic_jwt_key')) {
+    console.error('FATAL: JWT_SECRET environment variable must be properly configured!');
     process.exit(1);
   }
 

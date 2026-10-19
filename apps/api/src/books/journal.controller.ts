@@ -4,12 +4,12 @@ import {
   Patch,
   Post,
   Body,
-  UseGuards,
   Request,
 } from '@nestjs/common';
 import { BooksService } from './books.service';
 import { UpdateBookDto } from './dto/update-book.dto';
-import { AuthGuard } from '@nestjs/passport';
+import { Roles } from '../auth/roles.decorator';
+import { Role } from '@prisma/client';
 
 /**
  * JournalController
@@ -17,7 +17,6 @@ import { AuthGuard } from '@nestjs/passport';
  * Single Love Journal CMS Endpoint (/api/journal)
  * Directly manages the single canonical journal for Phúc & Trang without multi-book routing.
  */
-@UseGuards(AuthGuard('jwt'))
 @Controller('journal')
 export class JournalController {
   constructor(private booksService: BooksService) {}
@@ -45,6 +44,7 @@ export class JournalController {
     return this.booksService.validateForPublish(journalId);
   }
 
+  @Roles(Role.ADMIN)
   @Post('publish')
   async publishJournal(
     @Body() body: { changelog?: string } = {},
@@ -54,6 +54,7 @@ export class JournalController {
     return this.booksService.publishBook(journalId, body?.changelog, req.user?.id);
   }
 
+  @Roles(Role.ADMIN)
   @Post('archive')
   async archiveJournal() {
     const journalId = await this.booksService.getCanonicalJournalId();

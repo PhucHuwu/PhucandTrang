@@ -16,6 +16,7 @@ import {
   ELEMENT_INTERACTION_ACTIONS,
   ElementInteractionAction,
   validateInteractionTarget,
+  isValidHttpUrl,
 } from '@phucandtrang/shared';
 
 export function IsStringOrNumber(validationOptions?: ValidationOptions) {
@@ -53,6 +54,32 @@ export function IsValidInteractionTarget(validationOptions?: ValidationOptions) 
         defaultMessage(args: ValidationArguments) {
           const action = (args.object as ElementInteractionDto).action;
           return validateInteractionTarget(action, args.value) || 'Interaction target không hợp lệ.';
+        },
+      },
+    });
+  };
+}
+
+/**
+ * For free-form interaction objects (batch save, apply-layout): only rejects link targets
+ * that are not http/https, so stored data can never become a javascript: link on the public site.
+ */
+export function IsSafeInteraction(validationOptions?: ValidationOptions) {
+  return function (object: Object, propertyName: string) {
+    registerDecorator({
+      name: 'isSafeInteraction',
+      target: object.constructor,
+      propertyName,
+      options: validationOptions,
+      validator: {
+        validate(value: any) {
+          if (value === undefined || value === null) return true;
+          if (typeof value !== 'object' || Array.isArray(value)) return false;
+          if (value.action !== 'open-link') return true;
+          return value.target === undefined || value.target === '' || isValidHttpUrl(value.target);
+        },
+        defaultMessage() {
+          return 'open-link yêu cầu target là URL http/https hợp lệ.';
         },
       },
     });

@@ -1,5 +1,6 @@
 import { IsNotEmpty, IsString, IsArray, ValidateNested, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsSafeInteraction } from '../../common/dto/element-interaction.dto';
 
 export class ApplyLayoutItemDto {
   @IsString()
@@ -35,6 +36,7 @@ export class ApplyLayoutItemDto {
   data?: Record<string, any>;
 
   @IsOptional()
+  @IsSafeInteraction()
   interaction?: Record<string, any>;
 }
 

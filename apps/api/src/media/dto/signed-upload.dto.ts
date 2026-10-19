@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsEnum, IsArray } from 'class-validator';
+import { IsOptional, IsString, IsEnum } from 'class-validator';
 import { MediaType } from '@prisma/client';
 
 export class SignedUploadRequestDto {
@@ -9,13 +9,4 @@ export class SignedUploadRequestDto {
   @IsOptional()
   @IsString()
   folder?: string;
-
-  @IsOptional()
-  @IsString()
-  publicId?: string;
-
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  tags?: string[];
 }

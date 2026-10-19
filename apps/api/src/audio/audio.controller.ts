@@ -6,14 +6,11 @@ import {
   Delete,
   Body,
   Param,
-  UseGuards,
 } from '@nestjs/common';
 import { AudioService } from './audio.service';
-import { AuthGuard } from '@nestjs/passport';
 import { CreateAudioTrackDto } from './dto/create-audio-track.dto';
 import { UpdateAudioTrackDto } from './dto/update-audio-track.dto';
 
-@UseGuards(AuthGuard('jwt'))
 @Controller('audio')
 export class AudioController {
   constructor(private audioService: AudioService) {}
