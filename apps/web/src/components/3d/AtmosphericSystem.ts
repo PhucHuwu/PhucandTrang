@@ -81,6 +81,9 @@ export class AtmosphericSystem {
   private reducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   private lastTime: number | undefined;
   private motionTime = 0;
+  private activeButterflies = Infinity;
+  private activeFoliage = Infinity;
+  private activeDust = Infinity;
 
   constructor(
     scene: THREE.Scene,
@@ -245,7 +248,9 @@ export class AtmosphericSystem {
   }
 
   private stepFoliage(dt: number) {
-    for (const f of this.foliage) {
+    const count = Math.min(this.activeFoliage, this.foliage.length);
+    for (let i = 0; i < count; i++) {
+      const f = this.foliage[i];
       f.swayPhase += f.swaySpeed * dt;
       const sway = Math.sin(f.swayPhase);
       f.position.y -= f.fallSpeed * dt;
@@ -264,7 +269,9 @@ export class AtmosphericSystem {
   private writeFoliageInstances() {
     const mesh = this.foliageMesh;
     if (!mesh) return;
-    this.foliage.forEach((f, i) => {
+    const count = Math.min(this.activeFoliage, this.foliage.length);
+    for (let i = 0; i < count; i++) {
+      const f = this.foliage[i];
       this.instanceQuaternion.setFromEuler(f.rotation);
       this.instanceScale.setScalar(f.size);
       this.instanceMatrix.compose(f.position, this.instanceQuaternion, this.instanceScale);
@@ -272,7 +279,7 @@ export class AtmosphericSystem {
       // Fake lighting: darken as the sprite turns edge-on to the camera
       this.scratch.set(0, 0, 1).applyQuaternion(this.instanceQuaternion);
       mesh.setColorAt(i, this.shade.setScalar(0.72 + 0.28 * Math.abs(this.scratch.z)));
-    });
+    }
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }
@@ -412,7 +419,9 @@ export class AtmosphericSystem {
 
   private stepButterflies(dt: number, time: number) {
     const t = time * 0.12;
-    for (const b of this.butterflies) {
+    const count = Math.min(this.activeButterflies, this.butterflies.length);
+    for (let i = 0; i < count; i++) {
+      const b = this.butterflies[i];
       const p = b.position;
       const s = FLIGHT.noiseScale;
 
@@ -456,7 +465,9 @@ export class AtmosphericSystem {
     const phases = this.wingPhaseAttribute;
     if (!mesh || !phases) return;
 
-    this.butterflies.forEach((b, i) => {
+    const count = Math.min(this.activeButterflies, this.butterflies.length);
+    for (let i = 0; i < count; i++) {
+      const b = this.butterflies[i];
       // Forward (+z of the wing quad) along the heading, back of the wings facing the camera (+z world)
       this.rotationMatrix.lookAt(b.heading, this.origin, this.cameraFacingUp);
       this.instanceQuaternion.setFromRotationMatrix(this.rotationMatrix);
@@ -464,24 +475,40 @@ export class AtmosphericSystem {
       this.instanceMatrix.compose(b.position, this.instanceQuaternion, this.instanceScale);
       mesh.setMatrixAt(i, this.instanceMatrix);
       phases.setX(i, b.wingPhase);
-    });
+    }
     mesh.instanceMatrix.needsUpdate = true;
     phases.needsUpdate = true;
+  }
+
+  /** Scale how many of the configured butterflies / petals / dust particles are simulated and drawn. */
+  setQuality(share: number) {
+    const scaled = (total: number) => (total > 0 ? Math.max(1, Math.round(total * share)) : 0);
+    this.activeButterflies = scaled(this.butterflies.length);
+    if (this.butterflyMesh) this.butterflyMesh.count = this.activeButterflies;
+    this.activeFoliage = scaled(this.foliage.length);
+    if (this.foliageMesh) this.foliageMesh.count = this.activeFoliage;
+    if (this.dustParticles) {
+      const total = this.dustParticles.geometry.attributes.position.count;
+      this.activeDust = scaled(total);
+      this.dustParticles.geometry.setDrawRange(0, this.activeDust);
+    }
   }
 
   update(time: number, mouseParallax: { x: number; y: number }) {
     if (this.reducedMotion) return;
     const elapsed = this.lastTime === undefined ? 0 : time - this.lastTime;
     this.lastTime = time;
-    // Discard background-tab gaps rather than jumping across the scene.
-    const dt = elapsed > 0.25 ? 0 : Math.max(0, elapsed);
+    // Skip only real pauses (hidden tab); slow frames are clamped instead, otherwise
+    // machines that regularly take >0.25s per frame would see everything frozen.
+    const dt = elapsed > 1 ? 0 : THREE.MathUtils.clamp(elapsed, 0, 0.1);
     const frame = dt * 60;
     this.motionTime += dt;
     time = this.motionTime;
     // 1. Dust motion
     if (this.dustParticles) {
       const pos = this.dustParticles.geometry.attributes.position.array as Float32Array;
-      for (let i = 0; i < pos.length / 3; i++) {
+      const dustCount = Math.min(this.activeDust, pos.length / 3);
+      for (let i = 0; i < dustCount; i++) {
         pos[i * 3 + 1] += Math.sin(time * 0.5 + i) * 0.8 * frame;
         pos[i * 3] += (Math.cos(time * 0.3 + i) * 0.5 + mouseParallax.x * 0.4) * frame;
       }

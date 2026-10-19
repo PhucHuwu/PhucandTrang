@@ -14,6 +14,7 @@ import SlidingNumber, { ValueChangeEvent } from "./sliding-number";
 import SwipeHandler from "./swipe-handler";
 import IntroOverlay from "./intro-overlay";
 import PageCurveHelper from "./page-curve-helper";
+import { detectInitialTier, EFFECT_SHARE, FrameRateMonitor, MAX_PIXEL_RATIO, QualityTier } from "./quality";
 
 export default class Flipbook {
 	private containerEl: HTMLElement;
@@ -87,7 +88,14 @@ export default class Flipbook {
 	private cameraSideShift = new SlidingNumber(1, 0.2);
 	private isVerticalMode = false;
 	private swipeHandler: SwipeHandler;
-	public atmospheric?: any;
+	private atmosphericSystem?: any;
+	public get atmospheric() { return this.atmosphericSystem; }
+	public set atmospheric(system: any) {
+		this.atmosphericSystem = system;
+		system?.setQuality?.(EFFECT_SHARE[this.quality.tier]);
+	}
+	// Weak / average / strong machines: picked from hardware hints, then adjusted from the measured frame rate
+	private quality = new FrameRateMonitor(detectInitialTier(), tier => this.applyQuality(tier));
 	public loadingProgress = 0;
 
 	// if this code is running, means the scripts are already loaded
@@ -152,7 +160,7 @@ export default class Flipbook {
 		// this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
 		// this.renderer.toneMappingExposure = 1.2;
 		// Phones report DPR 3+; rendering the scene (and its soft shadows) at that density is too heavy
-		this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+		this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO[this.quality.tier]));
 		this.renderer.setSize(window.innerWidth, window.innerHeight);
 		this.renderer.shadowMap.enabled = true;
 		this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -500,6 +508,7 @@ export default class Flipbook {
 			let dt = Math.min((currentTime - previousTime) / 1000, 0.05);
 			previousTime = currentTime;
 			if (document.hidden) {
+				this.quality.reset();
 				this.animationFrame = requestAnimationFrame(animate);
 				return;
 			}
@@ -714,7 +723,19 @@ export default class Flipbook {
 		}
 		if (!this.focusedActiveArea || this.isChangingFocus) {
 			this.render();
+			// Only frames that actually render tell us how heavy the scene is
+			if (this.introPhase === "COMPLETED") this.quality.sample(performance.now());
+		} else {
+			this.quality.reset();
 		}
+	}
+
+	private applyQuality(tier: QualityTier) {
+		if (this.disposed) return;
+		this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO[tier]));
+		this.renderer.setSize(window.innerWidth, window.innerHeight);
+		this.atmosphericSystem?.setQuality?.(EFFECT_SHARE[tier]);
+		this.quality.reset();
 	}
 
 	private render() {
