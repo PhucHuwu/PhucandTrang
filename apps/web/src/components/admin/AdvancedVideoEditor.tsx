@@ -94,31 +94,13 @@ export default function AdvancedVideoEditor({
 
         {/* Video URL Display & Actions */}
         <div className="space-y-2">
-          <input
-            type="text"
-            disabled={disabled}
-            value={d.src || ''}
-            onChange={(e) => {
-              const newUrl = e.target.value;
-              onChange((el) => {
-                const updatedData = { ...el.data, src: newUrl };
-                // If user changes URL manually and it differs from canonical media URL, clear stale mediaId
-                if (el.data.mediaId && newUrl !== el.data.src) {
-                  delete updatedData.mediaId;
-                }
-                return {
-                  ...el,
-                  data: updatedData,
-                  interaction: {
-                    ...(el.interaction || { enabled: true, action: 'open-video' }),
-                    target: newUrl,
-                  },
-                };
-              });
-            }}
-            placeholder="https://res.cloudinary.com/.../video.mp4"
-            className="w-full px-3 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white font-mono text-xs placeholder-stone-600"
-          />
+          <p className="px-3 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-xs truncate" title={d.src || undefined}>
+            {d.src ? (
+              <span className="text-parchment-200">{d.src.split('?')[0].split('/').pop()}</span>
+            ) : (
+              <span className="text-stone-500">Chưa có video. Bấm nút bên dưới để chọn hoặc tải từ máy.</span>
+            )}
+          </p>
 
           <div className="flex items-center gap-2">
             <button

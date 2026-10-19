@@ -10,6 +10,8 @@ import {
   saveUploadedMediaMetadata,
 } from '@/services/adminApi';
 import { useAdminAuth } from '@/context/AdminAuthContext';
+import { useAdminDialog } from '@/hooks/useAdminDialog';
+import DialogPortal from '@/components/admin/DialogPortal';
 import { uploadDirectToCloudinary } from '@/services/mediaApi';
 import { Media, MediaType } from '@/types/book';
 import {
@@ -41,8 +43,10 @@ export default function AdminMediaPage() {
     media: Media;
     references: any[];
     isInUse: boolean;
+    confirmDelete: boolean;
   } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [checkingId, setCheckingId] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
 
   const fetchMedia = async () => {
@@ -114,14 +118,23 @@ export default function AdminMediaPage() {
     }
   };
 
-  const handleCheckReferences = async (id: string) => {
+  // confirmDelete=true when opened from the trash button: the dialog then acts as the delete confirmation
+  const handleCheckReferences = async (id: string, confirmDelete = false) => {
+    setCheckingId(id);
     try {
       const data = await getAdminMediaReferences(id);
-      setInspectReferences(data);
+      setInspectReferences({ ...data, confirmDelete });
     } catch (err: any) {
       alert(err?.message || 'Lỗi kiểm tra liên kết media');
+    } finally {
+      setCheckingId(null);
     }
   };
+
+  const closeReferences = () => {
+    if (!deletingId) setInspectReferences(null);
+  };
+  const dialogRef = useAdminDialog(!!inspectReferences, closeReferences);
 
   const handleDeleteMedia = async (id: string, force = false) => {
     setDeletingId(id);
@@ -130,10 +143,11 @@ export default function AdminMediaPage() {
       setInspectReferences(null);
       await fetchMedia();
     } catch (err: any) {
-      // If 409 conflict, open references modal automatically to show in-use locations
+      // If 409 conflict (became in use meanwhile), refresh the dialog to show in-use locations
       try {
         const refData = await getAdminMediaReferences(id);
-        setInspectReferences(refData);
+        setInspectReferences({ ...refData, confirmDelete: true });
+        if (!refData.isInUse) alert(err?.message || 'Không thể xóa media');
       } catch {
         alert(err?.message || 'Không thể xóa media');
       }
@@ -326,8 +340,8 @@ export default function AdminMediaPage() {
 
                     {isAdmin && (
                       <button
-                        onClick={() => handleDeleteMedia(item.id)}
-                        disabled={deletingId === item.id}
+                        onClick={() => handleCheckReferences(item.id, true)}
+                        disabled={checkingId === item.id || deletingId === item.id}
                         className="p-1 rounded text-red-400/80 hover:text-red-400 transition-colors"
                         title="Xóa media (Chỉ quyền ADMIN)"
                       >
@@ -344,20 +358,53 @@ export default function AdminMediaPage() {
 
       {/* References Inspection Modal */}
       {inspectReferences && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <DialogPortal>
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="media-dialog-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+        >
           <div className="relative w-full max-w-lg bg-[#1B1017] border border-rosewood-800/60 rounded-2xl p-6 shadow-2xl text-parchment-100 space-y-4">
             <div className="flex items-center justify-between border-b border-rosewood-900/50 pb-3">
-              <h3 className="font-serif text-base font-bold text-champagne-300 flex items-center gap-2">
-                <Info className="w-4 h-4 text-rosewood-400" />
-                <span>Kiểm tra liên kết của Media</span>
+              <h3 id="media-dialog-title" className="font-serif text-base font-bold text-champagne-300 flex items-center gap-2">
+                {inspectReferences.confirmDelete ? (
+                  <>
+                    <Trash2 className="w-4 h-4 text-red-400" />
+                    <span>Xóa media này?</span>
+                  </>
+                ) : (
+                  <>
+                    <Info className="w-4 h-4 text-rosewood-400" />
+                    <span>Kiểm tra liên kết của Media</span>
+                  </>
+                )}
               </h3>
               <button
-                onClick={() => setInspectReferences(null)}
+                onClick={closeReferences}
+                disabled={!!deletingId}
+                aria-label="Đóng"
                 className="text-stone-400 hover:text-white text-xs"
               >
                 ✕
               </button>
             </div>
+
+            {inspectReferences.confirmDelete && (
+              <div className="flex items-center gap-3">
+                <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-[#10070D] flex items-center justify-center">
+                  {inspectReferences.media.type === 'IMAGE' || inspectReferences.media.type === 'BACKGROUND' ? (
+                    <img src={inspectReferences.media.url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-[10px] font-mono text-stone-400">{inspectReferences.media.type}</span>
+                  )}
+                </div>
+                <p className="text-xs text-stone-300">
+                  File sẽ bị xóa vĩnh viễn khỏi thư viện và không thể khôi phục.
+                </p>
+              </div>
+            )}
 
             <div className="text-xs space-y-2">
               <p className="font-mono text-stone-300 break-all">URL: {inspectReferences.media.url}</p>
@@ -392,32 +439,36 @@ export default function AdminMediaPage() {
             {/* Modal Actions */}
             <div className="flex items-center justify-between pt-3 border-t border-rosewood-900/40">
               <button
-                onClick={() => setInspectReferences(null)}
-                className="px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs transition-colors"
+                onClick={closeReferences}
+                disabled={!!deletingId}
+                className="px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs transition-colors disabled:opacity-50"
               >
-                Đóng
+                {inspectReferences.confirmDelete ? 'Hủy, giữ lại' : 'Đóng'}
               </button>
 
-              {inspectReferences.isInUse ? (
+              {isAdmin && (inspectReferences.isInUse ? (
                 <button
                   onClick={() => handleDeleteMedia(inspectReferences.media.id, true)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-800 hover:bg-red-700 text-white text-xs font-semibold transition-colors shadow-lg"
-                  title="Cưỡng chế xóa dù đang có trang sử dụng"
+                  disabled={!!deletingId}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-800 hover:bg-red-700 text-white text-xs font-semibold transition-colors shadow-lg disabled:opacity-50"
+                  title="Xóa dù đang có trang sử dụng, các trang đó sẽ mất file này"
                 >
                   <AlertTriangle className="w-4 h-4" />
-                  <span>Cưỡng chế xóa (Force Delete)</span>
+                  <span>{deletingId ? 'Đang xóa...' : 'Vẫn xóa dù đang được dùng'}</span>
                 </button>
               ) : (
                 <button
                   onClick={() => handleDeleteMedia(inspectReferences.media.id, false)}
-                  className="px-4 py-2 rounded-xl bg-red-700 hover:bg-red-600 text-white text-xs font-semibold transition-colors"
+                  disabled={!!deletingId}
+                  className="px-4 py-2 rounded-xl bg-red-700 hover:bg-red-600 text-white text-xs font-semibold transition-colors disabled:opacity-50"
                 >
-                  Xóa media này
+                  {deletingId ? 'Đang xóa...' : 'Xóa vĩnh viễn'}
                 </button>
-              )}
+              ))}
             </div>
           </div>
         </div>
+        </DialogPortal>
       )}
     </div>
   );

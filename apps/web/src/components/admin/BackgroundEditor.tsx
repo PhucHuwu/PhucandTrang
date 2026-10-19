@@ -210,37 +210,35 @@ export default function BackgroundEditor({
       {currentType === 'image' && (
         <div className="p-3.5 rounded-xl bg-[#1C0F17] border border-rosewood-900/40 space-y-3.5">
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="block text-[11px] text-stone-300 font-medium">
-                Ảnh nền trang (Background Image)
-              </label>
-              {!disabled && (
-                <button
-                  type="button"
-                  onClick={() => setShowMediaPicker(true)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rosewood-900/60 hover:bg-rosewood-800 text-champagne-300 hover:text-white border border-rosewood-700/50 text-[10px] font-medium transition"
-                  title="Chọn ảnh từ Thư viện Media"
-                >
-                  <FolderOpen className="w-3 h-3" />
-                  <span>Chọn từ Thư viện</span>
-                </button>
-              )}
-            </div>
+            <label className="block text-[11px] text-stone-300 font-medium">
+              Ảnh nền trang
+            </label>
 
-            <input
-              type="text"
+            <button
+              type="button"
               disabled={disabled}
-              value={background.imageUrl || ''}
-              onChange={(e) => {
-                const newUrl = e.target.value;
-                updateField({
-                  imageUrl: newUrl,
-                  mediaId: background.mediaId && newUrl !== background.imageUrl ? undefined : background.mediaId,
-                });
-              }}
-              placeholder="https://res.cloudinary.com/..."
-              className="w-full px-3 py-1.5 bg-[#25151F] border border-rosewood-900/60 rounded-lg text-white font-mono text-xs"
-            />
+              onClick={() => setShowMediaPicker(true)}
+              className="w-full flex items-center gap-3 p-2 rounded-xl bg-[#25151F] border border-rosewood-900/60 hover:border-champagne-400/50 text-left transition disabled:opacity-60 disabled:hover:border-rosewood-900/60"
+            >
+              <div className="w-14 h-14 shrink-0 rounded-lg overflow-hidden bg-[#10070D] flex items-center justify-center">
+                {background.imageUrl ? (
+                  <img src={background.imageUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <ImageIcon className="w-5 h-5 text-stone-600" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-parchment-200 truncate">
+                  {background.imageUrl ? background.imageUrl.split('?')[0].split('/').pop() : 'Chưa có ảnh nền'}
+                </p>
+                {!disabled && (
+                  <p className="flex items-center gap-1 text-[11px] text-champagne-300 mt-0.5">
+                    <FolderOpen className="w-3 h-3" />
+                    <span>{background.imageUrl ? 'Đổi ảnh khác' : 'Chọn hoặc tải ảnh từ máy'}</span>
+                  </p>
+                )}
+              </div>
+            </button>
           </div>
 
           {/* Media Picker Modal */}

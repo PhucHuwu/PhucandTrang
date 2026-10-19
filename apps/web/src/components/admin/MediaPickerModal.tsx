@@ -13,6 +13,7 @@ import { Media, MediaType } from '@/types/book';
 import {
   Image as ImageIcon,
   Video,
+  Music,
   Upload,
   Search,
   Check,
@@ -43,6 +44,7 @@ export default function MediaPickerModal({
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const dialogRef = useAdminDialog(isOpen, onClose);
@@ -74,10 +76,30 @@ export default function MediaPickerModal({
     fetchMedia();
   };
 
-  // Direct Cloudinary Upload Flow without passing file bytes through NestJS
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const typeLabel = filterType === 'VIDEO' ? 'video' : filterType === 'AUDIO' ? 'nhạc' : 'ảnh';
+  const acceptTypes = filterType === 'VIDEO' ? 'video/*' : filterType === 'AUDIO' ? 'audio/*' : 'image/*';
+  const acceptPrefix = acceptTypes.replace('*', '');
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    e.target.value = '';
+    if (file) uploadFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) uploadFile(file);
+  };
+
+  // Direct Cloudinary Upload Flow without passing file bytes through NestJS
+  const uploadFile = async (file: File) => {
+    if (uploading) return;
+    if (file.type && !file.type.startsWith(acceptPrefix)) {
+      alert(`File "${file.name}" không phải ${typeLabel}. Vui lòng chọn đúng loại file.`);
+      return;
+    }
 
     setUploading(true);
     setUploadProgress(0);
@@ -98,7 +120,7 @@ export default function MediaPickerModal({
         publicId: uploadRes.publicId,
         width: uploadRes.width,
         height: uploadRes.height,
-        mimeType: file.type || `image/${uploadRes.format}`,
+        mimeType: file.type || `${acceptPrefix}${uploadRes.format || ''}`,
         size: uploadRes.bytes || file.size,
         alt: file.name.replace(/\.[^/.]+$/, ''),
       });
@@ -113,7 +135,7 @@ export default function MediaPickerModal({
       });
       onClose();
     } catch (err: any) {
-      alert(err?.message || 'Lỗi tải ảnh lên');
+      alert(err?.message || `Lỗi tải ${typeLabel} lên`);
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -192,9 +214,9 @@ export default function MediaPickerModal({
             <input
               ref={fileInputRef}
               type="file"
-              onChange={handleFileUpload}
+              onChange={handleFileInput}
               className="hidden"
-              accept={filterType === 'VIDEO' ? 'video/mp4,video/*' : filterType === 'AUDIO' ? 'audio/*' : 'image/*'}
+              accept={acceptTypes}
             />
 
             <button
@@ -204,22 +226,50 @@ export default function MediaPickerModal({
               className="h-11 flex items-center justify-center gap-1.5 px-4 rounded-xl bg-rosewood-600 hover:bg-rosewood-500 text-white text-sm font-semibold shadow-md transition-all active:scale-95 disabled:opacity-50"
             >
               <Upload className="w-4 h-4" />
-              <span>{uploading ? `Đang tải (${uploadProgress}%)` : filterType === 'VIDEO' ? 'Tải video' : 'Tải ảnh'}</span>
+              <span>{uploading ? `Đang tải (${uploadProgress}%)` : `Tải ${typeLabel} từ máy`}</span>
             </button>
           </div>
         </div>
 
         {/* Media Grid */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-5">
+        <div
+          className={`relative flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-5 ${dragging ? 'ring-2 ring-inset ring-champagne-400/70 bg-rosewood-950/40' : ''}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (!uploading) setDragging(true);
+          }}
+          onDragLeave={(e) => {
+            if (e.currentTarget === e.target) setDragging(false);
+          }}
+          onDrop={handleDrop}
+        >
+          {uploading && (
+            <div className="mb-3 rounded-xl border border-rosewood-800/60 bg-[#20111A] p-3">
+              <div className="flex justify-between text-xs text-parchment-200 mb-1.5">
+                <span>Đang tải {typeLabel} lên...</span>
+                <span className="font-mono">{uploadProgress}%</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-[#2C1923] overflow-hidden">
+                <div className="h-full bg-champagne-400 transition-all" style={{ width: `${uploadProgress}%` }} />
+              </div>
+            </div>
+          )}
           {loading ? (
             <div className="py-20 flex flex-col items-center justify-center text-stone-500 text-xs">
               <div className="w-8 h-8 rounded-full border-2 border-rosewood-500 border-t-transparent animate-spin mb-3" />
               <span>Đang nạp thư viện media...</span>
             </div>
           ) : mediaList.length === 0 ? (
-            <div className="py-20 text-center text-xs text-stone-500">
-              Không tìm thấy media phù hợp. Bấm nút tải lên để bổ sung vào thư viện.
-            </div>
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full py-16 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-rosewood-800/60 hover:border-champagne-400/60 text-stone-400 hover:text-parchment-100 transition-colors"
+            >
+              <Upload className="w-8 h-8 text-rosewood-400" />
+              <span className="text-sm font-medium">Kéo thả {typeLabel} vào đây, hoặc bấm để chọn từ máy</span>
+              <span className="text-xs text-stone-500">Thư viện chưa có {typeLabel} nào phù hợp</span>
+            </button>
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-2 sm:gap-3">
               {mediaList.map((m) => {
@@ -242,7 +292,12 @@ export default function MediaPickerModal({
                     {m.type === 'VIDEO' ? (
                       <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#2A1622] to-black text-amber-300 gap-2">
                         <Video className="w-8 h-8" />
-                        <span className="text-[9px] font-mono uppercase tracking-wider">Video MP4</span>
+                        <span className="text-[9px] font-mono uppercase tracking-wider">Video</span>
+                      </div>
+                    ) : m.type === 'AUDIO' ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#2A1622] to-black text-rosewood-300 gap-2">
+                        <Music className="w-8 h-8" />
+                        <span className="text-[9px] font-mono uppercase tracking-wider">Nhạc</span>
                       </div>
                     ) : (
                       <img
@@ -280,7 +335,7 @@ export default function MediaPickerModal({
                 Đã chọn: {currentSelected.alt || currentSelected.id}
               </span>
             ) : (
-              <span>Chọn một file để chèn vào phần tử</span>
+              <span>Chọn một {typeLabel} có sẵn, hoặc kéo thả file mới vào đây</span>
             )}
           </div>
 
@@ -299,7 +354,7 @@ export default function MediaPickerModal({
               className="h-11 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-5 rounded-xl bg-rosewood-600 hover:bg-rosewood-500 text-white text-sm font-semibold shadow-lg transition-all active:scale-95 disabled:opacity-50"
             >
               <Check className="w-4 h-4" />
-              <span>{filterType === 'VIDEO' ? 'Dùng video này' : 'Dùng ảnh này'}</span>
+              <span>Dùng {typeLabel} này</span>
             </button>
           </div>
         </div>

@@ -10,7 +10,10 @@ import {
 } from '@/services/adminApi';
 import { safeParseFloat } from '@phucandtrang/shared';
 import { useAdminAuth } from '@/context/AdminAuthContext';
+import MediaPickerModal from '@/components/admin/MediaPickerModal';
 import {
+  FolderOpen,
+  Upload,
   Music,
   Plus,
   Trash2,
@@ -33,6 +36,8 @@ export default function AdminAudioPage() {
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
   const [src, setSrc] = useState('');
+  const [mediaId, setMediaId] = useState<string | undefined>(undefined);
+  const [showPicker, setShowPicker] = useState(false);
   const [volume, setVolume] = useState(0.8);
   const [loop, setLoop] = useState(true);
   const [startAt, setStartAt] = useState(0);
@@ -61,6 +66,7 @@ export default function AdminAudioPage() {
     setTitle('');
     setArtist('');
     setSrc('');
+    setMediaId(undefined);
     setVolume(0.8);
     setLoop(true);
     setStartAt(0);
@@ -74,6 +80,7 @@ export default function AdminAudioPage() {
     setTitle(track.title || '');
     setArtist(track.artist || '');
     setSrc(track.src || '');
+    setMediaId(undefined);
     setVolume(track.volume ?? 0.8);
     setLoop(track.loop ?? true);
     setStartAt(track.startAt ?? 0);
@@ -84,12 +91,17 @@ export default function AdminAudioPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!src) {
+      alert('Vui lòng chọn hoặc tải lên một file nhạc.');
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
         title,
         artist: artist || undefined,
         src,
+        mediaId,
         volume: Number(volume),
         loop,
         startAt: Number(startAt),
@@ -277,15 +289,33 @@ export default function AdminAudioPage() {
               </div>
 
               <div>
-                <label className="block text-stone-300 font-medium mb-1">Đường dẫn file Audio (.mp3 / URL)</label>
-                <input
-                  type="text"
-                  required
-                  value={src}
-                  onChange={(e) => setSrc(e.target.value)}
-                  placeholder="/music/... hoặc https://..."
-                  className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-white font-mono focus:outline-none focus:border-rosewood-500"
-                />
+                <label className="block text-stone-300 font-medium mb-1">File nhạc</label>
+                {src ? (
+                  <div className="space-y-2 p-2.5 bg-[#25151F] border border-rosewood-900/60 rounded-xl">
+                    <p className="text-parchment-200 truncate" title={src}>
+                      {fileNameFromUrl(src)}
+                    </p>
+                    <audio src={src} controls className="w-full h-8" preload="none" />
+                    <button
+                      type="button"
+                      onClick={() => setShowPicker(true)}
+                      className="flex items-center gap-1.5 text-champagne-300 hover:text-white"
+                    >
+                      <FolderOpen className="w-3.5 h-3.5" />
+                      <span>Đổi file nhạc khác</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowPicker(true)}
+                    className="w-full py-6 flex flex-col items-center gap-1.5 rounded-xl border-2 border-dashed border-rosewood-800/60 hover:border-champagne-400/60 text-stone-400 hover:text-parchment-100 transition-colors"
+                  >
+                    <Upload className="w-5 h-5 text-rosewood-400" />
+                    <span className="font-medium">Chọn hoặc tải file nhạc từ máy</span>
+                    <span className="text-[11px] text-stone-500">MP3, M4A, WAV...</span>
+                  </button>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -374,6 +404,27 @@ export default function AdminAudioPage() {
           </div>
         </div>
       )}
+
+      <MediaPickerModal
+        isOpen={showPicker}
+        onClose={() => setShowPicker(false)}
+        filterType="AUDIO"
+        title="Chọn file nhạc"
+        onSelect={(selected) => {
+          setSrc(selected.url);
+          setMediaId(selected.mediaId);
+          if (!title && selected.alt) setTitle(selected.alt);
+          setShowPicker(false);
+        }}
+      />
     </div>
   );
+}
+
+function fileNameFromUrl(url: string) {
+  try {
+    return decodeURIComponent(url.split('?')[0].split('/').pop() || url);
+  } catch {
+    return url;
+  }
 }
