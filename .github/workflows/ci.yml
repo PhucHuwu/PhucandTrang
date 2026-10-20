@@ -35,8 +35,19 @@ jobs:
         working-directory: apps/api
         run: npx prisma generate --config prisma7.config.ts
 
+      - name: Typecheck API
+        working-directory: apps/api
+        run: npx tsc --noEmit -p tsconfig.build.json
+
+      - name: Typecheck Web
+        working-directory: apps/web
+        run: npx tsc --noEmit
+
       - name: Run API tests
         run: npm run test:api
+
+      - name: Dependency audit (report only)
+        run: npm audit --omit=dev --audit-level=high || true
 
       - name: Build API
         run: npm run build:api

@@ -26,7 +26,6 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
-    "@tailwindcss/postcss": "^4.3.3",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^22.13.10",
     "@types/react": "^19.0.10",

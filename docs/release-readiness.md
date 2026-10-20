@@ -2,7 +2,7 @@
 
 > **ĐÁNH GIÁ CUỐI CÙNG:** `PRODUCTION READY`  
 > **BLOCKER P0 / P1:** `0` (Đã xử lý dứt điểm tất cả 3 blocker P1 và 4 hạng mục P2)  
-> **KIỂM THỬ BACKEND:** `22 Test Suites, 113 Tests Passed (100%)`  
+> **KIỂM THỬ BACKEND:** `34 Test Suites, 224 Tests Passed (100%)`  
 > **BIÊN DỊCH DỰ ÁN:** `Frontend Next.js: 16 Static/Dynamic Routes OK (0 Errors), Backend NestJS Build OK (0 Errors)`  
 > **LOCKFILE & CI:** npm workspaces sử dụng một root `package-lock.json`; GitHub Actions CI Pipeline nằm tại `.github/workflows/ci.yml`.
 
@@ -54,7 +54,7 @@
 - [x] Đã commit cả hai tệp `package-lock.json` (Root và Backend).
 - [x] GitHub Actions CI Workflow đã được thiết lập tại `.github/workflows/ci.yml`.
 - [x] Prisma migrations: 3 migrations (`20260920000000_init`, `20260921000000_pre_admin_stabilization`, `20260921000001_draft_preview_publish`) sẵn sàng cho `npx prisma migrate deploy`.
-- [x] Bộ kiểm thử tự động đạt 100% tỷ lệ đỗ: **22 Test Suites, 113 Tests Passed**.
+- [x] Bộ kiểm thử tự động đạt 100% tỷ lệ đỗ: **34 Test Suites, 224 Tests Passed**.
 - [x] Cả hai ứng dụng (NestJS và Next.js) biên dịch thành công mà không có lỗi TypeScript hay webpack.
 
 ---

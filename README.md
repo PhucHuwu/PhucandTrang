@@ -46,7 +46,7 @@ PhucandTrang/
 │                                                                             │
 │  - Single Journal Controller: /api/journal (GET, PATCH, publish, preview)   │
 │  - Single Journal Resolver: earliest created book (no slug)                 │
-│  - Single Admin Authentication (No multi-user RBAC overhead)                │
+│  - Single Admin Account, password-only login (Role enum still enforced)     │
 │  - Public Registration Completely Disabled                                  │
 │  - Pre-Publish Validation Engine (10 Blocking Errors vs Warnings)           │
 │  - Cache Invalidation & Sequential ETag Calculation                         │
@@ -183,11 +183,11 @@ Sau khi đăng nhập, hệ thống điều hướng trực tiếp tới trang q
 
 ## 🔒 Mô Hình Xác Thực Đơn Giản & Bảo Mật (Single Admin Auth)
 
-- **Không còn sự phức tạp của RBAC đa cấp**: Loại bỏ hoàn toàn sự phân tách `VIEWER / EDITOR / ADMIN`.
-- **Tài khoản Quản trị duy nhất**: Sau khi đăng nhập thành công, Admin có toàn quyền thao tác trên toàn bộ hệ thống.
-- **Vô hiệu hóa đăng ký công khai**: Endpoint `POST /auth/register` bị tắt vĩnh viễn với mã lỗi `403 Forbidden`. Tài khoản Admin được khởi tạo an toàn qua Prisma Seed hoặc migration script.
-- **BFF Token Verification**: Endpoint `/api/admin/auth/me` gọi backend NestJS kiểm chứng chữ ký JWT thực tế, không tin tưởng cookie client không mã hóa.
-- **Brute-Force Rate Limiting**: Tự động khóa 15 phút nếu nhập sai mật khẩu quá 5 lần trong 5 phút.
+- **Đăng nhập chỉ bằng mật khẩu, một tài khoản Admin**: schema vẫn giữ enum `Role` (`ADMIN`/`EDITOR`/`VIEWER`) và guard toàn cục chặn ghi với role không phải ADMIN/EDITOR, nhưng thực tế chỉ có một tài khoản ADMIN.
+- **Vô hiệu hóa đăng ký công khai**: Endpoint `POST /auth/register` trả `403 Forbidden`. Seed không bao giờ ghi đè mật khẩu của admin đã tồn tại.
+- **Đổi mật khẩu admin**: `cd apps/api && read -rs ADMIN_NEW_PASSWORD && export ADMIN_NEW_PASSWORD && npm run admin:set-password`. Đổi mật khẩu sẽ vô hiệu hóa các token phát hành sau bản cập nhật này (claim `pwf`).
+- **BFF Token Verification**: Endpoint `/api/admin/auth/me` gọi backend NestJS kiểm chứng chữ ký JWT thực tế.
+- **Brute-Force Rate Limiting** (bộ nhớ trong, theo từng instance): mỗi client sai 5 lần/5 phút bị chặn 15 phút; sau 10 lần sai toàn cục, mỗi lần thử phải chờ tăng dần (tối đa 60 giây). Header `x-client-ip` chỉ được tin khi kèm `x-bff-secret` khớp `BFF_SHARED_SECRET`.
 
 ---
 
@@ -204,6 +204,9 @@ Tệp khởi tạo `apps/api/prisma/seed.ts` đảm bảo luôn chỉ tồn tạ
    - Dùng khi cần khôi phục cuốn nhật ký về trạng thái gốc của Phúc & Trang.
    - Xóa các trang hiện tại và nạp lại chuẩn tắc 21 trang mẫu với đầy đủ layout presets, hình ảnh Cloudinary, video clips kỷ niệm, nhạc nền và các tọa độ tương đối.
    - Biên dịch và đóng băng ngay một bản `publishedSnapshot` (Revision #1) sẵn sàng phục vụ độc giả công khai.
+   - Khi `NODE_ENV=production`, bắt buộc thêm `SEED_CONFIRM_DESTRUCTIVE=yes-wipe-pages`.
+
+> ⚠️ Không bao giờ chạy seed, `migrate dev/reset` hoặc `legacy-migration.ts --apply` lên database production khi chưa có bản backup (`pg_dump`). `legacy-migration.ts` mặc định chỉ chạy thử (dry run).
 
 ---
 
@@ -236,10 +239,11 @@ Tệp khởi tạo `apps/api/prisma/seed.ts` đảm bảo luôn chỉ tồn tạ
 ## 🎨 Three.js / Canvas Performance Optimization
 
 - **Lazy Texture Generation**: Sử dụng canvas 16x16 làm placeholder tức thì; chỉ render bìa trước và 2 trang đầu khi mở sách, cắt giảm thời gian tải từ 10s xuống còn **~500ms**.
-- **Sliding Window (±3 Pages)**: Tải trước ngầm các trang xung quanh trang hiện tại. Tự động `dispose()` các texture xa ngoài cửa sổ khi bộ nhớ vượt ngưỡng 16 textures để bảo vệ GPU VRAM.
+- **Sliding Window (±3 trang đôi, ±2 trên máy yếu)**: Tải trước ngầm các trang xung quanh trang hiện tại. Cache texture dạng LRU, tối đa 16 textures (10 trên máy yếu); không bao giờ giải phóng mặt trang đang hiển thị.
 - **Priority Media Preloading (`MediaPreloader`)**: Tải trước theo thứ tự ưu tiên: `Bìa & Nhạc ➔ Trang hiện tại ➔ Trang lân cận ➔ Trang còn lại`. Chỉ preload poster ảnh tĩnh, **tuyệt đối không tải toàn bộ video MP4** để tiết kiệm băng thông mạng.
 - **Debounced Autosave (800ms)**: Tự động gom các thao tác kéo thả và gõ phím, chống spam HTTP requests và bảo vệ khi rời trang (`beforeunload`).
-- **Undo / Redo History**: Lưu trữ 40 bước thao tác với phím tắt `Ctrl+Z` / `Ctrl+Shift+Z` đồng bộ nhịp nhàng với autosave.
+- **Atomic Save**: Autosave gửi trang và phần tử trong một request `POST /pages/:id/save` (một transaction), kèm `baseUpdatedAt` để phát hiện xung đột (HTTP 409) khi trang bị sửa ở tab khác.
+- **Undo / Redo History**: Lưu trữ 40 bước thao tác với phím tắt `Ctrl+Z` / `Ctrl+Shift+Z` / `Ctrl+Y`, đồng bộ với server (undo thao tác xóa sẽ tạo lại phần tử).
 
 ---
 
@@ -261,10 +265,11 @@ pg_restore -d "YOUR_TARGET_DATABASE_URL" -v "phuc_and_trang_backup_YYYYMMDD_HHMM
 
 ## 🧪 Kiểm Thử Hệ Thống (Automated Test Suites)
 
-Hệ thống sở hữu bộ kiểm thử tự động gồm **23 Test Suites với 117 Unit Tests** bao phủ logic trọng yếu:
+Backend có **34 test suites / 224 unit tests**; frontend có Playwright E2E (`apps/web/tests`):
 
 ```bash
 npm run test:api
+cd apps/web && npx playwright test --project=chromium
 ```
 
 ---

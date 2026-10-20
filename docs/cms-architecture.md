@@ -43,7 +43,7 @@ Hệ thống đã hoàn tất chuyển đổi toàn diện từ mô hình **Mult
 ---
 
 ## 3. Kết Quả Kiểm Thử & Biên Dịch Dự Án
-- **Backend NestJS**: **23/23 Test Suites Passed (117/117 Unit Tests, 100%)**.
+- **Backend NestJS**: **34/34 Test Suites Passed (224/224 Unit Tests, 100%)**.
 - **Backend Build**: Thành công 100% (0 errors).
 - **Frontend Build**: Thành công 100% (0 errors, 18 static & dynamic routes).
 
