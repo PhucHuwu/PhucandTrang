@@ -20,8 +20,9 @@ export interface InputHost {
 	onBookClick(pos: THREE.Vector2): void;
 	onSwipeMove(swipe: Swipe): void;
 	unfocusActiveArea(): void;
-	flipNext(): void;
-	flipPrev(): void;
+	/** `held` is true for auto-repeated key events (key held down). */
+	flipNext(held?: boolean): void;
+	flipPrev(held?: boolean): void;
 }
 
 /** Owns the canvas / wrapper / document listeners and the swipe handler; `detach()` removes all of them. */
@@ -92,10 +93,10 @@ export class InputController {
 			}
 		} else if (event.key === "ArrowRight" || event.key === "PageDown") {
 			event.preventDefault();
-			host.flipNext();
+			host.flipNext(event.repeat);
 		} else if (event.key === "ArrowLeft" || event.key === "PageUp") {
 			event.preventDefault();
-			host.flipPrev();
+			host.flipPrev(event.repeat);
 		}
 	};
 }

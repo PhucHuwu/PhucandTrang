@@ -256,6 +256,12 @@ export class LazyPageTextureManager {
     }
   }
 
+  /** Whether the face has a generated texture; faces outside the book count as ready. */
+  public hasTexture(faceIndex: number): boolean {
+    if (faceIndex < 0 || faceIndex >= this.book.pages.length + 3) return true;
+    return this.cache.has(faceIndex);
+  }
+
   public getCacheSize(): number {
     return this.cache.size;
   }

@@ -11,6 +11,10 @@ export class FaceTextureQueue {
 		this.pending.set(faceIndex, { url, texture });
 	}
 
+	has(faceIndex: number) {
+		return this.pending.has(faceIndex);
+	}
+
 	delete(faceIndex: number) {
 		const pending = this.pending.get(faceIndex);
 		if (pending) {

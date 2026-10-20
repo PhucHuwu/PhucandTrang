@@ -220,6 +220,7 @@ export default function QbjectAuthenticExperience({
           book3d.releaseFaceTexture(faceIdx, placeholderUrl);
           return true;
         });
+        book3d.setFaceReadyCheck((faceIdx) => textures.hasTexture(faceIdx));
 
         // Preload rest of window around page 0
         textures.updateActiveWindow(0, (faceIdx, textureUrl, directTexture) => {

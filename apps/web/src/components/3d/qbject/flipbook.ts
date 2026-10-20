@@ -200,8 +200,8 @@ export default class Flipbook {
 			onBookClick: pos => { this.onBookClick(pos); },
 			onSwipeMove: swipe => applySwipeMove(this.turnState, swipe),
 			unfocusActiveArea: () => { this.unfocusActiveArea(); },
-			flipNext: () => { this.flipNext(); },
-			flipPrev: () => { this.flipPrev(); },
+			flipNext: held => { this.flipTo(1, held); },
+			flipPrev: held => { this.flipTo(-1, held); },
 		});
 
 		bindTurnState(this.turnState);
@@ -466,10 +466,29 @@ export default class Flipbook {
 		return this.flipTo(-1);
 	}
 
-	private flipTo(direction: 1 | -1) {
+	private faceReady: (faceIndex: number) => boolean = () => true;
+
+	/** Tells the flipbook whether a face already shows its generated texture (not the placeholder). */
+	public setFaceReadyCheck(check: (faceIndex: number) => boolean) {
+		this.faceReady = check;
+	}
+
+	/** Faces revealed once the book settles at `target`: back of the left page, front of the right one. */
+	private isSpreadReady(target: number) {
+		return [target * 2 - 1, target * 2].every(
+			face => face < 0 || (!this.pendingFaceTextures.has(face) && this.faceReady(face)),
+		);
+	}
+
+	/**
+	 * `held`: a key held down auto-repeats faster than pages can be drawn, and textures are only
+	 * generated while the book is still, so wait for the next spread instead of flipping onto blanks.
+	 */
+	private flipTo(direction: 1 | -1, held = false) {
 		if (this.isWatchingVideo() || this.isTurning()) return false;
 		const target = getFlipTarget(this.progress.getValue(), this.pages.length, direction);
 		if (target === null) return false;
+		if (held && !this.isSpreadReady(target)) return false;
 
 		// Drive the turn naturally through progress sliding physics without hard locking
 		this.progress.setMin(target);
