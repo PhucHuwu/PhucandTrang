@@ -1,38 +1,62 @@
-import { IsNotEmpty, IsString, IsArray, ValidateNested, IsOptional } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsArray,
+  ValidateNested,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  IsInt,
+  IsBoolean,
+  IsObject,
+  Min,
+  Max,
+  ArrayMaxSize,
+} from 'class-validator';
 import { Type } from 'class-transformer';
+import { ElementType } from '@prisma/client';
 import { IsSafeInteraction } from '../../common/dto/element-interaction.dto';
+import { IsSafeTransform } from '../../common/dto/element-transform.dto';
 
 export class ApplyLayoutItemDto {
-  @IsString()
-  @IsNotEmpty()
-  type: string;
+  @IsEnum(ElementType)
+  type: ElementType;
 
   @IsOptional()
   @IsString()
   slot?: string;
 
-  @IsNotEmpty()
+  @IsNumber()
   zIndex: number;
 
   @IsOptional()
+  @IsInt()
   order?: number;
 
   @IsOptional()
+  @IsBoolean()
   visible?: boolean;
 
   @IsOptional()
+  @IsBoolean()
   locked?: boolean;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
   opacity?: number;
 
   @IsNotEmpty()
+  @IsSafeTransform()
   transform: Record<string, any>;
 
   @IsOptional()
+  @IsObject()
   style?: Record<string, any>;
 
   @IsOptional()
+  @IsObject()
   data?: Record<string, any>;
 
   @IsOptional()
@@ -46,6 +70,7 @@ export class ApplyLayoutDto {
   layoutTemplateId: string;
 
   @IsArray()
+  @ArrayMaxSize(500)
   @ValidateNested({ each: true })
   @Type(() => ApplyLayoutItemDto)
   elements: ApplyLayoutItemDto[];

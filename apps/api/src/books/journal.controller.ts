@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { BooksService } from './books.service';
 import { UpdateBookDto } from './dto/update-book.dto';
+import { PublishBookDto } from './dto/publish-book.dto';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '@prisma/client';
 
@@ -47,7 +48,7 @@ export class JournalController {
   @Roles(Role.ADMIN)
   @Post('publish')
   async publishJournal(
-    @Body() body: { changelog?: string } = {},
+    @Body() body: PublishBookDto = {},
     @Request() req: any,
   ) {
     const journalId = await this.booksService.getCanonicalJournalId();

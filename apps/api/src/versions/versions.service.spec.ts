@@ -3,6 +3,7 @@ import { VersionsService } from './versions.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PublicCacheService } from '../public/public-cache.service';
 import { BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
 describe('VersionsService Rollback Protection (Req 2, 3, 4, 14, 15, 16 & Prompt 24)', () => {
   let service: VersionsService;
@@ -195,5 +196,66 @@ describe('VersionsService Rollback Protection (Req 2, 3, 4, 14, 15, 16 & Prompt 
     // Ensure no current pages were deleted!
     expect(prisma.page.deleteMany).not.toHaveBeenCalled();
     expect(cacheService.touchBook).not.toHaveBeenCalled();
+  });
+  it('maps null style/interaction to Prisma.DbNull and defaults required Json fields to {}', async () => {
+    prisma.bookVersion.findUnique.mockResolvedValue({
+      id: 'ver-null',
+      bookId: 'book-1',
+      version: 'v1.0',
+      snapshot: {
+        title: 'Snapshot',
+        cover: null,
+        settings: { theme: 'warm' },
+        pages: [
+          {
+            id: 'page-1',
+            pageNumber: 1,
+            side: 'RIGHT',
+            order: 0,
+            background: null,
+            elements: [
+              { id: 'el-null', type: 'TEXT', transform: null, style: null, data: null, interaction: null },
+              { id: 'el-missing', type: 'TEXT' },
+              {
+                id: 'el-full',
+                type: 'IMAGE',
+                transform: { x: 0.1 },
+                style: { color: 'red' },
+                data: { mediaId: 'm1' },
+                interaction: { enabled: true },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    prisma.book.findUnique.mockResolvedValue({ id: 'book-1' });
+
+    await service.rollbackToSnapshot('book-1', 'ver-null');
+
+    const bookData = prisma.book.update.mock.calls[0][0].data;
+    expect(bookData.cover).toEqual({});
+    expect(bookData.settings).toEqual({ theme: 'warm' });
+
+    const pageData = prisma.page.create.mock.calls[0][0].data;
+    expect(pageData.background).toEqual({});
+
+    const [nullEl, missingEl, fullEl] = pageData.elements.create;
+    expect(nullEl.style).toBe(Prisma.DbNull);
+    expect(nullEl.interaction).toBe(Prisma.DbNull);
+    expect(nullEl.transform).toEqual({});
+    expect(nullEl.data).toEqual({});
+    expect(missingEl.style).toBe(Prisma.DbNull);
+    expect(missingEl.interaction).toBe(Prisma.DbNull);
+    expect(fullEl.style).toEqual({ color: 'red' });
+    expect(fullEl.interaction).toEqual({ enabled: true });
+    expect(fullEl.data).toEqual({ mediaId: 'm1' });
+
+    // No raw JS null may reach a Json column
+    for (const el of pageData.elements.create) {
+      for (const key of ['transform', 'style', 'data', 'interaction']) {
+        expect(el[key]).not.toBeNull();
+      }
+    }
   });
 });

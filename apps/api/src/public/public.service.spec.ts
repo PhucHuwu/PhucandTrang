@@ -129,4 +129,36 @@ describe('PublicService (Req 15, 19, 20 & Prompt 23/40.1 Draft Isolation)', () =
 
     await expect(service.getPublishedBook()).rejects.toThrow(NotFoundException);
   });
+  it('builds the ETag only from book id + publishedRevision + publishedAt, with a deterministic order', async () => {
+    const base = {
+      id: 'book-1',
+      status: BookStatus.PUBLISHED,
+      publishedRevision: 4,
+      publishedAt: new Date('2026-10-01T00:00:00.000Z'),
+      publishedSnapshot: { id: 'book-1', pages: [] },
+    };
+    prisma.book.findFirst.mockResolvedValue({ ...base, contentRevision: 10 });
+    const first = await service.getPublishedBook();
+
+    expect(prisma.book.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
+    );
+    expect(first.etag).toBe(`"book-1-rev4-${base.publishedAt.getTime()}"`);
+
+    // Draft edits bump contentRevision but must not change the public ETag
+    cacheService.invalidate();
+    prisma.book.findFirst.mockResolvedValue({ ...base, contentRevision: 11 });
+    const second = await service.getPublishedBook();
+    expect(second.etag).toBe(first.etag);
+
+    // A new publish changes it
+    cacheService.invalidate();
+    prisma.book.findFirst.mockResolvedValue({
+      ...base,
+      publishedRevision: 5,
+      publishedAt: new Date('2026-10-02T00:00:00.000Z'),
+    });
+    const third = await service.getPublishedBook();
+    expect(third.etag).not.toBe(first.etag);
+  });
 });

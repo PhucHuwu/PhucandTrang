@@ -12,6 +12,15 @@ import { DuplicatePageDto } from './dto/duplicate-page.dto';
 import { PublicCacheService } from '../public/public-cache.service';
 import { derivePageSideEnum } from '../utils/page-utils';
 import { safeDeepMerge, LAYOUT_PRESETS } from '@phucandtrang/shared';
+import { SavePageDto } from './dto/save-page.dto';
+import { nullableJson, requiredJson } from '../common/prisma-json';
+import { canonicalizeMediaData } from '../common/media-data';
+
+const PAGE_DETAIL_INCLUDE = {
+  elements: { orderBy: { zIndex: 'asc' as const } },
+  layoutTemplate: true,
+  audioTrack: true,
+};
 
 @Injectable()
 export class PagesService {
@@ -54,6 +63,38 @@ export class PagesService {
         return { ...el, data };
       }),
     } as T;
+  }
+
+  /**
+   * Rejects unknown layout template ids with a 400 instead of letting the FK constraint
+   * surface as a 500. `undefined`/`null` (no template) is always accepted.
+   */
+  private async assertLayoutTemplateExists(client: any, layoutTemplateId?: string | null) {
+    if (layoutTemplateId === undefined || layoutTemplateId === null) return;
+    const preset = LAYOUT_PRESETS[layoutTemplateId];
+    if (preset) {
+      // Built-in presets are valid even if boot-time seeding has not inserted the row yet.
+      await client.layoutTemplate.upsert({
+        where: { id: preset.id },
+        create: {
+          id: preset.id,
+          name: preset.name,
+          description: preset.description,
+          slots: preset.slots as any,
+          prototypes: preset.elementPrototypes as any,
+          isSystem: true,
+        },
+        update: {},
+      });
+      return;
+    }
+    const tpl = await client.layoutTemplate.findUnique({
+      where: { id: layoutTemplateId },
+      select: { id: true },
+    });
+    if (!tpl) {
+      throw new BadRequestException(`Layout template không tồn tại: ${layoutTemplateId}`);
+    }
   }
 
   /**
@@ -121,104 +162,105 @@ export class PagesService {
   }
 
   async create(dto: CreatePageDto) {
-    const book = await this.prisma.book.findUnique({ where: { id: dto.bookId } });
-    if (!book) throw new NotFoundException(`Book not found: ${dto.bookId}`);
+    const pageId = await this.prisma.$transaction(
+      async (tx) => {
+        const book = await tx.book.findUnique({ where: { id: dto.bookId } });
+        if (!book) throw new NotFoundException(`Book not found: ${dto.bookId}`);
 
-    const existing = await this.prisma.page.findUnique({
-      where: {
-        bookId_pageNumber: {
-          bookId: dto.bookId,
-          pageNumber: dto.pageNumber,
-        },
-      },
-    });
-    if (existing) {
-      throw new ConflictException(
-        `Trang số ${dto.pageNumber} đã tồn tại trong cuốn sách này. Hãy chọn số trang khác hoặc sắp xếp lại.`,
-      );
-    }
-
-    // Option B: append-only physical order (never assume order = pageNumber)
-    const maxOrderPage = await this.prisma.page.findFirst({
-      where: { bookId: dto.bookId },
-      orderBy: { order: 'desc' },
-      select: { order: true },
-    });
-    const order = (maxOrderPage?.order ?? -1) + 1;
-    const side = derivePageSideEnum(order);
-
-    const page = await this.prisma.page.create({
-      data: {
-        bookId: dto.bookId,
-        pageNumber: dto.pageNumber,
-        side,
-        order,
-        chapter: dto.chapter,
-        title: dto.title,
-        quote: dto.quote,
-        handwriting: dto.handwriting,
-        layoutTemplateId: dto.layoutTemplateId,
-        layoutMode: dto.layoutMode || 'PRESET',
-        sourceTemplateId: dto.sourceTemplateId,
-        isCustomized: dto.isCustomized || false,
-        background: dto.background as any,
-        audioTrackId: dto.audioTrackId,
-      },
-      include: {
-        elements: true,
-        layoutTemplate: true,
-        audioTrack: true,
-      },
-    });
-
-    // Automatically instantiate elements from layout template if provided (Prompt 40.2 / Reliability)
-    const templateId = dto.layoutTemplateId || 'single-hero';
-    let prototypes: any[] = [];
-    if (LAYOUT_PRESETS[templateId]) {
-      prototypes = LAYOUT_PRESETS[templateId].elementPrototypes;
-    } else {
-      const customTpl = await this.prisma.layoutTemplate.findUnique({
-        where: { id: templateId },
-      });
-      if (customTpl?.prototypes) {
-        prototypes = customTpl.prototypes as any[];
-      }
-    }
-
-    if (prototypes.length > 0) {
-      for (const proto of prototypes) {
-        const { zIndex: _ignore, ...cleanTransform } = proto.transform || {};
-        let elementData: any = { ...(proto.defaultData || {}) };
-        if (proto.slot === 'title' && dto.title) {
-          elementData.text = dto.title;
-        } else if (proto.slot === 'subtitle' && dto.chapter) {
-          elementData.text = dto.chapter;
-        } else if (proto.slot === 'quote' && dto.quote) {
-          elementData.text = dto.quote;
-        }
-
-        await this.prisma.pageElement.create({
-          data: {
-            pageId: page.id,
-            type: proto.defaultType,
-            slot: proto.slot,
-            zIndex: proto.zIndex,
-            order: proto.zIndex,
-            visible: true,
-            locked: false,
-            opacity: 1.0,
-            transform: cleanTransform,
-            style: proto.style || {},
-            data: elementData,
+        const existing = await tx.page.findUnique({
+          where: {
+            bookId_pageNumber: {
+              bookId: dto.bookId,
+              pageNumber: dto.pageNumber,
+            },
           },
         });
-      }
-    }
+        if (existing) {
+          throw new ConflictException(
+            `Trang số ${dto.pageNumber} đã tồn tại trong cuốn sách này. Hãy chọn số trang khác hoặc sắp xếp lại.`,
+          );
+        }
 
-    await this.normalizeBookPageSequence(dto.bookId);
+        await this.assertLayoutTemplateExists(tx, dto.layoutTemplateId);
+
+        // Option B: append-only physical order (never assume order = pageNumber)
+        const maxOrderPage = await tx.page.findFirst({
+          where: { bookId: dto.bookId },
+          orderBy: { order: 'desc' },
+          select: { order: true },
+        });
+        const order = (maxOrderPage?.order ?? -1) + 1;
+        const side = derivePageSideEnum(order);
+
+        const page = await tx.page.create({
+          data: {
+            bookId: dto.bookId,
+            pageNumber: dto.pageNumber,
+            side,
+            order,
+            chapter: dto.chapter,
+            title: dto.title,
+            quote: dto.quote,
+            handwriting: dto.handwriting,
+            layoutTemplateId: dto.layoutTemplateId,
+            layoutMode: dto.layoutMode || 'PRESET',
+            sourceTemplateId: dto.sourceTemplateId,
+            isCustomized: dto.isCustomized || false,
+            background: requiredJson(dto.background),
+            audioTrackId: dto.audioTrackId,
+          },
+        });
+
+        // Automatically instantiate elements from layout template if provided (Prompt 40.2 / Reliability)
+        const templateId = dto.layoutTemplateId || 'single-hero';
+        let prototypes: any[] = [];
+        if (LAYOUT_PRESETS[templateId]) {
+          prototypes = LAYOUT_PRESETS[templateId].elementPrototypes;
+        } else {
+          const customTpl = await tx.layoutTemplate.findUnique({
+            where: { id: templateId },
+          });
+          if (Array.isArray(customTpl?.prototypes)) {
+            prototypes = customTpl.prototypes as any[];
+          }
+        }
+
+        for (const proto of prototypes) {
+          const { zIndex: _ignore, ...cleanTransform } = proto.transform || {};
+          const elementData: any = { ...(proto.defaultData || {}) };
+          if (proto.slot === 'title' && dto.title) {
+            elementData.text = dto.title;
+          } else if (proto.slot === 'subtitle' && dto.chapter) {
+            elementData.text = dto.chapter;
+          } else if (proto.slot === 'quote' && dto.quote) {
+            elementData.text = dto.quote;
+          }
+
+          await tx.pageElement.create({
+            data: {
+              pageId: page.id,
+              type: proto.defaultType,
+              slot: proto.slot,
+              zIndex: proto.zIndex,
+              order: proto.zIndex,
+              visible: true,
+              locked: false,
+              opacity: 1.0,
+              transform: cleanTransform,
+              style: proto.style || {},
+              data: elementData,
+            },
+          });
+        }
+
+        await this.normalizeBookPageSequence(dto.bookId, tx);
+        return page.id;
+      },
+      { timeout: 15000 },
+    );
+
     await this.cacheService.touchBook(dto.bookId);
-
-    return this.findOne(page.id);
+    return this.findOne(pageId);
   }
 
   async update(id: string, dto: UpdatePageDto, isPatch: boolean = false) {
@@ -250,6 +292,10 @@ export class PagesService {
           `Trang số ${dto.pageNumber} đã tồn tại trong cuốn sách này.`,
         );
       }
+    }
+
+    if (dto.layoutTemplateId !== undefined && dto.layoutTemplateId !== page.layoutTemplateId) {
+      await this.assertLayoutTemplateExists(this.prisma, dto.layoutTemplateId);
     }
 
     // Safe merge for partial JSON objects if PATCH (cleanly accept updated background without stale field resurrection)
@@ -287,102 +333,112 @@ export class PagesService {
     const original = await this.findOne(id);
     const insertAfter = dto?.insertAfter ?? false;
 
-    // Option B: Validate or generate unique display pageNumber
-    let targetPageNum = dto?.targetPageNumber;
-    if (targetPageNum !== undefined) {
-      const existing = await this.prisma.page.findUnique({
-        where: {
-          bookId_pageNumber: {
-            bookId: original.bookId,
-            pageNumber: targetPageNum,
-          },
-        },
-      });
-      if (existing) {
-        throw new ConflictException(
-          `Trang số ${targetPageNum} đã tồn tại trong cuốn sách này.`,
-        );
-      }
-    } else {
-      const maxPage = await this.prisma.page.findFirst({
-        where: { bookId: original.bookId },
-        orderBy: { pageNumber: 'desc' },
-        select: { pageNumber: true },
-      });
-      targetPageNum = (maxPage?.pageNumber ?? original.pageNumber) + 1;
-    }
+    const duplicated = await this.prisma.$transaction(
+      async (tx) => {
+        // Option B: validate or generate a unique display pageNumber inside the transaction
+        let targetPageNum = dto?.targetPageNumber;
+        if (targetPageNum !== undefined) {
+          const existing = await tx.page.findUnique({
+            where: {
+              bookId_pageNumber: {
+                bookId: original.bookId,
+                pageNumber: targetPageNum,
+              },
+            },
+          });
+          if (existing) {
+            throw new ConflictException(
+              `Trang số ${targetPageNum} đã tồn tại trong cuốn sách này.`,
+            );
+          }
+        } else {
+          const maxPage = await tx.page.findFirst({
+            where: { bookId: original.bookId },
+            orderBy: { pageNumber: 'desc' },
+            select: { pageNumber: true },
+          });
+          targetPageNum = (maxPage?.pageNumber ?? original.pageNumber) + 1;
+        }
 
-    const duplicated = await this.prisma.$transaction(async (tx) => {
-      let targetOrder: number;
-
-      if (insertAfter) {
-        // Shift existing pages with order > original.order by +1 (pure integer operation)
-        await tx.page.updateMany({
-          where: {
-            bookId: original.bookId,
-            order: { gt: original.order },
-          },
-          data: {
-            order: { increment: 1 },
-          },
-        });
-        targetOrder = original.order + 1;
-      } else {
-        const maxPage = await tx.page.findFirst({
-          where: { bookId: original.bookId },
-          orderBy: { order: 'desc' },
+        // Re-read the source page's current order: it may have moved since findOne.
+        const source = await tx.page.findUnique({
+          where: { id },
           select: { order: true },
         });
-        targetOrder = (maxPage?.order ?? 0) + 1;
-      }
+        if (!source) throw new NotFoundException(`Không tìm thấy trang với ID: ${id}`);
 
-      const derivedSide = derivePageSideEnum(targetOrder);
+        let targetOrder: number;
+        if (insertAfter) {
+          // Shift existing pages with order > source.order by +1 (pure integer operation)
+          await tx.page.updateMany({
+            where: {
+              bookId: original.bookId,
+              order: { gt: source.order },
+            },
+            data: {
+              order: { increment: 1 },
+            },
+          });
+          targetOrder = source.order + 1;
+        } else {
+          const maxPage = await tx.page.findFirst({
+            where: { bookId: original.bookId },
+            orderBy: { order: 'desc' },
+            select: { order: true },
+          });
+          targetOrder = (maxPage?.order ?? 0) + 1;
+        }
 
-      const newPage = await tx.page.create({
-        data: {
-          bookId: original.bookId,
-          pageNumber: targetPageNum,
-          side: derivedSide,
-          order: targetOrder,
-          chapter: original.chapter ? `${original.chapter} (Bản sao)` : undefined,
-          title: original.title ? `${original.title} (Copy)` : undefined,
-          quote: original.quote,
-          handwriting: original.handwriting,
-          layoutTemplateId: original.layoutTemplateId,
-          layoutMode: original.layoutMode,
-          sourceTemplateId: original.sourceTemplateId,
-          isCustomized: true,
-          background: original.background as any,
-          audioTrackId: original.audioTrackId,
-          elements: {
-            create: original.elements.map((el) => ({
-              type: el.type,
-              slot: el.slot,
-              order: el.order,
-              zIndex: el.zIndex,
-              visible: el.visible,
-              locked: el.locked,
-              opacity: el.opacity,
-              transform: el.transform as any,
-              style: el.style as any,
-              data: el.data as any,
-              interaction: el.interaction as any,
-            })),
+        const derivedSide = derivePageSideEnum(targetOrder);
+
+        const newPage = await tx.page.create({
+          data: {
+            bookId: original.bookId,
+            pageNumber: targetPageNum,
+            side: derivedSide,
+            order: targetOrder,
+            chapter: original.chapter ? `${original.chapter} (Bản sao)` : undefined,
+            title: original.title ? `${original.title} (Copy)` : undefined,
+            quote: original.quote,
+            handwriting: original.handwriting,
+            layoutTemplateId: original.layoutTemplateId,
+            layoutMode: original.layoutMode,
+            sourceTemplateId: original.sourceTemplateId,
+            isCustomized: true,
+            background: requiredJson(original.background),
+            audioTrackId: original.audioTrackId,
+            elements: {
+              create: original.elements.map((el) => ({
+                type: el.type,
+                slot: el.slot,
+                order: el.order,
+                zIndex: el.zIndex,
+                visible: el.visible,
+                locked: el.locked,
+                opacity: el.opacity,
+                transform: requiredJson(el.transform),
+                style: nullableJson(el.style),
+                // findOne resolves media URLs at runtime; never persist them back
+                data: requiredJson(canonicalizeMediaData(el.type, el.data as any)),
+                interaction: nullableJson(el.interaction),
+              })),
+            },
           },
-        },
-      });
+        });
 
-      // Normalize sequence: orders are contiguous 0..N-1, display pageNumbers are untouched
-      await this.normalizeBookPageSequence(original.bookId, tx);
+        // Normalize sequence: orders are contiguous 0..N-1, display pageNumbers are untouched
+        await this.normalizeBookPageSequence(original.bookId, tx);
 
-      return tx.page.findUnique({
-        where: { id: newPage.id },
-        include: {
-          elements: { orderBy: { zIndex: 'asc' } },
-          layoutTemplate: true,
-        },
-      });
-    });
+        return tx.page.findUnique({
+          where: { id: newPage.id },
+          include: {
+            elements: { orderBy: { zIndex: 'asc' } },
+            layoutTemplate: true,
+          },
+        });
+      },
+      { timeout: 15000 },
+    );
 
     await this.cacheService.touchBook(original.bookId);
     return duplicated;
@@ -390,60 +446,58 @@ export class PagesService {
 
   async remove(id: string) {
     const page = await this.findOne(id);
-    await this.prisma.page.delete({ where: { id } });
-    // Compact orders to 0..N-1 and re-derive sides; pageNumbers of remaining pages are strictly preserved
-    await this.normalizeBookPageSequence(page.bookId);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.page.delete({ where: { id } });
+      // Compact orders to 0..N-1 and re-derive sides; pageNumbers of remaining pages are strictly preserved
+      await this.normalizeBookPageSequence(page.bookId, tx);
+    });
     await this.cacheService.touchBook(page.bookId);
     return { success: true, message: `Đã xóa trang ${id} cùng tất cả element liên quan` };
   }
 
   async reorder(bookId: string, dto: ReorderPagesDto) {
-    const book = await this.prisma.book.findUnique({ where: { id: bookId } });
-    if (!book) throw new NotFoundException(`Book not found: ${bookId}`);
+    const result = await this.prisma.$transaction(async (tx) => {
+      const book = await tx.book.findUnique({ where: { id: bookId } });
+      if (!book) throw new NotFoundException(`Book not found: ${bookId}`);
 
-    // Fetch existing pages for this book to validate full set and strict ownership
-    const existingPages = await this.prisma.page.findMany({
-      where: { bookId },
-      select: { id: true, pageNumber: true, order: true },
-    });
+      // Validate against the page set as seen inside the transaction (full set + strict ownership)
+      const existingPages = await tx.page.findMany({
+        where: { bookId },
+        select: { id: true, pageNumber: true, order: true },
+      });
 
-    const requestedIds = dto.items.map((item) => item.id);
-    const existingIdSet = new Set(existingPages.map((p) => p.id));
-    const requestedIdSet = new Set(requestedIds);
+      const requestedIds = dto.items.map((item) => item.id);
+      const existingIdSet = new Set(existingPages.map((p) => p.id));
+      const requestedIdSet = new Set(requestedIds);
 
-    // 1. Check duplicate IDs
-    if (requestedIdSet.size !== requestedIds.length) {
-      throw new BadRequestException('Danh sách reorder chứa ID trang bị trùng lặp.');
-    }
+      // 1. Check duplicate IDs
+      if (requestedIdSet.size !== requestedIds.length) {
+        throw new BadRequestException('Danh sách reorder chứa ID trang bị trùng lặp.');
+      }
 
-    // 2. Check complete page set length
-    if (requestedIds.length !== existingPages.length) {
-      throw new BadRequestException(
-        `Danh sách reorder phải chứa đầy đủ ${existingPages.length} trang của cuốn sách. Nhận được: ${requestedIds.length}.`,
-      );
-    }
-
-    // 3. Check ownership: every requested page MUST belong to this book
-    for (const reqId of requestedIds) {
-      if (!existingIdSet.has(reqId)) {
+      // 2. Check complete page set length
+      if (requestedIds.length !== existingPages.length) {
         throw new BadRequestException(
-          `Trang "${reqId}" không thuộc về cuốn sách "${bookId}" hoặc không tồn tại.`,
+          `Danh sách reorder phải chứa đầy đủ ${existingPages.length} trang của cuốn sách. Nhận được: ${requestedIds.length}.`,
         );
       }
-    }
 
-    // 4. Atomic transaction update: order = array index, side = derivePageSideEnum(order)
-    const result = await this.prisma.$transaction(async (tx) => {
+      // 3. Check ownership: every requested page MUST belong to this book
+      for (const reqId of requestedIds) {
+        if (!existingIdSet.has(reqId)) {
+          throw new BadRequestException(
+            `Trang "${reqId}" không thuộc về cuốn sách "${bookId}" hoặc không tồn tại.`,
+          );
+        }
+      }
+
+      // 4. order = array index, side = derivePageSideEnum(order)
       for (let i = 0; i < dto.items.length; i++) {
-        const pageId = dto.items[i].id;
-        const newOrder = i;
-        const derivedSide = derivePageSideEnum(newOrder);
-
         await tx.page.update({
-          where: { id: pageId },
+          where: { id: dto.items[i].id },
           data: {
-            order: newOrder,
-            side: derivedSide,
+            order: i,
+            side: derivePageSideEnum(i),
           },
         });
       }
@@ -470,6 +524,8 @@ export class PagesService {
     const existing = await this.findOne(pageId);
 
     const result = await this.prisma.$transaction(async (tx) => {
+      await this.assertLayoutTemplateExists(tx, layoutTemplateId);
+
       // 1. Delete all existing elements on this page
       await tx.pageElement.deleteMany({
         where: { pageId },
@@ -490,8 +546,8 @@ export class PagesService {
             opacity: el.opacity !== undefined ? el.opacity : 1.0,
             transform: cleanTransform,
             style: el.style || {},
-            data: el.data || {},
-            interaction: el.interaction || null,
+            data: requiredJson(canonicalizeMediaData(el.type, el.data)),
+            interaction: nullableJson(el.interaction ?? null),
           },
         });
       }
@@ -517,5 +573,171 @@ export class PagesService {
 
     await this.cacheService.touchBook(existing.bookId);
     return this.resolveElementMediaUrls(result);
+  }
+
+  /**
+   * Atomic page save (page fields + element upserts) used by the editor autosave.
+   * - Optimistic concurrency via `baseUpdatedAt` (409 PAGE_CONFLICT on mismatch).
+   * - style / data / interaction / background are replaced wholesale (no deep merge);
+   *   transforms are merged because they may be partial.
+   * - Elements missing from the payload are never deleted; foreign elements are skipped.
+   */
+  async savePage(pageId: string, dto: SavePageDto) {
+    const items = dto.elements ?? [];
+    const ids = items.map((item) => item.id);
+    if (new Set(ids).size !== ids.length) {
+      throw new BadRequestException('Danh sách element chứa ID bị trùng lặp.');
+    }
+
+    const { page, skippedElementIds, bookId } = await this.prisma.$transaction(
+      async (tx) => {
+        const current = await tx.page.findUnique({
+          where: { id: pageId },
+          select: { id: true, bookId: true, updatedAt: true },
+        });
+        if (!current) throw new NotFoundException(`Không tìm thấy trang với ID: ${pageId}`);
+
+        const throwConflict = (currentUpdatedAt: Date) => {
+          throw new ConflictException({
+            code: 'PAGE_CONFLICT',
+            message: 'Trang đã được thay đổi ở nơi khác',
+            currentUpdatedAt: currentUpdatedAt.toISOString(),
+          });
+        };
+
+        const baseUpdatedAt = dto.baseUpdatedAt ? new Date(dto.baseUpdatedAt) : undefined;
+        if (baseUpdatedAt && current.updatedAt.toISOString() !== baseUpdatedAt.toISOString()) {
+          throwConflict(current.updatedAt);
+        }
+
+        const fields = dto.page ?? {};
+        if (fields.layoutTemplateId !== undefined) {
+          await this.assertLayoutTemplateExists(tx, fields.layoutTemplateId);
+        }
+
+        const pageData: Record<string, any> = {
+          ...(fields.title !== undefined ? { title: fields.title } : {}),
+          ...(fields.chapter !== undefined ? { chapter: fields.chapter } : {}),
+          ...(fields.quote !== undefined ? { quote: fields.quote } : {}),
+          ...(fields.handwriting !== undefined ? { handwriting: fields.handwriting } : {}),
+          ...(fields.background !== undefined ? { background: requiredJson(fields.background) } : {}),
+          ...(fields.audioTrackId !== undefined ? { audioTrackId: fields.audioTrackId } : {}),
+          ...(fields.layoutTemplateId !== undefined ? { layoutTemplateId: fields.layoutTemplateId } : {}),
+          ...(fields.sourceTemplateId !== undefined ? { sourceTemplateId: fields.sourceTemplateId } : {}),
+          ...(fields.layoutMode !== undefined ? { layoutMode: fields.layoutMode } : {}),
+          ...(fields.isCustomized !== undefined ? { isCustomized: fields.isCustomized } : {}),
+          // Always bump so every save yields a fresh baseUpdatedAt for the client
+          updatedAt: new Date(),
+        };
+
+        // Conditional write closes the race between the check above and this update.
+        const written = await tx.page.updateMany({
+          where: {
+            id: pageId,
+            ...(baseUpdatedAt ? { updatedAt: current.updatedAt } : {}),
+          },
+          data: pageData,
+        });
+        if (written.count === 0) {
+          const latest = await tx.page.findUnique({
+            where: { id: pageId },
+            select: { updatedAt: true },
+          });
+          if (!latest) throw new NotFoundException(`Không tìm thấy trang với ID: ${pageId}`);
+          throwConflict(latest.updatedAt);
+        }
+
+        const skipped: string[] = [];
+        if (items.length > 0) {
+          const existing = await tx.pageElement.findMany({
+            where: { id: { in: ids } },
+            select: { id: true, pageId: true, type: true, transform: true },
+          });
+          const existingMap = new Map<string, { id: string; pageId: string; type: string; transform: any }>(
+            existing.map((el: any) => [el.id, el]),
+          );
+
+          for (const item of items) {
+            const { zIndex: _ignore, ...cleanTransform } = (item.transform as any) || {};
+            const found = existingMap.get(item.id);
+
+            if (found) {
+              if (found.pageId !== pageId) {
+                skipped.push(item.id);
+                continue;
+              }
+              await tx.pageElement.update({
+                where: { id: item.id },
+                data: {
+                  ...(item.slot !== undefined ? { slot: item.slot } : {}),
+                  ...(item.zIndex !== undefined ? { zIndex: item.zIndex } : {}),
+                  ...(item.order !== undefined ? { order: item.order } : {}),
+                  ...(item.visible !== undefined ? { visible: item.visible } : {}),
+                  ...(item.locked !== undefined ? { locked: item.locked } : {}),
+                  ...(item.opacity !== undefined ? { opacity: item.opacity } : {}),
+                  // Transforms may be partial (validated leniently), so they are merged.
+                  ...(item.transform !== undefined
+                    ? { transform: safeDeepMerge((found.transform as any) || {}, cleanTransform) }
+                    : {}),
+                  ...(item.style !== undefined ? { style: nullableJson(item.style) } : {}),
+                  ...(item.data !== undefined
+                    ? { data: requiredJson(canonicalizeMediaData(found.type, item.data)) }
+                    : {}),
+                  ...(item.interaction !== undefined
+                    ? { interaction: nullableJson(item.interaction) }
+                    : {}),
+                },
+              });
+              continue;
+            }
+
+            if (!item.type) {
+              skipped.push(item.id);
+              continue;
+            }
+
+            // Re-create a missing element (e.g. undo of a delete) with its original id.
+            const zIndex = item.zIndex ?? 1;
+            await tx.pageElement.create({
+              data: {
+                id: item.id,
+                pageId,
+                type: item.type,
+                slot: item.slot ?? null,
+                zIndex,
+                order: item.order ?? zIndex,
+                visible: item.visible ?? true,
+                locked: item.locked ?? false,
+                opacity: item.opacity ?? 1.0,
+                transform: requiredJson(cleanTransform),
+                style: nullableJson(item.style),
+                data: requiredJson(canonicalizeMediaData(item.type, item.data)),
+                interaction: nullableJson(item.interaction),
+              },
+            });
+          }
+        }
+
+        await tx.book.update({
+          where: { id: current.bookId },
+          data: { contentRevision: { increment: 1 } },
+          select: { contentRevision: true },
+        });
+
+        const saved = await tx.page.findUnique({
+          where: { id: pageId },
+          include: PAGE_DETAIL_INCLUDE,
+        });
+
+        return { page: saved, skippedElementIds: skipped, bookId: current.bookId };
+      },
+      { timeout: 15000 },
+    );
+
+    await this.cacheService.invalidateBookCache(bookId);
+    return {
+      page: await this.resolveElementMediaUrls(page),
+      skippedElementIds,
+    };
   }
 }

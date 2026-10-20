@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PublicCacheService } from '../public/public-cache.service';
+import { nullableJson, requiredJson } from '../common/prisma-json';
 
 @Injectable()
 export class VersionsService {
@@ -171,8 +172,9 @@ export class VersionsService {
         where: { id: bookId },
         data: {
           title: snapshot.title,
-          cover: snapshot.cover,
-          settings: snapshot.settings,
+          // Json columns: cover/settings are required (fallback {}), never send a raw JS null
+          ...(snapshot.cover !== undefined ? { cover: requiredJson(snapshot.cover) } : {}),
+          ...(snapshot.settings !== undefined ? { settings: requiredJson(snapshot.settings) } : {}),
           heName: snapshot.heName,
           sheName: snapshot.sheName,
           anniversaryDate: snapshot.anniversaryDate ? new Date(snapshot.anniversaryDate) : undefined,
@@ -200,7 +202,7 @@ export class VersionsService {
             sourceTemplateId: page.sourceTemplateId,
             layoutMode: page.layoutMode,
             isCustomized: page.isCustomized,
-            background: page.background,
+            background: requiredJson(page.background),
             audioTrackId: keepAudio(page.audioTrackId),
             elements: {
               create: (page.elements || []).map((el: any) => ({
@@ -212,10 +214,10 @@ export class VersionsService {
                 visible: el.visible !== false,
                 locked: Boolean(el.locked),
                 opacity: el.opacity ?? 1.0,
-                transform: el.transform,
-                style: el.style,
-                data: el.data,
-                interaction: el.interaction,
+                transform: requiredJson(el.transform),
+                style: nullableJson(el.style ?? null),
+                data: requiredJson(el.data),
+                interaction: nullableJson(el.interaction ?? null),
               })),
             },
           },

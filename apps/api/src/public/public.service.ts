@@ -31,14 +31,8 @@ export class PublicService {
 
     // The site hosts exactly one journal: the earliest created book (same rule as the admin CMS)
     const book = await this.prisma.book.findFirst({
-      orderBy: { createdAt: 'asc' },
-      include: {
-        versions: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: { version: true },
-        },
-      },
+      // id tiebreaker keeps the canonical journal deterministic if two books share createdAt
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
 
     if (!book || book.status !== BookStatus.PUBLISHED) {
@@ -55,9 +49,10 @@ export class PublicService {
 
     const document: CompiledBookDocument = book.publishedSnapshot as unknown as CompiledBookDocument;
 
-    const latestVersion = book.versions?.[0]?.version || '2.0.0';
-    const publishedRev = book.publishedRevision || book.contentRevision || 1;
-    const etag = `"${book.id}-rev${publishedRev}-v${latestVersion}"`;
+    // The ETag only depends on what identifies the frozen snapshot: draft edits (contentRevision)
+    // or manual version snapshots must not invalidate client caches of an unchanged publication.
+    const publishedAtMs = book.publishedAt ? new Date(book.publishedAt).getTime() : 0;
+    const etag = `"${book.id}-rev${book.publishedRevision || 0}-${publishedAtMs}"`;
 
     this.cacheService.set(PUBLIC_JOURNAL_CACHE_KEY, document, etag);
 

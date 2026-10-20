@@ -14,6 +14,7 @@ import { UpdatePageDto } from './dto/update-page.dto';
 import { ReorderPagesDto } from './dto/reorder-pages.dto';
 import { DuplicatePageDto } from './dto/duplicate-page.dto';
 import { ApplyLayoutDto } from './dto/apply-layout.dto';
+import { SavePageDto } from './dto/save-page.dto';
 
 @Controller('pages')
 export class PagesController {
@@ -40,6 +41,15 @@ export class PagesController {
     @Body() dto: ApplyLayoutDto,
   ) {
     return this.pagesService.applyLayout(id, dto.layoutTemplateId, dto.elements);
+  }
+
+  /**
+   * Atomic editor save: page fields + element upserts in one transaction with
+   * optimistic concurrency (baseUpdatedAt). Returns { page, skippedElementIds }.
+   */
+  @Post(':pageId/save')
+  async save(@Param('pageId') pageId: string, @Body() dto: SavePageDto) {
+    return this.pagesService.savePage(pageId, dto);
   }
 
   @Put(':id')

@@ -3,6 +3,8 @@ import {
   NotFoundException,
   ConflictException,
   ForbiddenException,
+  Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateLayoutTemplateDto } from './dto/create-layout-template.dto';
@@ -11,11 +13,28 @@ import { Role } from '@prisma/client';
 import { LAYOUT_PRESETS } from '@phucandtrang/shared';
 
 @Injectable()
-export class LayoutTemplatesService {
+export class LayoutTemplatesService implements OnModuleInit {
+  private readonly logger = new Logger(LayoutTemplatesService.name);
+
   constructor(private prisma: PrismaService) {}
 
-  async findAll() {
-    await this.prisma.layoutTemplate.createMany({
+  /**
+   * Seeds the built-in presets once at boot (idempotent). Failures are logged and never
+   * block startup: pages still accept preset ids, which are upserted on demand.
+   */
+  async onModuleInit() {
+    try {
+      await this.ensureSystemPresets();
+    } catch (err) {
+      this.logger.error(
+        'Không thể khởi tạo layout template hệ thống khi khởi động',
+        err instanceof Error ? err.stack : String(err),
+      );
+    }
+  }
+
+  async ensureSystemPresets() {
+    const result = await this.prisma.layoutTemplate.createMany({
       data: Object.values(LAYOUT_PRESETS).map((preset) => ({
         id: preset.id,
         name: preset.name,
@@ -26,6 +45,12 @@ export class LayoutTemplatesService {
       })),
       skipDuplicates: true,
     });
+    if (result?.count) {
+      this.logger.log(`Đã tạo ${result.count} layout template hệ thống còn thiếu`);
+    }
+  }
+
+  async findAll() {
     return this.prisma.layoutTemplate.findMany({
       orderBy: [{ isSystem: 'desc' }, { createdAt: 'asc' }],
     });

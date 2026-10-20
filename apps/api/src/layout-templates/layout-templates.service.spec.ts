@@ -141,4 +141,29 @@ describe('LayoutTemplatesService (Prompt 17 — Custom Layout Templates)', () =>
       }),
     });
   });
+
+  it('findAll is read-only (no seeding on GET)', async () => {
+    prisma.layoutTemplate.findMany.mockResolvedValue([mockSystemTemplate]);
+
+    const result = await service.findAll();
+
+    expect(result).toEqual([mockSystemTemplate]);
+    expect(prisma.layoutTemplate.createMany).not.toHaveBeenCalled();
+  });
+
+  it('onModuleInit seeds presets idempotently with skipDuplicates', async () => {
+    prisma.layoutTemplate.createMany.mockResolvedValue({ count: 0 });
+
+    await service.onModuleInit();
+
+    expect(prisma.layoutTemplate.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skipDuplicates: true }),
+    );
+  });
+
+  it('onModuleInit never throws when seeding fails (boot must not crash)', async () => {
+    prisma.layoutTemplate.createMany.mockRejectedValue(new Error('db down'));
+
+    await expect(service.onModuleInit()).resolves.toBeUndefined();
+  });
 });

@@ -195,23 +195,41 @@ export class AudioService {
     return this.serializeTrack(updated);
   }
 
+  /**
+   * Deletes a track atomically. Books/pages referencing it are unlinked by the database
+   * (ON DELETE SET NULL), and their contentRevision is bumped in the same transaction.
+   */
   async remove(id: string) {
-    await this.findOne(id);
+    const { deleted, bookIds } = await this.prisma.$transaction(async (tx) => {
+      const track = await tx.audioTrack.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+      if (!track) throw new NotFoundException(`Audio track not found: ${id}`);
 
-    // Invalidate affected books before removing
-    await this.touchAffectedBooks(id);
+      const [books, pages] = await Promise.all([
+        tx.book.findMany({ where: { backgroundMusicId: id }, select: { id: true } }),
+        tx.page.findMany({ where: { audioTrackId: id }, select: { bookId: true } }),
+      ]);
+      const affected = Array.from(
+        new Set<string>([...books.map((b) => b.id), ...pages.map((p) => p.bookId)]),
+      );
 
-    // Cleanly unlink from books and pages before deleting
-    await this.prisma.book.updateMany({
-      where: { backgroundMusicId: id },
-      data: { backgroundMusicId: null },
+      const removed = await tx.audioTrack.delete({ where: { id } });
+
+      if (affected.length > 0) {
+        await tx.book.updateMany({
+          where: { id: { in: affected } },
+          data: { contentRevision: { increment: 1 } },
+        });
+      }
+
+      return { deleted: removed, bookIds: affected };
     });
-    await this.prisma.page.updateMany({
-      where: { audioTrackId: id },
-      data: { audioTrackId: null },
-    });
 
-    const deleted = await this.prisma.audioTrack.delete({ where: { id } });
+    for (const bookId of bookIds) {
+      await this.cacheService.invalidateBookCache(bookId);
+    }
     return this.serializeTrack(deleted);
   }
 }

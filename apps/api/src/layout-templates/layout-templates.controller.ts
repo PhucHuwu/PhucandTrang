@@ -11,6 +11,7 @@ import {
 import { LayoutTemplatesService } from './layout-templates.service';
 import { CreateLayoutTemplateDto } from './dto/create-layout-template.dto';
 import { UpdateLayoutTemplateDto } from './dto/update-layout-template.dto';
+import { DuplicateLayoutTemplateDto } from './dto/duplicate-layout-template.dto';
 
 @Controller('layout-templates')
 export class LayoutTemplatesController {
@@ -43,7 +44,7 @@ export class LayoutTemplatesController {
   @Post(':id/duplicate')
   async duplicate(
     @Param('id') id: string,
-    @Body() body: { newId: string; newName?: string },
+    @Body() body: DuplicateLayoutTemplateDto,
   ) {
     return this.templatesService.duplicate(id, body.newId, body.newName);
   }

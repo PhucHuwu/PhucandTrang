@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 export const PUBLIC_JOURNAL_CACHE_KEY = 'journal';
@@ -11,6 +11,7 @@ export interface CacheEntry<T = any> {
 
 @Injectable()
 export class PublicCacheService {
+  private readonly logger = new Logger(PublicCacheService.name);
   private cache = new Map<string, CacheEntry>();
   private readonly CACHE_TTL_MS = 60 * 1000; // 60 seconds
 
@@ -71,7 +72,11 @@ export class PublicCacheService {
       this.invalidate();
 
       return updated.contentRevision;
-    } catch {
+    } catch (err) {
+      this.logger.error(
+        `touchBook(${bookId}) failed to bump contentRevision; cache invalidated anyway`,
+        err instanceof Error ? err.stack : String(err),
+      );
       this.invalidate();
       return 1;
     }
@@ -89,7 +94,11 @@ export class PublicCacheService {
       if (page?.bookId) {
         await this.touchBook(page.bookId);
       }
-    } catch {
+    } catch (err) {
+      this.logger.error(
+        `touchByPageId(${pageId}) failed; cache invalidated anyway`,
+        err instanceof Error ? err.stack : String(err),
+      );
       this.invalidate();
     }
   }
@@ -106,7 +115,11 @@ export class PublicCacheService {
       if (element?.page?.bookId) {
         await this.touchBook(element.page.bookId);
       }
-    } catch {
+    } catch (err) {
+      this.logger.error(
+        `touchByElementId(${elementId}) failed; cache invalidated anyway`,
+        err instanceof Error ? err.stack : String(err),
+      );
       this.invalidate();
     }
   }

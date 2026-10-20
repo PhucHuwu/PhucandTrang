@@ -5,7 +5,7 @@ import { PublicCacheService } from '../public/public-cache.service';
 import { PublicService } from '../public/public.service';
 import { PublishValidationService } from './publish-validation.service';
 import { BookStatus } from '@prisma/client';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 
 describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Validation)', () => {
   let service: BooksService;
@@ -20,6 +20,12 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
         findUnique: jest.fn(),
         findFirst: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      audioTrack: {
+        findUnique: jest.fn().mockImplementation(({ where }) =>
+          Promise.resolve(where.id.startsWith('track-') ? { id: where.id } : null),
+        ),
       },
       bookVersion: {
         create: jest.fn(),
@@ -173,5 +179,104 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
     expect(res.version).toBe('v2.2');
     expect(prisma.$transaction).toHaveBeenCalled();
     expect(cacheService.invalidateBookCache).toHaveBeenCalledWith('book-1');
+    // Conditional claim on the publishedRevision that was read
+    expect(prisma.book.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'book-1', publishedRevision: 1 },
+        data: expect.objectContaining({ publishedRevision: 2 }),
+      }),
+    );
+  });
+
+  it('publishBook retries once when a concurrent publish wins the race, using the fresh revision', async () => {
+    prisma.book.findUnique
+      .mockResolvedValueOnce({ ...mockExistingBook, publishedRevision: 1 }) // attempt 1 read
+      .mockResolvedValueOnce({ ...mockExistingBook, publishedRevision: 2 }) // attempt 2 read
+      .mockResolvedValueOnce({ ...mockExistingBook, publishedRevision: 3 }); // final read
+    prisma.book.updateMany
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 1 });
+
+    const res = await service.publishBook('book-1');
+
+    expect(res.publishedRevision).toBe(3);
+    expect(res.version).toBe('v2.3');
+    expect(prisma.book.updateMany).toHaveBeenCalledTimes(2);
+    expect(prisma.bookVersion.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('publishBook throws 409 Conflict when the revision claim fails twice', async () => {
+    prisma.book.findUnique.mockResolvedValue(mockExistingBook);
+    prisma.book.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.publishBook('book-1')).rejects.toThrow(ConflictException);
+    expect(prisma.book.updateMany).toHaveBeenCalledTimes(2);
+    expect(prisma.bookVersion.create).not.toHaveBeenCalled();
+    expect(cacheService.invalidateBookCache).not.toHaveBeenCalled();
+  });
+
+  it('update rejects an unknown backgroundMusicId with 400', async () => {
+    prisma.book.findUnique.mockResolvedValue(mockExistingBook);
+
+    await expect(
+      service.update('book-1', { backgroundMusicId: 'missing-track' }, true),
+    ).rejects.toThrow(BadRequestException);
+    expect(prisma.book.update).not.toHaveBeenCalled();
+  });
+
+  it('update rejects non-https playlist track sources with a clear 400', async () => {
+    prisma.book.findUnique.mockResolvedValue(mockExistingBook);
+
+    await expect(
+      service.update(
+        'book-1',
+        { settings: { playlistTracks: [{ id: 't1', src: 'https://cdn.example.com/a.mp3' }, { id: 't2', src: 'http://evil.example.com/b.mp3' }] } },
+        true,
+      ),
+    ).rejects.toThrow(/playlistTracks\[1\]\.src/);
+    expect(prisma.book.update).not.toHaveBeenCalled();
+  });
+
+  it('update accepts https and same-origin playlist sources', async () => {
+    prisma.book.findUnique.mockResolvedValue(mockExistingBook);
+    prisma.book.update.mockResolvedValue(mockExistingBook);
+
+    await service.update(
+      'book-1',
+      { settings: { playlistTracks: [{ src: 'https://cdn.example.com/a.mp3' }, { src: '/music/b.mp3' }, { id: 'no-src' }] } },
+      true,
+    );
+    expect(prisma.book.update).toHaveBeenCalled();
+  });
+
+  it('update rejects javascript: links in cover element interactions', async () => {
+    prisma.book.findUnique.mockResolvedValue(mockExistingBook);
+
+    await expect(
+      service.update(
+        'book-1',
+        {
+          cover: {
+            back: {
+              insideElements: [
+                { id: 'e1', interaction: { action: 'open-link', target: 'javascript:alert(1)' } },
+              ],
+            },
+          },
+        },
+        true,
+      ),
+    ).rejects.toThrow(BadRequestException);
+    expect(prisma.book.update).not.toHaveBeenCalled();
+  });
+
+  it('update reads, merges and writes settings inside one interactive transaction', async () => {
+    prisma.book.findUnique.mockResolvedValue({ ...mockExistingBook, settings: { theme: { a: 1 } } });
+    prisma.book.update.mockResolvedValue(mockExistingBook);
+
+    await service.update('book-1', { settings: { theme: { b: 2 } } }, true);
+
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
+    expect(prisma.book.update.mock.calls[0][0].data.settings).toEqual({ theme: { a: 1, b: 2 } });
   });
 });

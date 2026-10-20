@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { BooksService } from './books.service';
 import { UpdateBookDto } from './dto/update-book.dto';
+import { PublishBookDto } from './dto/publish-book.dto';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '@prisma/client';
 
@@ -51,7 +52,7 @@ export class BooksController {
   @Post(':id/publish')
   async publishBook(
     @Param('id') id: string,
-    @Body() body: { changelog?: string } = {},
+    @Body() body: PublishBookDto = {},
     @Request() req: any,
   ) {
     return this.booksService.publishBook(id, body?.changelog, req.user?.id);

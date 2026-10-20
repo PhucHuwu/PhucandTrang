@@ -26,6 +26,7 @@ describe('CMS Persistence & Reliability Contract Tests (Prompt 40.2 Audit)', () 
       },
       layoutTemplate: {
         findUnique: jest.fn(),
+        upsert: jest.fn(),
       },
       book: {
         findUnique: jest.fn(),

@@ -7,7 +7,9 @@ import {
   Delete,
   Body,
   Param,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { PageElementsService } from './page-elements.service';
 import { CreatePageElementDto } from './dto/create-page-element.dto';
 import { UpdatePageElementDto } from './dto/update-page-element.dto';
@@ -58,8 +60,12 @@ export class PageElementsController {
   async batchUpdate(
     @Param('pageId') pageId: string,
     @Body() dto: BatchUpdateElementsDto,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    return this.elementsService.batchUpdate(pageId, dto);
+    // Body stays the updated-elements array (backward compatible); skipped ids go in a header.
+    const { elements, skippedElementIds } = await this.elementsService.batchUpdateWithReport(pageId, dto);
+    res.setHeader('X-Skipped-Element-Ids', skippedElementIds.join(','));
+    return elements;
   }
 
   @Delete('page-elements/:id')

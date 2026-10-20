@@ -60,6 +60,14 @@ export function IsValidInteractionTarget(validationOptions?: ValidationOptions) 
   };
 }
 
+/** Returns true when a free-form interaction object is safe to persist (see IsSafeInteraction). */
+export function isSafeInteractionValue(value: any): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value !== 'object' || Array.isArray(value)) return false;
+  if (value.action !== 'open-link') return true;
+  return value.target === undefined || value.target === '' || isValidHttpUrl(value.target);
+}
+
 /**
  * For free-form interaction objects (batch save, apply-layout): only rejects link targets
  * that are not http/https, so stored data can never become a javascript: link on the public site.
@@ -73,10 +81,7 @@ export function IsSafeInteraction(validationOptions?: ValidationOptions) {
       options: validationOptions,
       validator: {
         validate(value: any) {
-          if (value === undefined || value === null) return true;
-          if (typeof value !== 'object' || Array.isArray(value)) return false;
-          if (value.action !== 'open-link') return true;
-          return value.target === undefined || value.target === '' || isValidHttpUrl(value.target);
+          return isSafeInteractionValue(value);
         },
         defaultMessage() {
           return 'open-link yêu cầu target là URL http/https hợp lệ.';

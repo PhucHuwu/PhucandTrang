@@ -9,6 +9,7 @@ import {
 import { VersionsService } from './versions.service';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '@prisma/client';
+import { CreateSnapshotDto } from './dto/create-snapshot.dto';
 
 @Controller('versions')
 export class VersionsController {
@@ -27,7 +28,7 @@ export class VersionsController {
   @Post('book/:bookId/snapshot')
   async createSnapshot(
     @Param('bookId') bookId: string,
-    @Body() body: { version: string; changelog?: string },
+    @Body() body: CreateSnapshotDto,
     @Request() req: any,
   ) {
     return this.versionsService.createSnapshot(

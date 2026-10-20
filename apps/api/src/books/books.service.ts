@@ -12,6 +12,20 @@ import { PublicCacheService } from '../public/public-cache.service';
 import { PublicService } from '../public/public.service';
 import { PublishValidationService } from './publish-validation.service';
 import { safeDeepMerge } from '@phucandtrang/shared';
+import { isSafeInteractionValue } from '../common/dto/element-interaction.dto';
+
+/** https URL or a same-origin root-relative path (e.g. "/music/x.mp3"); never protocol-relative. */
+function isAllowedTrackSrc(src: unknown): boolean {
+  if (typeof src !== 'string' || src.length === 0) return false;
+  if (src.startsWith('/') && !src.startsWith('//') && !src.startsWith('/\\')) return true;
+  try {
+    return new URL(src).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+const PUBLISH_MAX_ATTEMPTS = 2;
 
 @Injectable()
 export class BooksService {
@@ -119,42 +133,103 @@ export class BooksService {
     return book;
   }
 
-  async update(id: string, dto: UpdateBookDto, isPatch: boolean = false) {
-    const existingBook = await this.findOne(id);
-
-    const backgroundMusicUpdate: Record<string, any> = {};
-    if ('backgroundMusicId' in dto) {
-      backgroundMusicUpdate.backgroundMusicId = dto.backgroundMusicId;
+  /**
+   * Rejects unsafe values that DTO-level validation cannot see because cover/settings are
+   * free-form objects: playlist sources must be https (or same-origin paths) and cover element
+   * interactions must not carry non-http(s) link targets.
+   */
+  private validateBookJsonPayload(dto: UpdateBookDto) {
+    const tracks = dto.settings?.playlistTracks;
+    if (tracks !== undefined) {
+      if (!Array.isArray(tracks)) {
+        throw new BadRequestException('settings.playlistTracks phải là một mảng.');
+      }
+      tracks.forEach((track: any, index: number) => {
+        if (track && typeof track === 'object' && track.src !== undefined && track.src !== null) {
+          if (!isAllowedTrackSrc(track.src)) {
+            throw new BadRequestException(
+              `settings.playlistTracks[${index}].src phải là URL https:// hợp lệ (hoặc đường dẫn nội bộ bắt đầu bằng "/").`,
+            );
+          }
+        }
+      });
     }
 
-    // PATCH: each provided cover side replaces that side wholesale (element arrays must not be
-    // deep-merged), while sides that were not sent are kept as they are.
-    const cover = isPatch && dto.cover
-      ? (dto.cover.front || dto.cover.back
-          ? { ...((existingBook.cover as any) || {}), ...dto.cover }
-          : safeDeepMerge(existingBook.cover as any, dto.cover))
-      : dto.cover;
+    const cover = dto.cover as any;
+    if (cover && typeof cover === 'object') {
+      const groups: Array<[string, unknown]> = [
+        ['cover.front.elements', cover.front?.elements],
+        ['cover.back.elements', cover.back?.elements],
+        ['cover.back.insideElements', cover.back?.insideElements],
+        ['cover.front.insideElements', cover.front?.insideElements],
+      ];
+      for (const [path, list] of groups) {
+        if (!Array.isArray(list)) continue;
+        list.forEach((el: any, index: number) => {
+          if (el && typeof el === 'object' && !isSafeInteractionValue(el.interaction)) {
+            throw new BadRequestException(
+              `${path}[${index}].interaction không hợp lệ: liên kết chỉ được dùng http:// hoặc https://.`,
+            );
+          }
+        });
+      }
+    }
+  }
 
-    const settings = isPatch && dto.settings
-      ? safeDeepMerge(existingBook.settings as any, dto.settings)
-      : dto.settings;
+  async update(id: string, dto: UpdateBookDto, isPatch: boolean = false) {
+    this.validateBookJsonPayload(dto);
 
-    const updated = await this.prisma.book.update({
-      where: { id },
-      data: {
-        ...(dto.title !== undefined ? { title: dto.title } : {}),
-        ...(dto.description !== undefined ? { description: dto.description } : {}),
-        ...(dto.heName !== undefined ? { heName: dto.heName } : {}),
-        ...(dto.sheName !== undefined ? { sheName: dto.sheName } : {}),
-        ...(dto.anniversaryDate ? { anniversaryDate: new Date(dto.anniversaryDate) } : {}),
-        ...(dto.proposalQuote !== undefined ? { proposalQuote: dto.proposalQuote } : {}),
-        ...(cover !== undefined ? { cover } : {}),
-        ...(settings !== undefined ? { settings } : {}),
-        ...backgroundMusicUpdate,
-      },
-      include: {
-        backgroundMusic: true,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Read + merge + write in one transaction so concurrent PATCHes cannot drop each other's keys.
+      const existingBook = await tx.book.findUnique({
+        where: { id },
+        select: { id: true, cover: true, settings: true },
+      });
+      if (!existingBook) throw new NotFoundException(`Không tìm thấy cuốn sách với ID: ${id}`);
+
+      const backgroundMusicUpdate: Record<string, any> = {};
+      if ('backgroundMusicId' in dto) {
+        if (dto.backgroundMusicId) {
+          const track = await tx.audioTrack.findUnique({
+            where: { id: dto.backgroundMusicId },
+            select: { id: true },
+          });
+          if (!track) {
+            throw new BadRequestException(`Không tìm thấy bản nhạc nền với ID: ${dto.backgroundMusicId}`);
+          }
+        }
+        backgroundMusicUpdate.backgroundMusicId = dto.backgroundMusicId ?? null;
+      }
+
+      // PATCH: each provided cover side replaces that side wholesale (element arrays must not be
+      // deep-merged), while sides that were not sent are kept as they are.
+      const cover = isPatch && dto.cover
+        ? (dto.cover.front || dto.cover.back
+            ? { ...((existingBook.cover as any) || {}), ...dto.cover }
+            : safeDeepMerge((existingBook.cover as any) || {}, dto.cover))
+        : dto.cover;
+
+      const settings = isPatch && dto.settings
+        ? safeDeepMerge((existingBook.settings as any) || {}, dto.settings)
+        : dto.settings;
+
+      return tx.book.update({
+        where: { id },
+        data: {
+          ...(dto.title !== undefined ? { title: dto.title } : {}),
+          ...(dto.description !== undefined ? { description: dto.description } : {}),
+          ...(dto.heName !== undefined ? { heName: dto.heName } : {}),
+          ...(dto.sheName !== undefined ? { sheName: dto.sheName } : {}),
+          ...(dto.anniversaryDate ? { anniversaryDate: new Date(dto.anniversaryDate) } : {}),
+          ...(dto.proposalQuote !== undefined ? { proposalQuote: dto.proposalQuote } : {}),
+          ...(cover !== undefined ? { cover } : {}),
+          ...(settings !== undefined ? { settings } : {}),
+          ...backgroundMusicUpdate,
+        },
+        include: {
+          backgroundMusic: true,
+        },
+      });
     });
 
     await this.cacheService.touchBook(id);
@@ -247,79 +322,110 @@ export class BooksService {
       );
     }
 
-    // Hidden elements must be kept: this record doubles as the rollback source for BookVersion.
-    // compileBookDocument filters hidden elements out of the public snapshot itself.
-    const book = await this.prisma.book.findUnique({
-      where: { id },
-      include: {
-        backgroundMusic: true,
-        pages: {
-          orderBy: { order: 'asc' },
+    for (let attempt = 1; attempt <= PUBLISH_MAX_ATTEMPTS; attempt++) {
+      const result = await this.tryPublishOnce(id, changelog, userId);
+      if (result) {
+        // Prompt 40.1 Fix: Use invalidateBookCache so contentRevision is incremented exactly once per publish
+        await this.cacheService.invalidateBookCache(id);
+
+        return {
+          success: true,
+          message: `Đã xuất bản thành công bản phát hành ${result.versionTag} (revision #${result.publishedRevision})`,
+          version: result.versionTag,
+          publishedRevision: result.publishedRevision,
+          publishedAt: result.publishedAt.toISOString(),
+          validationReport,
+          book: result.book,
+        };
+      }
+    }
+
+    throw new ConflictException(
+      'Cuốn sách đang được xuất bản đồng thời từ một phiên khác. Vui lòng tải lại và thử lại.',
+    );
+  }
+
+  /**
+   * One publish attempt in an interactive transaction. The book row is claimed with a
+   * conditional update on the publishedRevision that was read, so two concurrent publishes
+   * can never both write the same revision. Returns null when another publish won the race.
+   */
+  private async tryPublishOnce(id: string, changelog?: string, userId?: string) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        // Hidden elements must be kept: this record doubles as the rollback source for BookVersion.
+        // compileBookDocument filters hidden elements out of the public snapshot itself.
+        const book = await tx.book.findUnique({
+          where: { id },
           include: {
-            elements: {
-              orderBy: { zIndex: 'asc' },
+            backgroundMusic: true,
+            pages: {
+              orderBy: { order: 'asc' },
+              include: {
+                elements: {
+                  orderBy: { zIndex: 'asc' },
+                },
+                layoutTemplate: true,
+                audioTrack: true,
+              },
             },
-            layoutTemplate: true,
-            audioTrack: true,
+            versions: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: { version: true },
+            },
           },
-        },
-        versions: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: { version: true },
-        },
-      },
-    });
+        });
 
-    if (!book) throw new NotFoundException(`Không tìm thấy sách với ID: ${id}`);
+        if (!book) throw new NotFoundException(`Không tìm thấy sách với ID: ${id}`);
 
-    const nextPublishedRevision = (book.publishedRevision || 0) + 1;
-    const versionTag = `v2.${nextPublishedRevision}`;
-    const mediaMap = await this.publicService.collectAndResolveMedia(book);
-    const compiledDocument = this.publicService.compileBookDocument(book, mediaMap);
+        const readRevision = book.publishedRevision || 0;
+        const nextPublishedRevision = readRevision + 1;
+        const versionTag = `v2.${nextPublishedRevision}`;
+        const mediaMap = await this.publicService.collectAndResolveMedia(book);
+        const compiledDocument = this.publicService.compileBookDocument(book, mediaMap);
 
-    // Embed current publication revision into snapshot document
-    compiledDocument.contentRevision = nextPublishedRevision;
+        // Embed current publication revision into snapshot document
+        compiledDocument.contentRevision = nextPublishedRevision;
 
-    const now = new Date();
+        const now = new Date();
 
-    const [updated] = await this.prisma.$transaction([
-      this.prisma.book.update({
-        where: { id },
-        data: {
-          status: BookStatus.PUBLISHED,
-          publishedSnapshot: compiledDocument as any,
+        const claimed = await tx.book.updateMany({
+          where: { id, publishedRevision: book.publishedRevision },
+          data: {
+            status: BookStatus.PUBLISHED,
+            publishedSnapshot: compiledDocument as any,
+            publishedRevision: nextPublishedRevision,
+            contentRevision: { increment: 1 },
+            publishedAt: now,
+          },
+        });
+        if (claimed.count === 0) return null;
+
+        // Create version history snapshot record automatically
+        await tx.bookVersion.create({
+          data: {
+            bookId: id,
+            version: versionTag,
+            snapshot: book as any,
+            changelog: changelog || `Xuất bản bản phát hành revision #${nextPublishedRevision}`,
+            createdById: userId,
+          },
+        });
+
+        const updated = await tx.book.findUnique({
+          where: { id },
+          include: { backgroundMusic: true },
+        });
+
+        return {
+          book: updated,
+          versionTag,
           publishedRevision: nextPublishedRevision,
-          contentRevision: { increment: 1 },
           publishedAt: now,
-        },
-        include: {
-          backgroundMusic: true,
-        },
-      }),
-      // Create version history snapshot record automatically
-      this.prisma.bookVersion.create({
-        data: {
-          bookId: id,
-          version: versionTag,
-          snapshot: book as any,
-          changelog: changelog || `Xuất bản bản phát hành revision #${nextPublishedRevision}`,
-          createdById: userId,
-        },
-      }),
-    ]);
-
-    // Prompt 40.1 Fix: Use invalidateBookCache so contentRevision is incremented exactly once per publish
-    await this.cacheService.invalidateBookCache(id);
-
-    return {
-      success: true,
-      message: `Đã xuất bản thành công bản phát hành ${versionTag} (revision #${nextPublishedRevision})`,
-      version: versionTag,
-      publishedRevision: nextPublishedRevision,
-      publishedAt: now.toISOString(),
-      validationReport,
-      book: updated,
-    };
+        };
+      },
+      { timeout: 30_000, maxWait: 10_000 },
+    );
   }
 }
