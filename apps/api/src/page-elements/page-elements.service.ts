@@ -13,6 +13,7 @@ import { PublicCacheService } from '../public/public-cache.service';
 import { safeDeepMerge } from '@phucandtrang/shared';
 import { canonicalizeMediaData } from '../common/media-data';
 import { nullableJson, requiredJson } from '../common/prisma-json';
+import { touchPageGuarded } from '../common/page-concurrency';
 
 @Injectable()
 export class PageElementsService {
@@ -75,13 +76,14 @@ export class PageElementsService {
         },
       });
 
-      // Mark parent page as customized
-      await tx.page.update({
-        where: { id: dto.pageId },
-        data: { isCustomized: true },
-      });
+      const pageUpdatedAt = await touchPageGuarded(
+        tx,
+        dto.pageId,
+        { isCustomized: true },
+        dto.baseUpdatedAt,
+      );
 
-      return created;
+      return { ...created, pageUpdatedAt };
     });
 
     await this.cacheService.touchByPageId(dto.pageId);
@@ -226,31 +228,41 @@ export class PageElementsService {
         },
       });
 
-      // Mark parent page as customized
-      await tx.page.update({
-        where: { id: original.pageId },
-        data: { isCustomized: true },
-      });
+      const pageUpdatedAt = await touchPageGuarded(
+        tx,
+        original.pageId,
+        { isCustomized: true },
+        dto?.baseUpdatedAt,
+      );
 
-      return created;
+      return { ...created, pageUpdatedAt };
     });
 
     await this.cacheService.touchByPageId(duplicate.pageId);
     return duplicate;
   }
 
-  async remove(id: string) {
+  async remove(id: string, baseUpdatedAt?: string) {
+    if (
+      baseUpdatedAt !== undefined &&
+      Number.isNaN(Date.parse(baseUpdatedAt))
+    ) {
+      throw new BadRequestException('baseUpdatedAt không hợp lệ.');
+    }
     const result = await this.prisma.$transaction(async (tx) => {
       const el = await tx.pageElement.findUnique({ where: { id } });
       if (!el)
         throw new NotFoundException(`Không tìm thấy phần tử với ID: ${id}`);
 
+      // Guard first so a conflicting delete leaves nothing behind
+      const pageUpdatedAt = await touchPageGuarded(
+        tx,
+        el.pageId,
+        { isCustomized: true },
+        baseUpdatedAt,
+      );
       const deleted = await tx.pageElement.delete({ where: { id } });
-      await tx.page.update({
-        where: { id: el.pageId },
-        data: { isCustomized: true },
-      });
-      return deleted;
+      return { ...deleted, pageUpdatedAt };
     });
 
     await this.cacheService.touchByPageId(result.pageId);

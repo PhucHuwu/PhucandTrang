@@ -23,6 +23,7 @@ import {
   resolveElementMediaUrls,
 } from './page-helpers';
 import { savePageAtomically } from './page-save';
+import { touchPageGuarded } from '../common/page-concurrency';
 
 @Injectable()
 export class PagesService {
@@ -437,11 +438,19 @@ export class PagesService {
    * 2. Updates page layout metadata: layoutTemplateId = id, sourceTemplateId = id, layoutMode = 'PRESET', isCustomized = false.
    * 3. Guarantees everything commits in a single transaction.
    */
-  async applyLayout(pageId: string, layoutTemplateId: string, elements: any[]) {
+  async applyLayout(
+    pageId: string,
+    layoutTemplateId: string,
+    elements: any[],
+    baseUpdatedAt?: string,
+  ) {
     const existing = await this.findOne(pageId);
 
     const result = await this.prisma.$transaction(async (tx) => {
       await assertLayoutTemplateExists(tx, layoutTemplateId);
+      if (baseUpdatedAt) {
+        await touchPageGuarded(tx, pageId, {}, baseUpdatedAt);
+      }
 
       // 1. Delete all existing elements on this page
       await tx.pageElement.deleteMany({

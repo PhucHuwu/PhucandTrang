@@ -1,8 +1,5 @@
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { throwPageConflict } from '../common/page-concurrency';
 import { PrismaService } from '../prisma/prisma.service';
 import { PublicCacheService } from '../public/public-cache.service';
 import { SaveElementItemDto, SavePageDto } from './dto/save-page.dto';
@@ -15,14 +12,6 @@ import {
   cleanElementTransform,
   resolveElementMediaUrls,
 } from './page-helpers';
-
-function throwPageConflict(currentUpdatedAt: Date): never {
-  throw new ConflictException({
-    code: 'PAGE_CONFLICT',
-    message: 'Trang đã được thay đổi ở nơi khác',
-    currentUpdatedAt: currentUpdatedAt.toISOString(),
-  });
-}
 
 /** Upserts the payload elements; returns ids that were skipped (foreign or not re-creatable). */
 async function upsertSavedElements(

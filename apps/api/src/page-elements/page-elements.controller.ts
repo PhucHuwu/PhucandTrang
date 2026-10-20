@@ -7,6 +7,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
@@ -70,7 +71,10 @@ export class PageElementsController {
   }
 
   @Delete('page-elements/:id')
-  async remove(@Param('id') id: string) {
-    return this.elementsService.remove(id);
+  async remove(
+    @Param('id') id: string,
+    @Query('baseUpdatedAt') baseUpdatedAt?: string,
+  ) {
+    return this.elementsService.remove(id, baseUpdatedAt || undefined);
   }
 }

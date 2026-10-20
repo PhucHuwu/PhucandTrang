@@ -41,6 +41,7 @@ export class PagesController {
       id,
       dto.layoutTemplateId,
       dto.elements,
+      dto.baseUpdatedAt,
     );
   }
 

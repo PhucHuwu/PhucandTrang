@@ -7,6 +7,7 @@ import {
   IsObject,
   IsBoolean,
   IsNumber,
+  IsDateString,
   Min,
   Max,
   ValidateNested,
@@ -67,4 +68,9 @@ export class CreatePageElementDto {
   @Type(() => ElementInteractionDto)
   @IsOptional()
   interaction?: ElementInteractionDto;
+
+  /** Optimistic concurrency: the page.updatedAt the client last saw (409 PAGE_CONFLICT on mismatch). */
+  @IsDateString()
+  @IsOptional()
+  baseUpdatedAt?: string;
 }

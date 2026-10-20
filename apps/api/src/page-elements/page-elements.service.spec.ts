@@ -14,6 +14,7 @@ describe('PageElementsService media canonicalization (Prompt 21)', () => {
       page: {
         findUnique: jest.fn().mockResolvedValue({ id: 'page-1' }),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       pageElement: {
         findFirst: jest.fn().mockResolvedValue({ zIndex: 1 }),
@@ -95,10 +96,42 @@ describe('PageElementsService media canonicalization (Prompt 21)', () => {
     expect(prisma.pageElement.create.mock.calls[0][0].data.style).toBe(
       Prisma.DbNull,
     );
-    expect(prisma.page.update).toHaveBeenCalledWith({
+    expect(prisma.page.updateMany).toHaveBeenCalledWith({
       where: { id: 'page-1' },
-      data: { isCustomized: true },
+      data: { isCustomized: true, updatedAt: expect.any(Date) },
     });
+  });
+
+  it('create with a stale baseUpdatedAt → 409 PAGE_CONFLICT', async () => {
+    prisma.page.updateMany.mockResolvedValue({ count: 0 });
+    prisma.page.findUnique
+      .mockResolvedValueOnce({ id: 'page-1' })
+      .mockResolvedValueOnce({ updatedAt: new Date('2026-10-20T10:00:00Z') });
+
+    await expect(
+      service.create({
+        pageId: 'page-1',
+        type: 'TEXT' as any,
+        transform: {} as any,
+        data: {},
+        baseUpdatedAt: '2026-10-20T09:00:00.000Z',
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(prisma.page.updateMany).toHaveBeenCalledWith({
+      where: { id: 'page-1', updatedAt: new Date('2026-10-20T09:00:00.000Z') },
+      data: { isCustomized: true, updatedAt: expect.any(Date) },
+    });
+  });
+
+  it('create returns the new page updatedAt for the client token', async () => {
+    const result: any = await service.create({
+      pageId: 'page-1',
+      type: 'TEXT' as any,
+      transform: {} as any,
+      data: {},
+      baseUpdatedAt: '2026-10-20T09:00:00.000Z',
+    });
+    expect(result.pageUpdatedAt).toBeInstanceOf(Date);
   });
 
   it('PATCH merges nested objects but an explicit null deletes the key', async () => {
@@ -185,10 +218,26 @@ describe('PageElementsService media canonicalization (Prompt 21)', () => {
     expect(prisma.pageElement.delete).toHaveBeenCalledWith({
       where: { id: 'el-1' },
     });
-    expect(prisma.page.update).toHaveBeenCalledWith({
+    expect(prisma.page.updateMany).toHaveBeenCalledWith({
       where: { id: 'page-1' },
-      data: { isCustomized: true },
+      data: { isCustomized: true, updatedAt: expect.any(Date) },
     });
+  });
+
+  it('remove with a stale baseUpdatedAt deletes nothing and answers 409', async () => {
+    prisma.pageElement.findUnique.mockResolvedValue({
+      id: 'el-1',
+      pageId: 'page-1',
+    });
+    prisma.page.updateMany.mockResolvedValue({ count: 0 });
+    prisma.page.findUnique.mockResolvedValue({
+      updatedAt: new Date('2026-10-20T10:00:00Z'),
+    });
+
+    await expect(
+      service.remove('el-1', '2026-10-20T09:00:00.000Z'),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(prisma.pageElement.delete).not.toHaveBeenCalled();
   });
 
   describe('batchUpdate', () => {

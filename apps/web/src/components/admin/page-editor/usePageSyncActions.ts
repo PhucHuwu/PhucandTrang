@@ -31,6 +31,7 @@ export interface PageSyncActionsContext {
   writeDraft: Autosave['writeDraft'];
   overwriteConflict: Autosave['overwriteConflict'];
   limitKnownServerIds: Autosave['limitKnownServerIds'];
+  adoptDraftBase: Autosave['adoptDraftBase'];
 }
 
 /**
@@ -59,6 +60,7 @@ export function usePageSyncActions({
   writeDraft,
   overwriteConflict,
   limitKnownServerIds,
+  adoptDraftBase,
 }: PageSyncActionsContext) {
   /** In-app navigation away from this page: persist first so nothing is lost or written elsewhere. */
   const navigateAway = useCallback(
@@ -117,6 +119,9 @@ export function usePageSyncActions({
     const draftIds = new Set((draft.page.elements || []).map((el) => el.id));
     // Elements added on the server after the draft was written are left alone
     limitKnownServerIds(serverIds.filter((id) => draftIds.has(id)));
+    // Save against the version the draft was edited from: if the server moved on since, the
+    // save raises the conflict prompt instead of silently overwriting those changes
+    adoptDraftBase(draft.baseUpdatedAt);
     const current = pageRef.current;
     const restored: Page = { ...draft.page, ...(current ? { updatedAt: (current as any).updatedAt } : {}) } as Page;
     setPage(restored);

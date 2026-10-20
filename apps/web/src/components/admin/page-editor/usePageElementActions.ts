@@ -6,6 +6,7 @@ import {
   createAdminElement,
   deleteAdminElement,
   duplicateAdminElement,
+  isPageConflictError,
 } from '@/services/adminApi';
 import { Page, PageElement, PageElementType } from '@/types/book';
 import {
@@ -51,6 +52,11 @@ export function usePageElementActions({
 }: PageElementActionsContext) {
   const mutationErrorMessage = (err: any, fallback: string) =>
     err?.name === 'PageConflictPendingError' ? err.message : err?.message || fallback;
+  // A fresh conflict opens the conflict dialog (reload / overwrite); no extra alert on top of it
+  const reportMutationError = (err: any, fallback: string) => {
+    if (isPageConflictError(err)) return;
+    alert(mutationErrorMessage(err, fallback));
+  };
 
   // Apply Layout Template
   const handleApplyLayoutTemplate = async (templateDef: LayoutPresetDefinition) => {
@@ -87,7 +93,7 @@ export function usePageElementActions({
 
       // Atomic Apply Layout (single transaction replaces elements & sets isCustomized=false).
       // All element ids change, so the undo stack would point at elements that no longer exist.
-      await runServerMutation(() => applyAdminLayout(pageId, templateDef.id, elementsToSave), {
+      await runServerMutation((base) => applyAdminLayout(pageId, templateDef.id, elementsToSave, base), {
         updatedAtFrom: (refreshed: any) => refreshed?.updatedAt,
         apply: (refreshed: Page) => {
           adoptServerPage(refreshed);
@@ -102,7 +108,7 @@ export function usePageElementActions({
         4000
       );
     } catch (err: any) {
-      alert(mutationErrorMessage(err, 'Lỗi áp dụng bố cục mới'));
+      reportMutationError(err, 'Lỗi áp dụng bố cục mới');
     } finally {
       setSaving(false);
     }
@@ -163,20 +169,24 @@ export function usePageElementActions({
     };
 
     try {
-      await runServerMutation(() => createAdminElement(newElementPayload), {
-        apply: (created: PageElement) => {
-          // Known on the server: undoing the add deletes it there on the next save
-          markElementOnServer(created.id);
-          updatePage(
-            (prev) => ({ ...prev, isCustomized: true, elements: [...prev.elements, created] }),
-            `Thêm phần tử ${type}`
-          );
-          setSelectedElementId(created.id);
-          return pageRef.current;
-        },
-      });
+      await runServerMutation(
+        (base) => createAdminElement({ ...newElementPayload, ...(base ? { baseUpdatedAt: base } : {}) }),
+        {
+          updatedAtFrom: (created: any) => created?.pageUpdatedAt,
+          apply: ({ pageUpdatedAt: _pageUpdatedAt, ...created }: PageElement & { pageUpdatedAt?: string }) => {
+            // Known on the server: undoing the add deletes it there on the next save
+            markElementOnServer(created.id);
+            updatePage(
+              (prev) => ({ ...prev, isCustomized: true, elements: [...prev.elements, created] }),
+              `Thêm phần tử ${type}`
+            );
+            setSelectedElementId(created.id);
+            return pageRef.current;
+          },
+        }
+      );
     } catch (err: any) {
-      alert(mutationErrorMessage(err, 'Lỗi thêm phần tử mới'));
+      reportMutationError(err, 'Lỗi thêm phần tử mới');
     }
   };
 
@@ -190,8 +200,9 @@ export function usePageElementActions({
       return;
     }
     try {
-      await runServerMutation(() => duplicateAdminElement(sourceId, 0.03, 0.03), {
-        apply: (dup: PageElement) => {
+      await runServerMutation((base) => duplicateAdminElement(sourceId, 0.03, 0.03, base), {
+        updatedAtFrom: (dup: any) => dup?.pageUpdatedAt,
+        apply: ({ pageUpdatedAt: _pageUpdatedAt, ...dup }: PageElement & { pageUpdatedAt?: string }) => {
           markElementOnServer(dup.id);
           updatePage(
             (prev) => ({ ...prev, isCustomized: true, elements: [...prev.elements, dup] }),
@@ -203,7 +214,7 @@ export function usePageElementActions({
       });
       showToast('Đã nhân bản phần tử!', 'success', 2500);
     } catch (err: any) {
-      alert(mutationErrorMessage(err, 'Lỗi nhân bản phần tử'));
+      reportMutationError(err, 'Lỗi nhân bản phần tử');
     }
   };
 
@@ -212,9 +223,9 @@ export function usePageElementActions({
     if (!confirm('Bạn có chắc chắn muốn xóa phần tử này khỏi trang?')) return;
     try {
       await runServerMutation(
-        async () => {
+        async (base) => {
           try {
-            return await deleteAdminElement(elementId);
+            return await deleteAdminElement(elementId, base);
           } catch (err: any) {
             // Never reached the server (e.g. added then undone/redone before saving): local removal is enough
             if (err?.status === 404) return null;
@@ -222,6 +233,8 @@ export function usePageElementActions({
           }
         },
         {
+          // A 404 changed nothing on the server, so the current token stays valid
+          updatedAtFrom: (deleted: any) => (deleted ? deleted.pageUpdatedAt : null),
           apply: () => {
             // Gone on the server: undoing the delete re-creates it through the save endpoint (type + slot)
             markElementDeleted(elementId);
@@ -239,7 +252,7 @@ export function usePageElementActions({
       );
       setSelectedElementId(null);
     } catch (err: any) {
-      alert(mutationErrorMessage(err, 'Lỗi xóa phần tử'));
+      reportMutationError(err, 'Lỗi xóa phần tử');
     }
   };
 

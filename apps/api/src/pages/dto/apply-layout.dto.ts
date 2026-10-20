@@ -12,6 +12,7 @@ import {
   Min,
   Max,
   ArrayMaxSize,
+  IsDateString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ElementType } from '@prisma/client';
@@ -74,4 +75,9 @@ export class ApplyLayoutDto {
   @ValidateNested({ each: true })
   @Type(() => ApplyLayoutItemDto)
   elements: ApplyLayoutItemDto[];
+
+  /** Optimistic concurrency: the page.updatedAt the client last saw (409 PAGE_CONFLICT on mismatch). */
+  @IsOptional()
+  @IsDateString()
+  baseUpdatedAt?: string;
 }

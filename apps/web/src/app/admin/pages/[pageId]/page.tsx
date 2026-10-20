@@ -16,7 +16,7 @@ import {
 import { useJournal } from '@/context/JournalContext';
 import { Page, PageElement } from '@/types/book';
 import { DESIGN_CANVAS_HEIGHT, DESIGN_CANVAS_WIDTH } from '@phucandtrang/shared';
-import { useAutosavePage, readPageDraft, clearPageDraft, PageDraft } from '@/hooks/useAutosavePage';
+import { useAutosavePage, readPageDraft, clearPageDraft, PageDraft, serializePageState } from '@/hooks/useAutosavePage';
 import { usePageHistory } from '@/hooks/usePageHistory';
 import { useUndoRedoShortcuts } from '@/hooks/useUndoRedoShortcuts';
 import { usePageTabPresence } from '@/hooks/usePageTabPresence';
@@ -148,6 +148,7 @@ function PageEditor({ pageId }: { pageId: string }) {
     markElementDeleted,
     writeDraft,
     limitKnownServerIds,
+    adoptDraftBase,
   } = useAutosavePage(page, {
     pageId,
     isViewer: false,
@@ -208,12 +209,12 @@ function PageEditor({ pageId }: { pageId: string }) {
 
         const draft = readPageDraft(pageId);
         if (draft) {
-          const serverUpdatedAt = Date.parse(pageData.updatedAt ?? '');
-          if (Number.isNaN(serverUpdatedAt) || draft.savedAt > serverUpdatedAt) {
-            setDraftOffer({ draft, serverIds: (pageData.elements || []).map((el: PageElement) => el.id) });
-          } else {
-            // The server already holds something newer than the draft
+          // Compare content, not clocks: the browser and server clocks may differ. Only a draft
+          // identical to the server copy is dropped; anything else is left for the user to decide.
+          if (serializePageState(draft.page) === serializePageState(pageData)) {
             clearPageDraft(pageId);
+          } else {
+            setDraftOffer({ draft, serverIds: (pageData.elements || []).map((el: PageElement) => el.id) });
           }
         }
 
@@ -334,6 +335,7 @@ function PageEditor({ pageId }: { pageId: string }) {
     writeDraft,
     overwriteConflict,
     limitKnownServerIds,
+    adoptDraftBase,
   });
 
   if (loading || !page) {

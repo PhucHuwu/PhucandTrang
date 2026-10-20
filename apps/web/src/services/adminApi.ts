@@ -281,11 +281,12 @@ export async function updateAdminElement(elementId: string, data: any, isPatch =
 export async function applyAdminLayout(
   pageId: string,
   layoutTemplateId: string,
-  elements: any[]
+  elements: any[],
+  baseUpdatedAt?: string | null
 ): Promise<any> {
   return adminFetch<any>(`pages/${pageId}/apply-layout`, {
     method: 'POST',
-    body: JSON.stringify({ layoutTemplateId, elements }),
+    body: JSON.stringify({ layoutTemplateId, elements, ...(baseUpdatedAt ? { baseUpdatedAt } : {}) }),
   });
 }
 
@@ -402,15 +403,21 @@ export async function saveAdminPage(
   };
 }
 
-export async function duplicateAdminElement(elementId: string, offsetX = 0.02, offsetY = 0.02): Promise<any> {
+export async function duplicateAdminElement(
+  elementId: string,
+  offsetX = 0.02,
+  offsetY = 0.02,
+  baseUpdatedAt?: string | null
+): Promise<any> {
   return adminFetch<any>(`page-elements/${elementId}/duplicate`, {
     method: 'POST',
-    body: JSON.stringify({ offsetX, offsetY }),
+    body: JSON.stringify({ offsetX, offsetY, ...(baseUpdatedAt ? { baseUpdatedAt } : {}) }),
   });
 }
 
-export async function deleteAdminElement(elementId: string): Promise<any> {
-  return adminFetch<any>(`page-elements/${elementId}`, {
+export async function deleteAdminElement(elementId: string, baseUpdatedAt?: string | null): Promise<any> {
+  const query = baseUpdatedAt ? `?baseUpdatedAt=${encodeURIComponent(baseUpdatedAt)}` : '';
+  return adminFetch<any>(`page-elements/${elementId}${query}`, {
     method: 'DELETE',
   });
 }

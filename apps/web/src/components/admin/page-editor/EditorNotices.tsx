@@ -48,7 +48,8 @@ export default function EditorNotices({
           <AlertTriangle className="w-4 h-4 shrink-0 text-sky-400" />
           <span className="flex-1 min-w-0">
             Có bản nháp chưa lưu trên trình duyệt này (
-            {new Date(draftOffer.draft.savedAt).toLocaleString('vi-VN')}), mới hơn bản trên máy chủ.
+            {new Date(draftOffer.draft.savedAt).toLocaleString('vi-VN')}), khác với bản trên máy chủ. Nếu trang đã
+            được sửa ở nơi khác sau đó, bạn sẽ được hỏi trước khi ghi đè.
           </span>
           <button
             type="button"

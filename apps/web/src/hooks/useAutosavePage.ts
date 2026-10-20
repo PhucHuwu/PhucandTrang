@@ -33,6 +33,9 @@ export interface PageDraft {
   savedAt: number;
 }
 
+// Never equal to a real page.updatedAt, so a save based on it always raises the conflict prompt.
+const UNKNOWN_DRAFT_BASE = '1970-01-01T00:00:00.000Z';
+
 // Browsers cap the total in-flight keepalive body size at 64KB.
 const KEEPALIVE_MAX_BYTES = 60 * 1024;
 
@@ -309,15 +312,18 @@ export function useAutosavePage(page: Page | null, options: UseAutosavePageOptio
         const localIds = new Set((targetPage.elements || []).map((el) => el.id));
         const toDelete = Array.from(knownServerIdsRef.current).filter((id) => !localIds.has(id));
         if (toDelete.length > 0) {
+          let tokenKnown = baseUpdatedAtRef.current !== null;
           for (const id of toDelete) {
             try {
-              await deleteAdminElement(id);
+              const deleted = await deleteAdminElement(id, baseUpdatedAtRef.current);
+              if (deleted?.pageUpdatedAt) baseUpdatedAtRef.current = deleted.pageUpdatedAt;
+              else tokenKnown = false;
             } catch (err) {
               if (!(err instanceof AdminApiError && err.status === 404)) throw err;
             }
             knownServerIdsRef.current.delete(id);
           }
-          await refreshBaseUpdatedAt();
+          if (!tokenKnown) await refreshBaseUpdatedAt();
           if (generation !== generationRef.current) return true;
         }
 
@@ -396,15 +402,17 @@ export function useAutosavePage(page: Page | null, options: UseAutosavePageOptio
    */
   const runServerMutation = useCallback(
     async <T,>(
-      op: () => Promise<T>,
+      /** Receives the concurrency token to send along, so the server rejects the change on a stale page. */
+      op: (baseUpdatedAt: string | null) => Promise<T>,
       opts: {
         /** Applies the result locally; the returned page becomes the latest state before any other save can run. */
         apply?: (result: T) => Page | null | void;
-        updatedAtFrom?: (result: T) => string | undefined;
+        /** New page.updatedAt from the response; null = the server page did not change. */
+        updatedAtFrom?: (result: T) => string | null | undefined;
       } = {}
     ): Promise<T> => {
       if (isViewer) {
-        const result = await op();
+        const result = await op(null);
         opts.apply?.(result);
         return result;
       }
@@ -423,7 +431,13 @@ export function useAutosavePage(page: Page | null, options: UseAutosavePageOptio
       const generation = generationRef.current;
       const preOpState = serializePageState(latestPageRef.current);
       const run = (async () => {
-        const result = await op();
+        let result: T;
+        try {
+          result = await op(baseUpdatedAtRef.current);
+        } catch (err) {
+          if (generation === generationRef.current && isPageConflictError(err)) enterConflict(err);
+          throw err;
+        }
         const fromResult = opts.updatedAtFrom?.(result);
         if (fromResult) baseUpdatedAtRef.current = fromResult;
         const editedDuringOp = serializePageState(latestPageRef.current) !== preOpState;
@@ -437,7 +451,8 @@ export function useAutosavePage(page: Page | null, options: UseAutosavePageOptio
             lastSavedStateRef.current = serializePageState(next);
           }
         }
-        if (!fromResult) await refreshBaseUpdatedAt();
+        // Older API without the token in the response: re-read it (best effort)
+        if (fromResult === undefined) await refreshBaseUpdatedAt();
         return result;
       })();
       inFlightSaveRef.current = run;
@@ -447,7 +462,7 @@ export function useAutosavePage(page: Page | null, options: UseAutosavePageOptio
         if (inFlightSaveRef.current === run) inFlightSaveRef.current = null;
       }
     },
-    [isViewer, saveLatest, refreshBaseUpdatedAt]
+    [isViewer, saveLatest, refreshBaseUpdatedAt, enterConflict]
   );
 
   const markElementOnServer = useCallback((id: string) => {
@@ -506,6 +521,15 @@ export function useAutosavePage(page: Page | null, options: UseAutosavePageOptio
   const limitKnownServerIds = useCallback((ids: string[]) => {
     const keep = new Set(ids);
     knownServerIdsRef.current = new Set(Array.from(knownServerIdsRef.current).filter((id) => keep.has(id)));
+  }, []);
+
+  /**
+   * A restored draft is saved against the version it was edited from, so if the server changed
+   * since then the save raises the conflict prompt instead of silently overwriting. A draft without
+   * a known version always asks.
+   */
+  const adoptDraftBase = useCallback((draftBaseUpdatedAt: string | null) => {
+    baseUpdatedAtRef.current = draftBaseUpdatedAt ?? UNKNOWN_DRAFT_BASE;
   }, []);
 
   // Session expiry: keep the unsaved edits locally before adminFetch redirects to the login page
@@ -626,5 +650,6 @@ export function useAutosavePage(page: Page | null, options: UseAutosavePageOptio
     isDirty,
     writeDraft,
     limitKnownServerIds,
+    adoptDraftBase,
   };
 }
