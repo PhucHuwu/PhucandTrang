@@ -13,6 +13,8 @@ async function fitAndSave(page: Page, rotation: number) {
   const entry = { id: 'page-test', bookId: 'journal-test', pageNumber: 1, order: 1, side: 'right', title: 'Trang thử', elements: [image], background: { type: 'color', color: '#fff' } };
   const journal = { id: 'journal-test', title: 'Nhật ký', pages: [entry], settings: {}, cover: { front: { elements: [] } } };
   const saved: string[] = [];
+  // Passes the middleware's session-cookie UX guard; every API call is mocked below
+  await page.context().addCookies([{ name: 'admin_access_token', value: 'test', url: test.info().project.use.baseURL! }]);
   await page.route('**/fit-test.png', (route) => route.fulfill({ contentType: 'image/png', body: png }));
   await page.route('**/api/admin/**', async (route) => {
     const req = route.request();
