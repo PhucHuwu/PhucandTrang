@@ -17,25 +17,25 @@
     "clsx": "^2.1.1",
     "gsap": "^3.12.7",
     "konva": "^9.3.18",
-    "lucide-react": "^1.16.0",
-    "next": "^15.2.1",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-konva": "19.0.3",
+    "lucide-react": "^1.59.0",
+    "next": "^15.5.28",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-konva": "19.3.2",
     "tailwind-merge": "^3.0.2",
-    "three": "^0.186.0"
+    "three": "^0.186.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.64.0",
+    "@playwright/test": "^1.64.1",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^22.13.10",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
-    "autoprefixer": "^10.4.21",
+    "autoprefixer": "^10.6.1",
     "eslint": "^8.57.1",
-    "eslint-config-next": "^15.5.25",
-    "postcss": "^8.5.3",
+    "eslint-config-next": "^15.5.28",
+    "postcss": "^8.5.30",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.8.2"
+    "typescript": "^5.9.3"
   }
 }
