@@ -28,6 +28,9 @@ import { syncLegacyMediaMap } from './media-legacy-sync';
 
 export type { MediaReferenceItem };
 
+/** Files the web app links to directly (e.g. the og:image in apps/web/src/app/layout.tsx). */
+const PROTECTED_PUBLIC_IDS = new Set(['phuc_trang_memories/21-08-2026_3']);
+
 export const ALLOWED_CLOUDINARY_FOLDERS = new Set([
   'phuc_trang_memories',
   'phuc_trang_backgrounds',
@@ -307,8 +310,13 @@ export class MediaService {
     await this.prisma.media.delete({ where: { id } });
 
     // The DB row goes first: a failed Cloudinary call only leaves an orphaned file behind,
-    // never a record pointing at a deleted file.
-    const warning = await this.destroyRemoteAsset(media);
+    // never a record pointing at a deleted file. A forced delete of an in-use item, or a file
+    // still used by the published site, a saved version or the site's share image, keeps the file.
+    const keepReason =
+      isInUse && force
+        ? 'Tệp vẫn được giữ trên Cloudinary vì đang được dùng ở trang nháp.'
+        : await this.findProtectedUse(media);
+    const warning = keepReason ?? (await this.destroyRemoteAsset(media));
 
     return {
       success: true,
@@ -317,6 +325,36 @@ export class MediaService {
       forceDeleted: isInUse && force,
       ...(warning ? { warning } : {}),
     };
+  }
+
+  /**
+   * The draft scan only covers live CMS rows. The public site serves the published snapshot,
+   * rollbacks restore version snapshots, and the share image is hard-coded in the web app.
+   */
+  private async findProtectedUse(media: any): Promise<string | undefined> {
+    const publicId: string | undefined = media.publicId;
+    if (publicId && PROTECTED_PUBLIC_IDS.has(publicId)) {
+      return 'Tệp vẫn được giữ trên Cloudinary vì đang là ảnh chia sẻ (OG) của trang.';
+    }
+
+    const needles = [media.url, publicId].filter(
+      (value): value is string => typeof value === 'string' && value.length > 0,
+    );
+    for (const needle of needles) {
+      const pattern = `%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+      const [hit] = await this.prisma.$queryRaw<{ source: string }[]>`
+        SELECT 'published' AS source FROM books WHERE published_snapshot::text LIKE ${pattern}
+        UNION ALL
+        SELECT 'version' AS source FROM book_versions WHERE snapshot::text LIKE ${pattern}
+        LIMIT 1`;
+      if (hit?.source === 'published') {
+        return 'Tệp vẫn được giữ trên Cloudinary vì bản đã xuất bản đang dùng. Hãy xuất bản lại rồi xóa sau.';
+      }
+      if (hit) {
+        return 'Tệp vẫn được giữ trên Cloudinary vì một phiên bản đã lưu đang dùng.';
+      }
+    }
+    return undefined;
   }
 
   /** Removes the file from Cloudinary. Returns a warning message instead of throwing on failure. */

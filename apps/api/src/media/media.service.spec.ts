@@ -53,6 +53,7 @@ describe('MediaService', () => {
       audioTrack: {
         findMany: jest.fn(),
       },
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -360,11 +361,62 @@ describe('MediaService', () => {
       );
     });
 
+    it('keeps the Cloudinary file when a draft still uses it (forced delete)', async () => {
+      mockUnused(baseMedia);
+      prisma.pageElement.findMany.mockResolvedValue([
+        {
+          id: 'elem-1',
+          type: 'IMAGE',
+          slot: 'primaryImage',
+          pageId: 'page-1',
+          zIndex: 10,
+          data: { src: baseMedia.url, mediaId: baseMedia.id },
+          page: {
+            pageNumber: 1,
+            bookId: 'book-1',
+            book: { title: 'Chúng Mình' },
+          },
+        },
+      ]);
+      const result = await service.remove('media-1', true);
+      expect(result.success).toBe(true);
+      expect(prisma.media.delete).toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect((result as any).warning).toContain('giữ trên Cloudinary');
+    });
+
+    it('keeps the Cloudinary file when the published site still uses it', async () => {
+      mockUnused(baseMedia);
+      prisma.$queryRaw.mockResolvedValue([{ source: 'published' }]);
+      const result = await service.remove('media-1', false);
+      expect(prisma.media.delete).toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect((result as any).warning).toContain('xuất bản');
+    });
+
+    it('keeps the Cloudinary file when a saved version still uses it', async () => {
+      mockUnused(baseMedia);
+      prisma.$queryRaw.mockResolvedValue([{ source: 'version' }]);
+      const result = await service.remove('media-1', false);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect((result as any).warning).toContain('phiên bản');
+    });
+
+    it('never destroys the share (OG) image', async () => {
+      mockUnused({
+        ...baseMedia,
+        publicId: 'phuc_trang_memories/21-08-2026_3',
+      });
+      const result = await service.remove('media-1', false);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect((result as any).warning).toContain('OG');
+    });
+
     it('still deletes the DB row and returns a warning when Cloudinary fails', async () => {
       mockUnused(baseMedia);
       fetchMock.mockRejectedValue(new Error('network down'));
 
-      const result = await service.remove('media-1', true);
+      const result = await service.remove('media-1', false);
       expect(result.success).toBe(true);
       expect(prisma.media.delete).toHaveBeenCalledWith({
         where: { id: 'media-1' },

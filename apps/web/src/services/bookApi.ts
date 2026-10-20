@@ -1,5 +1,5 @@
 import { Book } from '@/types/book';
-import { DEFAULT_BOOK_SETTINGS } from '@/data/defaultBookSettings';
+import { withBookSettingsDefaults } from '@phucandtrang/shared';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -54,13 +54,10 @@ function mapApiBook(data: any): Book {
   // Audio contract: preserve null if API returned null (do not overwrite with fallback)
   const resolvedAudio = data.audio !== undefined ? data.audio : null;
 
-  const settings =
-    data.settings && typeof data.settings === 'object'
-      ? {
-          ...data.settings,
-          dimensions: { ...DEFAULT_BOOK_SETTINGS.dimensions, ...(data.settings.dimensions || {}) },
-        }
-      : DEFAULT_BOOK_SETTINGS;
+  // Deep merge: a stored settings object missing a whole section (theme, typography...) must not crash the viewer
+  const settings = withBookSettingsDefaults(
+    data.settings && typeof data.settings === 'object' ? data.settings : null
+  ) as Book['settings'];
 
   return {
     id: data.id,

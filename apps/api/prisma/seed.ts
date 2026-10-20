@@ -50,15 +50,15 @@ async function main() {
 
   const forceCanonicalReset = process.env.SEED_FORCE_CANONICAL_BOOK === 'true';
 
-  // Force mode deletes every page of the live journal; never allow it by accident in production.
+  // Force mode deletes every page of the journal. A dev machine's .env often points at the live
+  // database, so NODE_ENV says nothing about the target: always require explicit confirmation.
   if (
     forceCanonicalReset &&
-    isProduction &&
     process.env.SEED_CONFIRM_DESTRUCTIVE !== 'yes-wipe-pages'
   ) {
     throw new Error(
-      'FATAL: SEED_FORCE_CANONICAL_BOOK=true wipes all CMS pages. In production you must also set ' +
-        'SEED_CONFIRM_DESTRUCTIVE=yes-wipe-pages to confirm.',
+      'FATAL: SEED_FORCE_CANONICAL_BOOK=true wipes all CMS pages of the database in DATABASE_URL. ' +
+        'Also set SEED_CONFIRM_DESTRUCTIVE=yes-wipe-pages to confirm.',
     );
   }
 

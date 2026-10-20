@@ -170,7 +170,7 @@ export default function QbjectAuthenticExperience({
           coverThickness: book.settings.dimensions.coverThickness,
           coverMarginX: book.settings.dimensions.coverMarginX,
           coverMarginY: book.settings.dimensions.coverMarginY,
-          pageEdgeColor: book.settings.theme.edgeColor,
+          pageEdgeColor: book.settings.theme?.edgeColor,
           pageActiveAreas,
           settings: {
             cameraFov: book.settings.camera?.fov || 14,
