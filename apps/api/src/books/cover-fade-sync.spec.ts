@@ -35,6 +35,7 @@ describe('Cover Settings & Fade Effects Sync Test', () => {
     };
 
     publicService = {
+      loadPlaylistTracks: jest.fn().mockResolvedValue(new Map()),
       collectAndResolveMedia: jest.fn().mockResolvedValue(new Map()),
       compileBookDocument: jest.fn(),
     };

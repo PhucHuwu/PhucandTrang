@@ -317,10 +317,15 @@ export class BooksService {
 
     if (!book) throw new NotFoundException(`Không tìm thấy sách với ID: ${id}`);
 
-    const mediaMap = await this.publicService.collectAndResolveMedia(book);
+    const liveTracks = await this.publicService.loadPlaylistTracks(book);
+    const mediaMap = await this.publicService.collectAndResolveMedia(
+      book,
+      liveTracks,
+    );
     const compiledDraft = this.publicService.compileBookDocument(
       book,
       mediaMap,
+      liveTracks,
     );
 
     return {
@@ -418,10 +423,15 @@ export class BooksService {
         const readRevision = book.publishedRevision || 0;
         const nextPublishedRevision = readRevision + 1;
         const versionTag = `v2.${nextPublishedRevision}`;
-        const mediaMap = await this.publicService.collectAndResolveMedia(book);
+        const liveTracks = await this.publicService.loadPlaylistTracks(book);
+        const mediaMap = await this.publicService.collectAndResolveMedia(
+          book,
+          liveTracks,
+        );
         const compiledDocument = this.publicService.compileBookDocument(
           book,
           mediaMap,
+          liveTracks,
         );
 
         // Embed current publication revision into snapshot document

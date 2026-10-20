@@ -48,6 +48,7 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
     };
 
     publicService = {
+      loadPlaylistTracks: jest.fn().mockResolvedValue(new Map()),
       collectAndResolveMedia: jest.fn().mockResolvedValue(new Map()),
       compileBookDocument: jest.fn().mockImplementation((book) => ({
         id: book.id,
@@ -158,6 +159,7 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
     expect(preview.document.id).toBe('book-1');
     expect(publicService.collectAndResolveMedia).toHaveBeenCalledWith(
       mockExistingBook,
+      expect.any(Map),
     );
     expect(publicService.compileBookDocument).toHaveBeenCalled();
   });

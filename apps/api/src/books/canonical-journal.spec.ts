@@ -28,6 +28,7 @@ describe('BooksService Canonical Single Love Journal (Prompt 40.2 Architecture)'
     };
 
     publicService = {
+      loadPlaylistTracks: jest.fn().mockResolvedValue(new Map()),
       collectAndResolveMedia: jest.fn(),
       compileBookDocument: jest.fn(),
     };

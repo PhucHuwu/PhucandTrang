@@ -13,6 +13,15 @@ import {
 } from './public-cache.service';
 import { derivePageSide } from '../utils/page-utils';
 
+/** Ordered ids of the book playlist, read from the stored track copies. */
+export function playlistTrackIds(book: any): string[] {
+  const tracks = (book?.settings as any)?.playlistTracks;
+  if (!Array.isArray(tracks)) return [];
+  return tracks
+    .map((t: any) => t?.id)
+    .filter((id: unknown): id is string => typeof id === 'string');
+}
+
 @Injectable()
 export class PublicService {
   constructor(
@@ -74,7 +83,10 @@ export class PublicService {
    * Scans all mediaIds referenced in covers, cover elements, backgrounds, elements, and audio,
    * then fetches them in one batch to resolve canonical runtime URLs.
    */
-  async collectAndResolveMedia(book: any): Promise<Map<string, any>> {
+  async collectAndResolveMedia(
+    book: any,
+    liveTracks?: Map<string, any>,
+  ): Promise<Map<string, any>> {
     const mediaIdSet = new Set<string>();
 
     // 1. Cover background & cover elements mediaIds
@@ -110,6 +122,9 @@ export class PublicService {
       for (const track of settings.playlistTracks) {
         if (track.mediaId) mediaIdSet.add(track.mediaId);
       }
+    }
+    for (const track of liveTracks?.values() || []) {
+      if (track.mediaId) mediaIdSet.add(track.mediaId);
     }
 
     // 3. Pages & Elements
@@ -216,9 +231,24 @@ export class PublicService {
    * Compiles raw database entities into a pristine, lean client document.
    * Resolves canonical URLs, strips sensitive fields, and computes deterministic page side sequencing.
    */
+  /**
+   * Loads the current library rows for the tracks in the book playlist. settings.playlistTracks
+   * holds copies taken when the settings were saved, so edits made later in the audio library
+   * (artist, volume, fades...) only reach the compiled document through these rows.
+   */
+  async loadPlaylistTracks(book: any): Promise<Map<string, any>> {
+    const ids = playlistTrackIds(book);
+    if (ids.length === 0) return new Map();
+    const rows = await this.prisma.audioTrack.findMany({
+      where: { id: { in: ids } },
+    });
+    return new Map(rows.map((row: any) => [row.id, row]));
+  }
+
   compileBookDocument(
     book: any,
     mediaMap: Map<string, any>,
+    liveTracks?: Map<string, any>,
   ): CompiledBookDocument {
     const allUrls = new Set<string>();
     const images = new Set<string>();
@@ -266,7 +296,10 @@ export class PublicService {
       settings.playlistTracks.length > 0
     ) {
       compiledPlaylist = settings.playlistTracks
-        .map((track: any) => {
+        // With live rows available, tracks deleted from the library are dropped
+        .filter((stored: any) => !liveTracks || liveTracks.has(stored?.id))
+        .map((stored: any) => {
+          const track = { ...stored, ...(liveTracks?.get(stored.id) || {}) };
           const trackSrc =
             (track.mediaId && mediaMap.get(track.mediaId)?.url) || track.src;
           if (trackSrc) {

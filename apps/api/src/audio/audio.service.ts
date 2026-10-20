@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateAudioTrackDto } from './dto/create-audio-track.dto';
 import { UpdateAudioTrackDto } from './dto/update-audio-track.dto';
 import { PublicCacheService } from '../public/public-cache.service';
+import { playlistTrackIds } from '../public/public.service';
 
 @Injectable()
 export class AudioService {
@@ -40,8 +41,7 @@ export class AudioService {
   async touchAffectedBooks(audioTrackId: string): Promise<void> {
     try {
       const books = await this.prisma.book.findMany({
-        where: { backgroundMusicId: audioTrackId },
-        select: { id: true },
+        select: { id: true, backgroundMusicId: true, settings: true },
       });
       const pages = await this.prisma.page.findMany({
         where: { audioTrackId },
@@ -49,7 +49,13 @@ export class AudioService {
       });
 
       const bookIds = new Set<string>();
-      books.forEach((b) => bookIds.add(b.id));
+      books
+        .filter(
+          (b) =>
+            b.backgroundMusicId === audioTrackId ||
+            playlistTrackIds(b).includes(audioTrackId),
+        )
+        .forEach((b) => bookIds.add(b.id));
       pages.forEach((p) => bookIds.add(p.bookId));
 
       for (const bId of bookIds) {

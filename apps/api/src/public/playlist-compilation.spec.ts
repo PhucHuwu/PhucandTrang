@@ -69,4 +69,64 @@ describe('Global Music Playlist Compilation Contract Test', () => {
     expect(compiled.media.audio).toContain('https://cdn.example.com/song1.mp3');
     expect(compiled.media.audio).toContain('https://cdn.example.com/song2.mp3');
   });
+
+  it('uses current audio library values over the copies stored in settings', async () => {
+    const mockBook = {
+      id: 'book-1',
+      cover: { front: {}, back: {} },
+      pages: [],
+      settings: {
+        playlistTracks: [
+          {
+            id: 'track-1',
+            title: 'Song 1',
+            artist: 'Old artist',
+            src: 'https://cdn.example.com/song1.mp3',
+            volume: 0.8,
+            fadeIn: 2,
+          },
+          {
+            id: 'track-deleted',
+            title: 'Gone',
+            src: 'https://cdn.example.com/gone.mp3',
+          },
+        ],
+      },
+    };
+    prisma.audioTrack = {
+      findMany: jest.fn().mockResolvedValue([
+        {
+          id: 'track-1',
+          title: 'Song 1',
+          artist: null,
+          src: 'https://cdn.example.com/song1.mp3',
+          mediaId: null,
+          volume: 0.3,
+          fadeIn: 0,
+        },
+      ]),
+    };
+
+    const liveTracks = await publicService.loadPlaylistTracks(mockBook);
+    const mediaMap = await publicService.collectAndResolveMedia(
+      mockBook,
+      liveTracks,
+    );
+    const compiled = publicService.compileBookDocument(
+      mockBook,
+      mediaMap,
+      liveTracks,
+    );
+
+    expect(prisma.audioTrack.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ['track-1', 'track-deleted'] } },
+    });
+    expect(compiled.playlist).toHaveLength(1);
+    expect(compiled.playlist?.[0]).toMatchObject({
+      id: 'track-1',
+      artist: null,
+      volume: 0.3,
+      fadeIn: 0,
+    });
+  });
 });

@@ -155,7 +155,7 @@ export default function AdminAudioPage() {
               <span>Kho Âm Thanh & Nhạc Nền (Audio Library)</span>
             </h1>
             <p className="text-xs text-stone-400">
-              Quản lý các bài hát tình ca lãng mạn và nhạc nền chương
+              Quản lý các bài hát tình ca lãng mạn và nhạc nền chương. Thay đổi hiện trên trang công khai sau khi Xuất bản.
             </p>
           </div>
         </div>
