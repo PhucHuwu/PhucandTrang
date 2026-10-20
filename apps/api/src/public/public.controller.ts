@@ -1,10 +1,4 @@
-import {
-  Controller,
-  Get,
-  Req,
-  Res,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Get, Req, Res, HttpStatus } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { PublicService } from './public.service';
 import { Public } from '../auth/admin-access.guard';
@@ -18,7 +12,10 @@ const stripWeak = (tag: string) => (tag.startsWith('W/') ? tag.slice(2) : tag);
  * If-None-Match uses the weak comparison function: `W/"x"` matches `"x"`, the header may
  * carry a comma-separated list, and `*` matches any current representation.
  */
-export function ifNoneMatchMatches(header: string | string[] | undefined, etag: string): boolean {
+export function ifNoneMatchMatches(
+  header: string | string[] | undefined,
+  etag: string,
+): boolean {
   if (!header) return false;
   const raw = Array.isArray(header) ? header.join(',') : header;
   const target = stripWeak(etag.trim());

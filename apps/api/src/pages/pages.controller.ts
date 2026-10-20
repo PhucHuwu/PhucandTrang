@@ -36,11 +36,12 @@ export class PagesController {
   }
 
   @Post(':id/apply-layout')
-  async applyLayout(
-    @Param('id') id: string,
-    @Body() dto: ApplyLayoutDto,
-  ) {
-    return this.pagesService.applyLayout(id, dto.layoutTemplateId, dto.elements);
+  async applyLayout(@Param('id') id: string, @Body() dto: ApplyLayoutDto) {
+    return this.pagesService.applyLayout(
+      id,
+      dto.layoutTemplateId,
+      dto.elements,
+    );
   }
 
   /**
@@ -68,10 +69,7 @@ export class PagesController {
   }
 
   @Put('book/:bookId/reorder')
-  async reorder(
-    @Param('bookId') bookId: string,
-    @Body() dto: ReorderPagesDto,
-  ) {
+  async reorder(@Param('bookId') bookId: string, @Body() dto: ReorderPagesDto) {
     return this.pagesService.reorder(bookId, dto);
   }
 

@@ -24,7 +24,9 @@ describe('Safe Deep Merge Utility (Req 23)', () => {
 
   it('should strictly block prototype pollution keys', () => {
     const target = { name: 'Test' };
-    const malicious = JSON.parse('{"__proto__":{"polluted":true},"constructor":{"name":"evil"}}');
+    const malicious = JSON.parse(
+      '{"__proto__":{"polluted":true},"constructor":{"name":"evil"}}',
+    );
 
     const result = safeDeepMerge(target, malicious);
 
@@ -38,16 +40,32 @@ describe('Safe Deep Merge Utility (Req 23)', () => {
   });
 
   it('with nullDeletes, explicit null removes the key at any depth', () => {
-    const target = { color: '#000', shadow: { blur: 4, color: 'red' }, keep: true };
-    const result = safeDeepMerge(target as any, { color: null, shadow: { color: null }, extra: { x: 1, y: null } }, { nullDeletes: true });
+    const target = {
+      color: '#000',
+      shadow: { blur: 4, color: 'red' },
+      keep: true,
+    };
+    const result = safeDeepMerge(
+      target as any,
+      { color: null, shadow: { color: null }, extra: { x: 1, y: null } },
+      { nullDeletes: true },
+    );
 
-    expect(result).toEqual({ shadow: { blur: 4 }, keep: true, extra: { x: 1 } });
+    expect(result).toEqual({
+      shadow: { blur: 4 },
+      keep: true,
+      extra: { x: 1 },
+    });
     expect('color' in result).toBe(false);
   });
 
   it('with nullDeletes, still blocks prototype pollution keys', () => {
-    const malicious = JSON.parse('{"__proto__":{"polluted":true},"nested":{"constructor":null,"__proto__":{"x":1}}}');
-    const result = safeDeepMerge({ nested: { a: 1 } } as any, malicious, { nullDeletes: true });
+    const malicious = JSON.parse(
+      '{"__proto__":{"polluted":true},"nested":{"constructor":null,"__proto__":{"x":1}}}',
+    );
+    const result = safeDeepMerge({ nested: { a: 1 } } as any, malicious, {
+      nullDeletes: true,
+    });
 
     expect(result).toEqual({ nested: { a: 1 } });
     expect((Object.prototype as any).polluted).toBeUndefined();

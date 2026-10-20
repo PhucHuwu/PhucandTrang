@@ -29,7 +29,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const user = payload?.sub
       ? await this.prisma.user.findUnique({
           where: { id: payload.sub },
-          select: { id: true, email: true, name: true, role: true, passwordHash: true },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            passwordHash: true,
+          },
         })
       : null;
     if (!user) throw new UnauthorizedException();
@@ -37,13 +43,23 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // Tokens issued before `pwf` existed carry no fingerprint and are still accepted;
     // rotating JWT_SECRET retires them.
     if (payload.pwf !== undefined) {
-      const expected = Buffer.from(passwordFingerprint(user.passwordHash, this.secret));
+      const expected = Buffer.from(
+        passwordFingerprint(user.passwordHash, this.secret),
+      );
       const actual = Buffer.from(String(payload.pwf));
-      if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+      if (
+        actual.length !== expected.length ||
+        !timingSafeEqual(actual, expected)
+      ) {
         throw new UnauthorizedException();
       }
     }
 
-    return { id: user.id, email: user.email, name: user.name || 'Phúc & Trang Admin', role: user.role };
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name || 'Phúc & Trang Admin',
+      role: user.role,
+    };
   }
 }

@@ -44,14 +44,18 @@ describe('RolesGuard (Req 24 & 25)', () => {
   });
 
   it('should allow EDITOR user if EDITOR role is required', () => {
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([Role.ADMIN, Role.EDITOR]);
+    jest
+      .spyOn(reflector, 'getAllAndOverride')
+      .mockReturnValue([Role.ADMIN, Role.EDITOR]);
     const context = createMockContext({ role: Role.EDITOR });
 
     expect(guard.canActivate(context)).toBe(true);
   });
 
   it('should block VIEWER user from mutation requiring ADMIN or EDITOR', () => {
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([Role.ADMIN, Role.EDITOR]);
+    jest
+      .spyOn(reflector, 'getAllAndOverride')
+      .mockReturnValue([Role.ADMIN, Role.EDITOR]);
     const context = createMockContext({ role: Role.VIEWER });
 
     expect(() => guard.canActivate(context)).toThrow(ForbiddenException);

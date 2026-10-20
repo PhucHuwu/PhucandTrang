@@ -98,12 +98,19 @@ describe('TextVariableResolver (Prompt 13 - Dynamic Text Variables)', () => {
     });
 
     it('should support custom filters like uppercase and number formatting', () => {
-      const templateUpper = 'Tên: {{couple.he | uppercase}} & {{couple.she | uppercase}}';
-      const resultUpper = TextVariableResolver.resolve(templateUpper, mockContext);
+      const templateUpper =
+        'Tên: {{couple.he | uppercase}} & {{couple.she | uppercase}}';
+      const resultUpper = TextVariableResolver.resolve(
+        templateUpper,
+        mockContext,
+      );
       expect(resultUpper).toBe('Tên: PHÚC & TRANG');
 
       const templateNumber = 'Số ngày: {{daysTogether | number}}';
-      const resultNumber = TextVariableResolver.resolve(templateNumber, mockContext);
+      const resultNumber = TextVariableResolver.resolve(
+        templateNumber,
+        mockContext,
+      );
       expect(resultNumber).toMatch(/Số ngày: \d{1,3}(\.\d{3})*/);
     });
 

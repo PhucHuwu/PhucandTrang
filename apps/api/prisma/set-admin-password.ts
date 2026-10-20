@@ -21,13 +21,19 @@ const MIN_LENGTH = 8;
 async function main() {
   const newPassword = process.env.ADMIN_NEW_PASSWORD;
   if (!newPassword || newPassword.length < MIN_LENGTH) {
-    throw new Error(`ADMIN_NEW_PASSWORD must be set and at least ${MIN_LENGTH} characters long.`);
+    throw new Error(
+      `ADMIN_NEW_PASSWORD must be set and at least ${MIN_LENGTH} characters long.`,
+    );
   }
 
   const connectionString =
-    process.env.DATABASE_URL_UNPOOLED || process.env.DIRECT_URL || process.env.DATABASE_URL;
+    process.env.DATABASE_URL_UNPOOLED ||
+    process.env.DIRECT_URL ||
+    process.env.DATABASE_URL;
   if (!connectionString) {
-    throw new Error('DATABASE_URL (or DATABASE_URL_UNPOOLED / DIRECT_URL) is required.');
+    throw new Error(
+      'DATABASE_URL (or DATABASE_URL_UNPOOLED / DIRECT_URL) is required.',
+    );
   }
 
   // Verifies the server certificate; DB_SSL_INSECURE=true opts out (see src/prisma/pool-config.ts)
@@ -37,13 +43,20 @@ async function main() {
   try {
     // Same lookup as AuthService.validateUser, so the account updated is the one login checks
     const canonicalEmail =
-      process.env.ADMIN_EMAIL || process.env.SEED_ADMIN_EMAIL || 'admin@phucandtrang.love';
+      process.env.ADMIN_EMAIL ||
+      process.env.SEED_ADMIN_EMAIL ||
+      'admin@phucandtrang.love';
     const admin =
       (await prisma.user.findUnique({ where: { email: canonicalEmail } })) ||
-      (await prisma.user.findFirst({ where: { role: Role.ADMIN }, orderBy: { createdAt: 'desc' } }));
+      (await prisma.user.findFirst({
+        where: { role: Role.ADMIN },
+        orderBy: { createdAt: 'desc' },
+      }));
 
     if (!admin) {
-      throw new Error(`No admin account found (looked for ${canonicalEmail}, then any ADMIN).`);
+      throw new Error(
+        `No admin account found (looked for ${canonicalEmail}, then any ADMIN).`,
+      );
     }
 
     const adminCount = await prisma.user.count({ where: { role: Role.ADMIN } });
@@ -54,7 +67,10 @@ async function main() {
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    await prisma.user.update({ where: { id: admin.id }, data: { passwordHash } });
+    await prisma.user.update({
+      where: { id: admin.id },
+      data: { passwordHash },
+    });
 
     const stored = await prisma.user.findUnique({ where: { id: admin.id } });
     if (!stored || !(await bcrypt.compare(newPassword, stored.passwordHash))) {

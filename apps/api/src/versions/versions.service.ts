@@ -58,7 +58,12 @@ export class VersionsService {
     return version;
   }
 
-  async createSnapshot(bookId: string, versionTag: string, changelog?: string, userId?: string) {
+  async createSnapshot(
+    bookId: string,
+    versionTag: string,
+    changelog?: string,
+    userId?: string,
+  ) {
     const book = await this.prisma.book.findUnique({
       where: { id: bookId },
       include: {
@@ -115,7 +120,9 @@ export class VersionsService {
     const snapshot = version.snapshot as any;
 
     if (!snapshot || typeof snapshot !== 'object') {
-      throw new BadRequestException('Dữ liệu bản snapshot không hợp lệ hoặc bị rỗng.');
+      throw new BadRequestException(
+        'Dữ liệu bản snapshot không hợp lệ hoặc bị rỗng.',
+      );
     }
 
     // Defensive check: snapshot MUST have valid pages array to prevent loss of pages
@@ -125,7 +132,9 @@ export class VersionsService {
       );
     }
 
-    const currentBook = await this.prisma.book.findUnique({ where: { id: bookId } });
+    const currentBook = await this.prisma.book.findUnique({
+      where: { id: bookId },
+    });
     if (!currentBook) {
       throw new NotFoundException(`Không tìm thấy cuốn sách với ID: ${bookId}`);
     }
@@ -134,7 +143,8 @@ export class VersionsService {
     // foreign key would abort the whole transaction, so drop the ones that no longer exist.
     const snapshotTemplateIds = new Set<string>();
     const snapshotAudioIds = new Set<string>();
-    if (snapshot.backgroundMusicId) snapshotAudioIds.add(snapshot.backgroundMusicId);
+    if (snapshot.backgroundMusicId)
+      snapshotAudioIds.add(snapshot.backgroundMusicId);
     for (const page of snapshot.pages) {
       if (page.layoutTemplateId) snapshotTemplateIds.add(page.layoutTemplateId);
       if (page.audioTrackId) snapshotAudioIds.add(page.audioTrackId);
@@ -155,75 +165,88 @@ export class VersionsService {
     ]);
     const validTemplateIds = new Set(existingTemplates.map((t) => t.id));
     const validAudioIds = new Set(existingAudio.map((a) => a.id));
-    const keepTemplate = (id?: string | null) => (id && validTemplateIds.has(id) ? id : null);
-    const keepAudio = (id?: string | null) => (id && validAudioIds.has(id) ? id : null);
+    const keepTemplate = (id?: string | null) =>
+      id && validTemplateIds.has(id) ? id : null;
+    const keepAudio = (id?: string | null) =>
+      id && validAudioIds.has(id) ? id : null;
 
     // Atomic transaction restoring ONLY the draft state
-    await this.prisma.$transaction(async (tx) => {
-      // 1. Delete current draft pages (cascades to elements)
-      await tx.page.deleteMany({ where: { bookId } });
+    await this.prisma.$transaction(
+      async (tx) => {
+        // 1. Delete current draft pages (cascades to elements)
+        await tx.page.deleteMany({ where: { bookId } });
 
-      // 2. Restore book metadata to draft.
-      // Notice: we do NOT touch publishedSnapshot or publishedRevision!
-      const backgroundMusicId =
-        'backgroundMusicId' in snapshot ? keepAudio(snapshot.backgroundMusicId) : null;
+        // 2. Restore book metadata to draft.
+        // Notice: we do NOT touch publishedSnapshot or publishedRevision!
+        const backgroundMusicId =
+          'backgroundMusicId' in snapshot
+            ? keepAudio(snapshot.backgroundMusicId)
+            : null;
 
-      await tx.book.update({
-        where: { id: bookId },
-        data: {
-          title: snapshot.title,
-          // Json columns: cover/settings are required (fallback {}), never send a raw JS null
-          ...(snapshot.cover !== undefined ? { cover: requiredJson(snapshot.cover) } : {}),
-          ...(snapshot.settings !== undefined ? { settings: requiredJson(snapshot.settings) } : {}),
-          heName: snapshot.heName,
-          sheName: snapshot.sheName,
-          anniversaryDate: snapshot.anniversaryDate ? new Date(snapshot.anniversaryDate) : undefined,
-          proposalQuote: snapshot.proposalQuote,
-          backgroundMusicId,
-          contentRevision: { increment: 1 },
-        },
-      });
-
-      // 3. Re-create pages and elements from snapshot.
-      // Original IDs are reused so open editor sessions and links keep pointing at the same page.
-      for (const page of snapshot.pages) {
-        await tx.page.create({
+        await tx.book.update({
+          where: { id: bookId },
           data: {
-            ...(page.id ? { id: page.id } : {}),
-            bookId,
-            pageNumber: page.pageNumber,
-            side: page.side,
-            order: page.order,
-            chapter: page.chapter,
-            title: page.title,
-            quote: page.quote,
-            handwriting: page.handwriting,
-            layoutTemplateId: keepTemplate(page.layoutTemplateId),
-            sourceTemplateId: page.sourceTemplateId,
-            layoutMode: page.layoutMode,
-            isCustomized: page.isCustomized,
-            background: requiredJson(page.background),
-            audioTrackId: keepAudio(page.audioTrackId),
-            elements: {
-              create: (page.elements || []).map((el: any) => ({
-                ...(el.id ? { id: el.id } : {}),
-                type: el.type,
-                slot: el.slot,
-                order: el.order,
-                zIndex: el.zIndex,
-                visible: el.visible !== false,
-                locked: Boolean(el.locked),
-                opacity: el.opacity ?? 1.0,
-                transform: requiredJson(el.transform),
-                style: nullableJson(el.style ?? null),
-                data: requiredJson(el.data),
-                interaction: nullableJson(el.interaction ?? null),
-              })),
-            },
+            title: snapshot.title,
+            // Json columns: cover/settings are required (fallback {}), never send a raw JS null
+            ...(snapshot.cover !== undefined
+              ? { cover: requiredJson(snapshot.cover) }
+              : {}),
+            ...(snapshot.settings !== undefined
+              ? { settings: requiredJson(snapshot.settings) }
+              : {}),
+            heName: snapshot.heName,
+            sheName: snapshot.sheName,
+            anniversaryDate: snapshot.anniversaryDate
+              ? new Date(snapshot.anniversaryDate)
+              : undefined,
+            proposalQuote: snapshot.proposalQuote,
+            backgroundMusicId,
+            contentRevision: { increment: 1 },
           },
         });
-      }
-    }, { timeout: 30_000, maxWait: 10_000 });
+
+        // 3. Re-create pages and elements from snapshot.
+        // Original IDs are reused so open editor sessions and links keep pointing at the same page.
+        for (const page of snapshot.pages) {
+          await tx.page.create({
+            data: {
+              ...(page.id ? { id: page.id } : {}),
+              bookId,
+              pageNumber: page.pageNumber,
+              side: page.side,
+              order: page.order,
+              chapter: page.chapter,
+              title: page.title,
+              quote: page.quote,
+              handwriting: page.handwriting,
+              layoutTemplateId: keepTemplate(page.layoutTemplateId),
+              sourceTemplateId: page.sourceTemplateId,
+              layoutMode: page.layoutMode,
+              isCustomized: page.isCustomized,
+              background: requiredJson(page.background),
+              audioTrackId: keepAudio(page.audioTrackId),
+              elements: {
+                create: (page.elements || []).map((el: any) => ({
+                  ...(el.id ? { id: el.id } : {}),
+                  type: el.type,
+                  slot: el.slot,
+                  order: el.order,
+                  zIndex: el.zIndex,
+                  visible: el.visible !== false,
+                  locked: Boolean(el.locked),
+                  opacity: el.opacity ?? 1.0,
+                  transform: requiredJson(el.transform),
+                  style: nullableJson(el.style ?? null),
+                  data: requiredJson(el.data),
+                  interaction: nullableJson(el.interaction ?? null),
+                })),
+              },
+            },
+          });
+        }
+      },
+      { timeout: 30_000, maxWait: 10_000 },
+    );
 
     // Prompt 40.1 Fix: Use invalidateBookCache so contentRevision is incremented exactly once in transaction
     await this.cacheService.invalidateBookCache(bookId);

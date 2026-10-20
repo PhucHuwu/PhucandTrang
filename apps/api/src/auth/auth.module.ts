@@ -15,7 +15,10 @@ import { AdminAccessGuard } from './admin-access.guard';
       imports: [ConfigModule],
       useFactory: async (config: ConfigService) => ({
         secret: requireJwtSecret(config.get<string>('JWT_SECRET')),
-        signOptions: { expiresIn: config.get<string>('JWT_EXPIRATION') || '7d', algorithm: 'HS256' },
+        signOptions: {
+          expiresIn: config.get<string>('JWT_EXPIRATION') || '7d',
+          algorithm: 'HS256',
+        },
         verifyOptions: { algorithms: ['HS256'] },
       }),
       inject: [ConfigService],

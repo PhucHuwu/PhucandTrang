@@ -3,10 +3,9 @@
  * When a mediaId/posterMediaId exists, URLs are runtime-only and are resolved
  * from the Media table by the Admin/Public compilers.
  */
-export function canonicalizeMediaData<T extends Record<string, any> | null | undefined>(
-  type: string,
-  data: T,
-): T {
+export function canonicalizeMediaData<
+  T extends Record<string, any> | null | undefined,
+>(type: string, data: T): T {
   if (!data) return data;
   const canonical: Record<string, any> = { ...data };
 

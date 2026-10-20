@@ -5,7 +5,10 @@ import { Pool } from 'pg';
 import { buildPoolConfig } from './pool-config';
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService
+  extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy
+{
   private pool: Pool;
 
   constructor() {
@@ -51,7 +54,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     try {
       await this.$disconnect();
     } catch (err: any) {
-      console.warn('[PrismaService] Error disconnecting Prisma during shutdown:', err?.message || err);
+      console.warn(
+        '[PrismaService] Error disconnecting Prisma during shutdown:',
+        err?.message || err,
+      );
     }
 
     try {
@@ -59,7 +65,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         await this.pool.end();
       }
     } catch (err: any) {
-      console.warn('[PrismaService] Error closing PostgreSQL pool during shutdown:', err?.message || err);
+      console.warn(
+        '[PrismaService] Error closing PostgreSQL pool during shutdown:',
+        err?.message || err,
+      );
     }
   }
 }

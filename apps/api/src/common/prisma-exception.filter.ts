@@ -37,7 +37,9 @@ const FALLBACK_ERROR: MappedPrismaError = {
   message: 'Đã xảy ra lỗi khi xử lý dữ liệu. Vui lòng thử lại sau.',
 };
 
-export function mapPrismaError(exception: Prisma.PrismaClientKnownRequestError): MappedPrismaError {
+export function mapPrismaError(
+  exception: Prisma.PrismaClientKnownRequestError,
+): MappedPrismaError {
   return PRISMA_ERROR_MAP[exception.code] ?? FALLBACK_ERROR;
 }
 

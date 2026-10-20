@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PagesService } from './pages.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -15,9 +19,7 @@ describe('PagesService.savePage (POST /pages/:pageId/save)', () => {
   const savedPage = {
     id: 'p1',
     bookId: 'b1',
-    elements: [
-      { id: 'e1', type: 'IMAGE', zIndex: 1, data: { mediaId: 'm1' } },
-    ],
+    elements: [{ id: 'e1', type: 'IMAGE', zIndex: 1, data: { mediaId: 'm1' } }],
     layoutTemplate: null,
     audioTrack: null,
   };
@@ -25,9 +27,11 @@ describe('PagesService.savePage (POST /pages/:pageId/save)', () => {
   beforeEach(async () => {
     prisma = {
       page: {
-        findUnique: jest.fn().mockImplementation((args: any) =>
-          Promise.resolve(args.include ? savedPage : currentPage),
-        ),
+        findUnique: jest
+          .fn()
+          .mockImplementation((args: any) =>
+            Promise.resolve(args.include ? savedPage : currentPage),
+          ),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       pageElement: {
@@ -45,7 +49,11 @@ describe('PagesService.savePage (POST /pages/:pageId/save)', () => {
         update: jest.fn().mockResolvedValue({ contentRevision: 2 }),
       },
       media: {
-        findMany: jest.fn().mockResolvedValue([{ id: 'm1', url: 'https://cdn/x.jpg', alt: 'x' }]),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { id: 'm1', url: 'https://cdn/x.jpg', alt: 'x' },
+          ]),
       },
       $transaction: jest.fn(async (cb: any) => cb(prisma)),
     };
@@ -63,12 +71,17 @@ describe('PagesService.savePage (POST /pages/:pageId/save)', () => {
 
   it('404 when the page does not exist', async () => {
     prisma.page.findUnique.mockResolvedValue(null);
-    await expect(service.savePage('nope', {})).rejects.toThrow(NotFoundException);
+    await expect(service.savePage('nope', {})).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('409 PAGE_CONFLICT when baseUpdatedAt is stale, without writing anything', async () => {
     const err = await service
-      .savePage('p1', { baseUpdatedAt: '2026-10-20T09:00:00.000Z', page: { title: 'x' } })
+      .savePage('p1', {
+        baseUpdatedAt: '2026-10-20T09:00:00.000Z',
+        page: { title: 'x' },
+      })
       .catch((e) => e);
 
     expect(err).toBeInstanceOf(ConflictException);
@@ -94,7 +107,10 @@ describe('PagesService.savePage (POST /pages/:pageId/save)', () => {
   it('replaces page fields + background wholesale and always touches updatedAt', async () => {
     await service.savePage('p1', {
       baseUpdatedAt: BASE.toISOString(),
-      page: { title: 'Mới', background: { type: 'color', color: '#fff' } as any },
+      page: {
+        title: 'Mới',
+        background: { type: 'color', color: '#fff' } as any,
+      },
     });
 
     const data = prisma.page.updateMany.mock.calls[0][0].data;
@@ -115,7 +131,12 @@ describe('PagesService.savePage (POST /pages/:pageId/save)', () => {
 
   it('replaces style/data/interaction wholesale (null → DbNull), re-creates missing elements and skips foreign ones', async () => {
     prisma.pageElement.findMany.mockResolvedValue([
-      { id: 'e1', pageId: 'p1', type: 'IMAGE', transform: { x: 0, y: 0, width: 1, height: 1, rotation: 15 } },
+      {
+        id: 'e1',
+        pageId: 'p1',
+        type: 'IMAGE',
+        transform: { x: 0, y: 0, width: 1, height: 1, rotation: 15 },
+      },
       { id: 'foreign', pageId: 'other-page', type: 'TEXT' },
     ]);
 
@@ -130,7 +151,12 @@ describe('PagesService.savePage (POST /pages/:pageId/save)', () => {
           interaction: null,
         },
         { id: 'foreign', style: { color: 'red' } },
-        { id: 'restored', type: 'TEXT' as any, zIndex: 2, data: { text: 'hi' } },
+        {
+          id: 'restored',
+          type: 'TEXT' as any,
+          zIndex: 2,
+          data: { text: 'hi' },
+        },
         { id: 'unknown-no-type', style: {} },
       ],
     });
@@ -183,7 +209,9 @@ describe('PagesService.savePage (POST /pages/:pageId/save)', () => {
     );
     expect(cacheService.invalidateBookCache).toHaveBeenCalledWith('b1');
     expect(cacheService.touchBook).not.toHaveBeenCalled();
-    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), { timeout: 15000 });
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      timeout: 15000,
+    });
   });
 
   it('rejects duplicate element ids', async () => {
@@ -210,7 +238,10 @@ describe('PagesService transactional page operations', () => {
         delete: jest.fn(),
       },
       pageElement: { create: jest.fn(), deleteMany: jest.fn() },
-      layoutTemplate: { findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn() },
+      layoutTemplate: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        upsert: jest.fn(),
+      },
       book: { findUnique: jest.fn() },
       media: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(async (cb: any) => cb(prisma)),
@@ -232,7 +263,12 @@ describe('PagesService transactional page operations', () => {
     prisma.page.findUnique.mockResolvedValue(null);
 
     await expect(
-      service.create({ bookId: 'b1', pageNumber: 1, layoutTemplateId: 'ghost', background: {} } as any),
+      service.create({
+        bookId: 'b1',
+        pageNumber: 1,
+        layoutTemplateId: 'ghost',
+        background: {},
+      } as any),
     ).rejects.toThrow(BadRequestException);
     expect(prisma.page.create).not.toHaveBeenCalled();
   });
@@ -245,7 +281,12 @@ describe('PagesService transactional page operations', () => {
     prisma.page.findFirst.mockResolvedValue({ order: 4 });
     prisma.page.create.mockResolvedValue({ id: 'p-new' });
 
-    await service.create({ bookId: 'b1', pageNumber: 9, layoutTemplateId: 'single-hero', background: {} } as any);
+    await service.create({
+      bookId: 'b1',
+      pageNumber: 9,
+      layoutTemplateId: 'single-hero',
+      background: {},
+    } as any);
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(prisma.page.create.mock.calls[0][0].data.order).toBe(5);
@@ -254,19 +295,37 @@ describe('PagesService transactional page operations', () => {
   });
 
   it('update: unknown layoutTemplateId → 400', async () => {
-    prisma.page.findUnique.mockResolvedValue({ id: 'p1', bookId: 'b1', pageNumber: 1, layoutTemplateId: null, elements: [] });
-    await expect(service.update('p1', { layoutTemplateId: 'ghost' }, true)).rejects.toThrow(BadRequestException);
+    prisma.page.findUnique.mockResolvedValue({
+      id: 'p1',
+      bookId: 'b1',
+      pageNumber: 1,
+      layoutTemplateId: null,
+      elements: [],
+    });
+    await expect(
+      service.update('p1', { layoutTemplateId: 'ghost' }, true),
+    ).rejects.toThrow(BadRequestException);
     expect(prisma.page.update).not.toHaveBeenCalled();
   });
 
   it('applyLayout: unknown layoutTemplateId → 400 and existing elements are kept', async () => {
-    prisma.page.findUnique.mockResolvedValue({ id: 'p1', bookId: 'b1', elements: [] });
-    await expect(service.applyLayout('p1', 'ghost', [])).rejects.toThrow(BadRequestException);
+    prisma.page.findUnique.mockResolvedValue({
+      id: 'p1',
+      bookId: 'b1',
+      elements: [],
+    });
+    await expect(service.applyLayout('p1', 'ghost', [])).rejects.toThrow(
+      BadRequestException,
+    );
     expect(prisma.pageElement.deleteMany).not.toHaveBeenCalled();
   });
 
   it('applyLayout: interaction null/absent is stored as DbNull, never raw null', async () => {
-    prisma.page.findUnique.mockResolvedValue({ id: 'p1', bookId: 'b1', elements: [] });
+    prisma.page.findUnique.mockResolvedValue({
+      id: 'p1',
+      bookId: 'b1',
+      elements: [],
+    });
     prisma.layoutTemplate.findUnique.mockResolvedValue({ id: 'custom-1' });
     prisma.page.update.mockResolvedValue({ id: 'p1', elements: [] });
 
@@ -281,7 +340,11 @@ describe('PagesService transactional page operations', () => {
   });
 
   it('remove: delete + renumber happen in one transaction', async () => {
-    prisma.page.findUnique.mockResolvedValue({ id: 'p1', bookId: 'b1', elements: [] });
+    prisma.page.findUnique.mockResolvedValue({
+      id: 'p1',
+      bookId: 'b1',
+      elements: [],
+    });
     await service.remove('p1');
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(prisma.page.delete).toHaveBeenCalledWith({ where: { id: 'p1' } });
@@ -295,8 +358,20 @@ describe('PagesService transactional page operations', () => {
       order: 1,
       background: null,
       elements: [
-        { type: 'TEXT', transform: null, style: null, data: null, interaction: null },
-        { type: 'IMAGE', transform: { x: 1 }, style: { a: 1 }, data: { mediaId: 'm', src: 'runtime' }, interaction: { enabled: true } },
+        {
+          type: 'TEXT',
+          transform: null,
+          style: null,
+          data: null,
+          interaction: null,
+        },
+        {
+          type: 'IMAGE',
+          transform: { x: 1 },
+          style: { a: 1 },
+          data: { mediaId: 'm', src: 'runtime' },
+          interaction: { enabled: true },
+        },
       ],
     });
     prisma.page.findFirst.mockResolvedValue({ pageNumber: 10, order: 5 });

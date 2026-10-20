@@ -1,5 +1,7 @@
 type CorsCallback = (err: Error | null, allow?: boolean) => void;
-type CorsOrigin = (string | RegExp)[] | ((origin: string | undefined, callback: CorsCallback) => void);
+type CorsOrigin =
+  | (string | RegExp)[]
+  | ((origin: string | undefined, callback: CorsCallback) => void);
 
 export const DEFAULT_PRODUCTION_ORIGINS: (string | RegExp)[] = [
   'https://love.phuchuwu.io.vn',
@@ -14,13 +16,19 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 export function isLocalOrigin(origin: string): boolean {
   try {
     const url = new URL(origin);
-    return (url.protocol === 'http:' || url.protocol === 'https:') && LOCAL_HOSTS.has(url.hostname);
+    return (
+      (url.protocol === 'http:' || url.protocol === 'https:') &&
+      LOCAL_HOSTS.has(url.hostname)
+    );
   } catch {
     return false;
   }
 }
 
-export function buildCorsOrigin(isProduction: boolean, corsOriginsEnv?: string): CorsOrigin {
+export function buildCorsOrigin(
+  isProduction: boolean,
+  corsOriginsEnv?: string,
+): CorsOrigin {
   if (isProduction) {
     if (corsOriginsEnv) {
       return corsOriginsEnv

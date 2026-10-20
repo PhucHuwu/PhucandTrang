@@ -5,16 +5,19 @@ describe('Image & Background Fitting Calculation (Req 9 & 10)', () => {
     [4000, 2000, 240, 600],
     [2000, 4000, 600, 240],
     [3000, 3000, 420, 180],
-  ])('preserves the complete %sx%s image in a %sx%s layout slot by default', (srcW, srcH, boxW, boxH) => {
-    const fit = computeImageFit(srcW, srcH, boxW, boxH);
-    expect(fit.sw).toBe(srcW);
-    expect(fit.sh).toBe(srcH);
-    expect(fit.sx).toBe(0);
-    expect(fit.sy).toBe(0);
-    expect(fit.dw / fit.dh).toBeCloseTo(srcW / srcH);
-    expect(fit.dw).toBeLessThanOrEqual(boxW);
-    expect(fit.dh).toBeLessThanOrEqual(boxH);
-  });
+  ])(
+    'preserves the complete %sx%s image in a %sx%s layout slot by default',
+    (srcW, srcH, boxW, boxH) => {
+      const fit = computeImageFit(srcW, srcH, boxW, boxH);
+      expect(fit.sw).toBe(srcW);
+      expect(fit.sh).toBe(srcH);
+      expect(fit.sx).toBe(0);
+      expect(fit.sy).toBe(0);
+      expect(fit.dw / fit.dh).toBeCloseTo(srcW / srcH);
+      expect(fit.dw).toBeLessThanOrEqual(boxW);
+      expect(fit.dh).toBeLessThanOrEqual(boxH);
+    },
+  );
 
   it('should compute contain fit without cropping source', () => {
     // 400x200 source into 100x100 box
@@ -34,7 +37,10 @@ describe('Image & Background Fitting Calculation (Req 9 & 10)', () => {
   it('should compute cover fit with focalPoint cropping', () => {
     // 400x200 source (ratio 2.0) into 100x100 box (ratio 1.0)
     // Needs horizontal cropping: sw = 200 * 1.0 = 200. Excess width = 400 - 200 = 200.
-    const fitCenter = computeImageFit(400, 200, 100, 100, 'cover', { x: 0.5, y: 0.5 });
+    const fitCenter = computeImageFit(400, 200, 100, 100, 'cover', {
+      x: 0.5,
+      y: 0.5,
+    });
 
     expect(fitCenter.sw).toBe(200);
     expect(fitCenter.sh).toBe(200);
@@ -43,11 +49,17 @@ describe('Image & Background Fitting Calculation (Req 9 & 10)', () => {
     expect(fitCenter.dh).toBe(100);
 
     // Test custom focalPoint: x = 0 (left-aligned crop)
-    const fitLeft = computeImageFit(400, 200, 100, 100, 'cover', { x: 0.0, y: 0.5 });
+    const fitLeft = computeImageFit(400, 200, 100, 100, 'cover', {
+      x: 0.0,
+      y: 0.5,
+    });
     expect(fitLeft.sx).toBe(0);
 
     // Test custom focalPoint: x = 1.0 (right-aligned crop)
-    const fitRight = computeImageFit(400, 200, 100, 100, 'cover', { x: 1.0, y: 0.5 });
+    const fitRight = computeImageFit(400, 200, 100, 100, 'cover', {
+      x: 1.0,
+      y: 0.5,
+    });
     expect(fitRight.sx).toBe(200);
   });
 

@@ -1,7 +1,8 @@
 import { buildPoolConfig } from './pool-config';
 
 describe('buildPoolConfig', () => {
-  const neonUrl = 'postgresql://u:p@ep-x.neon.tech/db?sslmode=require&channel_binding=require';
+  const neonUrl =
+    'postgresql://u:p@ep-x.neon.tech/db?sslmode=require&channel_binding=require';
 
   it('verifies certificates by default when sslmode is set', () => {
     const config = buildPoolConfig(neonUrl, {});
@@ -17,7 +18,10 @@ describe('buildPoolConfig', () => {
   });
 
   it('leaves TLS off for local URLs without sslmode', () => {
-    expect(buildPoolConfig('postgresql://postgres:postgres@localhost:5432/db', {}).ssl).toBeUndefined();
+    expect(
+      buildPoolConfig('postgresql://postgres:postgres@localhost:5432/db', {})
+        .ssl,
+    ).toBeUndefined();
   });
 
   it('keeps the pool small for serverless', () => {
@@ -30,11 +34,15 @@ describe('buildPoolConfig', () => {
   it('resolves to a verifying TLS config inside node-postgres', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const ConnectionParameters = require('pg/lib/connection-parameters');
-    const warn = jest.spyOn(process, 'emitWarning').mockImplementation(() => undefined);
+    const warn = jest
+      .spyOn(process, 'emitWarning')
+      .mockImplementation(() => undefined);
     try {
       const secure = new ConnectionParameters(buildPoolConfig(neonUrl, {}));
       expect(secure.ssl.rejectUnauthorized).not.toBe(false);
-      const insecure = new ConnectionParameters(buildPoolConfig(neonUrl, { DB_SSL_INSECURE: 'true' }));
+      const insecure = new ConnectionParameters(
+        buildPoolConfig(neonUrl, { DB_SSL_INSECURE: 'true' }),
+      );
       expect(insecure.ssl.rejectUnauthorized).toBe(false);
     } finally {
       warn.mockRestore();

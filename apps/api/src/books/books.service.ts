@@ -17,7 +17,8 @@ import { isSafeInteractionValue } from '../common/dto/element-interaction.dto';
 /** https URL or a same-origin root-relative path (e.g. "/music/x.mp3"); never protocol-relative. */
 function isAllowedTrackSrc(src: unknown): boolean {
   if (typeof src !== 'string' || src.length === 0) return false;
-  if (src.startsWith('/') && !src.startsWith('//') && !src.startsWith('/\\')) return true;
+  if (src.startsWith('/') && !src.startsWith('//') && !src.startsWith('/\\'))
+    return true;
   try {
     return new URL(src).protocol === 'https:';
   } catch {
@@ -62,7 +63,9 @@ export class BooksService {
     });
 
     if (!journal) {
-      throw new NotFoundException('Không tìm thấy cuốn nhật ký tình yêu Phúc & Trang trong cơ sở dữ liệu.');
+      throw new NotFoundException(
+        'Không tìm thấy cuốn nhật ký tình yêu Phúc & Trang trong cơ sở dữ liệu.',
+      );
     }
 
     return journal;
@@ -98,7 +101,8 @@ export class BooksService {
         },
       },
     });
-    if (!book) throw new NotFoundException(`Không tìm thấy cuốn sách với ID: ${id}`);
+    if (!book)
+      throw new NotFoundException(`Không tìm thấy cuốn sách với ID: ${id}`);
     return book;
   }
 
@@ -118,7 +122,8 @@ export class BooksService {
         anniversaryDate: dto.anniversaryDate
           ? new Date(dto.anniversaryDate)
           : new Date('2022-10-20T00:00:00Z'),
-        proposalQuote: dto.proposalQuote || 'Thế cậu đồng ý làm bạn gái tớ không?',
+        proposalQuote:
+          dto.proposalQuote || 'Thế cậu đồng ý làm bạn gái tớ không?',
         cover: dto.cover,
         settings: dto.settings,
         backgroundMusicId,
@@ -142,10 +147,17 @@ export class BooksService {
     const tracks = dto.settings?.playlistTracks;
     if (tracks !== undefined) {
       if (!Array.isArray(tracks)) {
-        throw new BadRequestException('settings.playlistTracks phải là một mảng.');
+        throw new BadRequestException(
+          'settings.playlistTracks phải là một mảng.',
+        );
       }
       tracks.forEach((track: any, index: number) => {
-        if (track && typeof track === 'object' && track.src !== undefined && track.src !== null) {
+        if (
+          track &&
+          typeof track === 'object' &&
+          track.src !== undefined &&
+          track.src !== null
+        ) {
           if (!isAllowedTrackSrc(track.src)) {
             throw new BadRequestException(
               `settings.playlistTracks[${index}].src phải là URL https:// hợp lệ (hoặc đường dẫn nội bộ bắt đầu bằng "/").`,
@@ -166,7 +178,11 @@ export class BooksService {
       for (const [path, list] of groups) {
         if (!Array.isArray(list)) continue;
         list.forEach((el: any, index: number) => {
-          if (el && typeof el === 'object' && !isSafeInteractionValue(el.interaction)) {
+          if (
+            el &&
+            typeof el === 'object' &&
+            !isSafeInteractionValue(el.interaction)
+          ) {
             throw new BadRequestException(
               `${path}[${index}].interaction không hợp lệ: liên kết chỉ được dùng http:// hoặc https://.`,
             );
@@ -185,7 +201,8 @@ export class BooksService {
         where: { id },
         select: { id: true, cover: true, settings: true },
       });
-      if (!existingBook) throw new NotFoundException(`Không tìm thấy cuốn sách với ID: ${id}`);
+      if (!existingBook)
+        throw new NotFoundException(`Không tìm thấy cuốn sách với ID: ${id}`);
 
       const backgroundMusicUpdate: Record<string, any> = {};
       if ('backgroundMusicId' in dto) {
@@ -195,7 +212,9 @@ export class BooksService {
             select: { id: true },
           });
           if (!track) {
-            throw new BadRequestException(`Không tìm thấy bản nhạc nền với ID: ${dto.backgroundMusicId}`);
+            throw new BadRequestException(
+              `Không tìm thấy bản nhạc nền với ID: ${dto.backgroundMusicId}`,
+            );
           }
         }
         backgroundMusicUpdate.backgroundMusicId = dto.backgroundMusicId ?? null;
@@ -203,25 +222,33 @@ export class BooksService {
 
       // PATCH: each provided cover side replaces that side wholesale (element arrays must not be
       // deep-merged), while sides that were not sent are kept as they are.
-      const cover = isPatch && dto.cover
-        ? (dto.cover.front || dto.cover.back
+      const cover =
+        isPatch && dto.cover
+          ? dto.cover.front || dto.cover.back
             ? { ...((existingBook.cover as any) || {}), ...dto.cover }
-            : safeDeepMerge((existingBook.cover as any) || {}, dto.cover))
-        : dto.cover;
+            : safeDeepMerge((existingBook.cover as any) || {}, dto.cover)
+          : dto.cover;
 
-      const settings = isPatch && dto.settings
-        ? safeDeepMerge((existingBook.settings as any) || {}, dto.settings)
-        : dto.settings;
+      const settings =
+        isPatch && dto.settings
+          ? safeDeepMerge((existingBook.settings as any) || {}, dto.settings)
+          : dto.settings;
 
       return tx.book.update({
         where: { id },
         data: {
           ...(dto.title !== undefined ? { title: dto.title } : {}),
-          ...(dto.description !== undefined ? { description: dto.description } : {}),
+          ...(dto.description !== undefined
+            ? { description: dto.description }
+            : {}),
           ...(dto.heName !== undefined ? { heName: dto.heName } : {}),
           ...(dto.sheName !== undefined ? { sheName: dto.sheName } : {}),
-          ...(dto.anniversaryDate ? { anniversaryDate: new Date(dto.anniversaryDate) } : {}),
-          ...(dto.proposalQuote !== undefined ? { proposalQuote: dto.proposalQuote } : {}),
+          ...(dto.anniversaryDate
+            ? { anniversaryDate: new Date(dto.anniversaryDate) }
+            : {}),
+          ...(dto.proposalQuote !== undefined
+            ? { proposalQuote: dto.proposalQuote }
+            : {}),
           ...(cover !== undefined ? { cover } : {}),
           ...(settings !== undefined ? { settings } : {}),
           ...backgroundMusicUpdate,
@@ -291,7 +318,10 @@ export class BooksService {
     if (!book) throw new NotFoundException(`Không tìm thấy sách với ID: ${id}`);
 
     const mediaMap = await this.publicService.collectAndResolveMedia(book);
-    const compiledDraft = this.publicService.compileBookDocument(book, mediaMap);
+    const compiledDraft = this.publicService.compileBookDocument(
+      book,
+      mediaMap,
+    );
 
     return {
       isDraftPreview: true,
@@ -309,7 +339,8 @@ export class BooksService {
    */
   async publishBook(id: string, changelog?: string, userId?: string) {
     // PROMPT 34 CORE RULE: Run validation first. Cannot publish if blocking errors exist!
-    const validationReport = await this.publishValidationService.validateBookForPublish(id);
+    const validationReport =
+      await this.publishValidationService.validateBookForPublish(id);
 
     if (!validationReport.isValid) {
       const errorSummaries = validationReport.issues
@@ -318,7 +349,7 @@ export class BooksService {
         .join('\n');
 
       throw new BadRequestException(
-        `Không thể xuất bản cuốn sách do có ${validationReport.errorCount} lỗi nghiêm trọng cần khắc phục:\n${errorSummaries}`
+        `Không thể xuất bản cuốn sách do có ${validationReport.errorCount} lỗi nghiêm trọng cần khắc phục:\n${errorSummaries}`,
       );
     }
 
@@ -350,7 +381,11 @@ export class BooksService {
    * conditional update on the publishedRevision that was read, so two concurrent publishes
    * can never both write the same revision. Returns null when another publish won the race.
    */
-  private async tryPublishOnce(id: string, changelog?: string, userId?: string) {
+  private async tryPublishOnce(
+    id: string,
+    changelog?: string,
+    userId?: string,
+  ) {
     return this.prisma.$transaction(
       async (tx) => {
         // Hidden elements must be kept: this record doubles as the rollback source for BookVersion.
@@ -377,13 +412,17 @@ export class BooksService {
           },
         });
 
-        if (!book) throw new NotFoundException(`Không tìm thấy sách với ID: ${id}`);
+        if (!book)
+          throw new NotFoundException(`Không tìm thấy sách với ID: ${id}`);
 
         const readRevision = book.publishedRevision || 0;
         const nextPublishedRevision = readRevision + 1;
         const versionTag = `v2.${nextPublishedRevision}`;
         const mediaMap = await this.publicService.collectAndResolveMedia(book);
-        const compiledDocument = this.publicService.compileBookDocument(book, mediaMap);
+        const compiledDocument = this.publicService.compileBookDocument(
+          book,
+          mediaMap,
+        );
 
         // Embed current publication revision into snapshot document
         compiledDocument.contentRevision = nextPublishedRevision;
@@ -408,7 +447,9 @@ export class BooksService {
             bookId: id,
             version: versionTag,
             snapshot: book as any,
-            changelog: changelog || `Xuất bản bản phát hành revision #${nextPublishedRevision}`,
+            changelog:
+              changelog ||
+              `Xuất bản bản phát hành revision #${nextPublishedRevision}`,
             createdById: userId,
           },
         });

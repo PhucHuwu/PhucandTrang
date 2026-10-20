@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PublicService } from './public.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PublicCacheService } from './public-cache.service';
-import { BookStatus, PageSide, ElementType } from '@prisma/client';
+import { BookStatus } from '@prisma/client';
 import { NotFoundException } from '@nestjs/common';
 
 describe('PublicService (Req 15, 19, 20 & Prompt 23/40.1 Draft Isolation)', () => {
@@ -92,9 +92,7 @@ describe('PublicService (Req 15, 19, 20 & Prompt 23/40.1 Draft Isolation)', () =
 
     prisma.book.findFirst.mockResolvedValue(mockBookWithoutSnapshot);
 
-    await expect(service.getPublishedBook()).rejects.toThrow(
-      NotFoundException,
-    );
+    await expect(service.getPublishedBook()).rejects.toThrow(NotFoundException);
   });
 
   it('should respect audio null in publishedSnapshot without throwing error', async () => {
@@ -141,7 +139,9 @@ describe('PublicService (Req 15, 19, 20 & Prompt 23/40.1 Draft Isolation)', () =
     const first = await service.getPublishedBook();
 
     expect(prisma.book.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
+      expect.objectContaining({
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      }),
     );
     expect(first.etag).toBe(`"book-1-rev4-${base.publishedAt.getTime()}"`);
 

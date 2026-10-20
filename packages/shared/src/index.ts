@@ -1,4 +1,5 @@
 export * from './coordinateConversion';
+export * from './bookSettingsDefaults';
 export * from './cloudinaryCatalog';
 export * from './imageFitting';
 export * from './interactionContract';

@@ -1,4 +1,9 @@
-import { ExecutionContext, ForbiddenException, Injectable, SetMetadata } from '@nestjs/common';
+import {
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+  SetMetadata,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { Role } from '@prisma/client';
@@ -23,7 +28,8 @@ export class AdminAccessGuard extends AuthGuard('jwt') {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const targets = [context.getHandler(), context.getClass()];
-    if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, targets)) return true;
+    if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, targets))
+      return true;
 
     await super.canActivate(context);
 
@@ -31,14 +37,19 @@ export class AdminAccessGuard extends AuthGuard('jwt') {
     const role: Role | undefined = request.user?.role;
     if (role === Role.ADMIN) return true;
 
-    const required = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, targets);
+    const required = this.reflector.getAllAndOverride<Role[]>(
+      ROLES_KEY,
+      targets,
+    );
     const allowed = required?.length
       ? required
       : READ_METHODS.has(request.method)
         ? [Role.ADMIN, Role.EDITOR, Role.VIEWER]
         : [Role.ADMIN, Role.EDITOR];
     if (!role || !allowed.includes(role)) {
-      throw new ForbiddenException('Tài khoản của bạn không có quyền thực hiện thao tác này.');
+      throw new ForbiddenException(
+        'Tài khoản của bạn không có quyền thực hiện thao tác này.',
+      );
     }
     return true;
   }

@@ -6,7 +6,10 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { LayoutSlotDto, TemplateElementPrototypeDto } from './create-layout-template.dto';
+import {
+  LayoutSlotDto,
+  TemplateElementPrototypeDto,
+} from './create-layout-template.dto';
 
 export class UpdateLayoutTemplateDto {
   @IsString()

@@ -63,7 +63,10 @@ describe('Renderer & Editor Pure Functions & Regression Suite (Prompt 37)', () =
       expect(pageRect.width).toBeCloseTo(0.32); // 0.8 * 0.4
       expect(pageRect.height).toBeCloseTo(0.32); // 0.8 * 0.4
 
-      const reversedRelative = computeRelativeActiveArea(elementTransform, pageRect);
+      const reversedRelative = computeRelativeActiveArea(
+        elementTransform,
+        pageRect,
+      );
       expect(reversedRelative.left).toBeCloseTo(0.1);
       expect(reversedRelative.top).toBeCloseTo(0.1);
       expect(reversedRelative.width).toBeCloseTo(0.8);
@@ -73,7 +76,10 @@ describe('Renderer & Editor Pure Functions & Regression Suite (Prompt 37)', () =
 
   describe('3. Image Fitting Logic (Cover / Contain / FocalPoint)', () => {
     it('correctly calculates cover fit with center focal point', () => {
-      const fit = computeImageFit(800, 600, 400, 400, 'cover', { x: 0.5, y: 0.5 });
+      const fit = computeImageFit(800, 600, 400, 400, 'cover', {
+        x: 0.5,
+        y: 0.5,
+      });
       expect(fit.dw).toBe(400);
       expect(fit.dh).toBe(400);
       expect(fit.sw).toBeLessThan(800); // cropped horizontally
@@ -96,14 +102,18 @@ describe('Renderer & Editor Pure Functions & Regression Suite (Prompt 37)', () =
         daysTogether: 1438,
       };
 
-      const template = '{{couple.he}} & {{couple.she}} bên nhau {{daysTogether}} ngày từ {{anniversaryDate}}';
+      const template =
+        '{{couple.he}} & {{couple.she}} bên nhau {{daysTogether}} ngày từ {{anniversaryDate}}';
       const resolved = TextVariableResolver.resolve(template, context);
 
       expect(resolved).toBe('Phúc & Trang bên nhau 1438 ngày từ 20.10.2022');
     });
 
     it('gracefully handles missing keys without throwing error', () => {
-      const resolved = TextVariableResolver.resolve('Xin chào {{unknown.variable}}', {});
+      const resolved = TextVariableResolver.resolve(
+        'Xin chào {{unknown.variable}}',
+        {},
+      );
       expect(resolved).toBe('Xin chào {{unknown.variable}}');
     });
   });
@@ -130,7 +140,9 @@ describe('Renderer & Editor Pure Functions & Regression Suite (Prompt 37)', () =
         height: 100,
       };
 
-      const result = computeSnapping(boxNearCenterLine, [], 1024, 1360, { threshold: 8 });
+      const result = computeSnapping(boxNearCenterLine, [], 1024, 1360, {
+        threshold: 8,
+      });
 
       expect(result.x).toBe(512); // Snapped left edge to center line
       expect(result.y).toBe(680); // Snapped top edge to center line
@@ -167,9 +179,16 @@ describe('Renderer & Editor Pure Functions & Regression Suite (Prompt 37)', () =
         pageNumber: 0,
         showPageNumber: false,
         layout: 'custom',
-        background: { type: 'image', imageUrl: 'https://cdn.example.com/cover.jpg' },
+        background: {
+          type: 'image',
+          imageUrl: 'https://cdn.example.com/cover.jpg',
+        },
         elements: [
-          { type: 'TEXT', data: { text: 'Chúng Mình', variant: 'title' }, zIndex: 1 },
+          {
+            type: 'TEXT',
+            data: { text: 'Chúng Mình', variant: 'title' },
+            zIndex: 1,
+          },
         ],
       };
       expect(coverPage.showPageNumber).toBe(false);
@@ -178,7 +197,9 @@ describe('Renderer & Editor Pure Functions & Regression Suite (Prompt 37)', () =
 
     it('verifies Single Hero page preset structure', () => {
       const singleHero = LAYOUT_PRESETS['single-hero'];
-      expect(singleHero.slots.some((s) => s.name === 'primaryImage')).toBe(true);
+      expect(singleHero.slots.some((s) => s.name === 'primaryImage')).toBe(
+        true,
+      );
       expect(singleHero.elementPrototypes.length).toBeGreaterThan(0);
     });
 

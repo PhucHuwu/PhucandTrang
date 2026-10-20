@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
-import { MediaType, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { CreateMediaDto } from './dto/create-media.dto';
 import { UpdateMediaDto } from './dto/update-media.dto';
 import { QueryMediaDto } from './dto/query-media.dto';
@@ -20,24 +20,13 @@ import {
   getAllowedFormatsForType,
   getResourceTypeForMedia,
   destroyCloudinaryAsset,
-  isHttpsUrl,
   CloudinaryCredentials,
   CloudinarySignedConfig,
 } from './cloudinary.utils';
+import { MediaReferenceItem, scanMediaReferences } from './media-references';
+import { syncLegacyMediaMap } from './media-legacy-sync';
 
-export interface MediaReferenceItem {
-  targetType: 'BOOK_COVER' | 'PAGE_BACKGROUND' | 'PAGE_ELEMENT' | 'AUDIO_TRACK';
-  bookId?: string;
-  bookTitle?: string;
-  pageId?: string;
-  pageNumber?: number;
-  chapter?: string;
-  elementId?: string;
-  elementType?: string;
-  slot?: string;
-  field: string;
-  description: string;
-}
+export type { MediaReferenceItem };
 
 export const ALLOWED_CLOUDINARY_FOLDERS = new Set([
   'phuc_trang_memories',
@@ -75,7 +64,11 @@ export class MediaService {
     if (!credentials) {
       throw new InternalServerErrorException('Cloudinary chưa được cấu hình');
     }
-    const { cloudName: effectiveCloudName, apiKey: effectiveApiKey, apiSecret: effectiveSecret } = credentials;
+    const {
+      cloudName: effectiveCloudName,
+      apiKey: effectiveApiKey,
+      apiSecret: effectiveSecret,
+    } = credentials;
 
     const requestedFolder = dto.folder;
     if (requestedFolder && !ALLOWED_CLOUDINARY_FOLDERS.has(requestedFolder)) {
@@ -98,7 +91,10 @@ export class MediaService {
       allowed_formats: getAllowedFormatsForType(dto.type),
     };
 
-    const signature = generateCloudinarySignature(paramsToSign, effectiveSecret);
+    const signature = generateCloudinarySignature(
+      paramsToSign,
+      effectiveSecret,
+    );
     const uploadUrl = `https://api.cloudinary.com/v1_1/${effectiveCloudName}/${resourceType}/upload`;
 
     return {
@@ -187,7 +183,9 @@ export class MediaService {
       throw new BadRequestException('Query filenameOrUrl is required');
     }
 
-    let media = await this.prisma.media.findUnique({ where: { url: filenameOrUrl } });
+    let media = await this.prisma.media.findUnique({
+      where: { url: filenameOrUrl },
+    });
     if (media) return this.formatMedia(media);
 
     media = await this.prisma.media.findFirst({
@@ -209,7 +207,9 @@ export class MediaService {
    * Saves metadata after client uploads directly to Cloudinary.
    */
   async create(dto: CreateMediaDto) {
-    const existing = await this.prisma.media.findUnique({ where: { url: dto.url } });
+    const existing = await this.prisma.media.findUnique({
+      where: { url: dto.url },
+    });
     if (existing) {
       const updated = await this.prisma.media.update({
         where: { id: existing.id },
@@ -276,246 +276,7 @@ export class MediaService {
     isInUse: boolean;
   }> {
     const media = await this.findOne(mediaId);
-    const references: MediaReferenceItem[] = [];
-
-    const mediaUrl = media.url;
-    const mediaPublicId = media.publicId;
-
-    const matchesMedia = (testUrl?: string | null, testMediaId?: string | null): boolean => {
-      if (testMediaId && testMediaId === mediaId) return true;
-      if (!testUrl) return false;
-      if (testUrl === mediaUrl) return true;
-      if (mediaPublicId && testUrl.includes(mediaPublicId)) return true;
-      return false;
-    };
-
-    // 1. Scan Books (cover backgrounds, cover elements, background music, playlist)
-    const books = await this.prisma.book.findMany({
-      select: {
-        id: true,
-        title: true,
-        cover: true,
-        settings: true,
-        backgroundMusic: { select: { src: true, mediaId: true } },
-      },
-    });
-
-    for (const book of books) {
-      const cover = (book.cover as any) || {};
-
-      if (matchesMedia(cover.front?.backgroundUrl, cover.front?.mediaId)) {
-        references.push({
-          targetType: 'BOOK_COVER',
-          bookId: book.id,
-          bookTitle: book.title,
-          field: 'cover.front.backgroundUrl',
-          description: `Bìa trước sách "${book.title}" (Front Cover)`,
-        });
-      }
-
-      if (matchesMedia(cover.back?.insideBackgroundUrl, cover.back?.insideMediaId)) {
-        references.push({
-          targetType: 'BOOK_COVER',
-          bookId: book.id,
-          bookTitle: book.title,
-          field: 'cover.back.insideBackgroundUrl',
-          description: `Mặt trong bìa sau sách "${book.title}" (Inside Back Cover)`,
-        });
-      }
-
-      if (matchesMedia(cover.back?.outsideBackgroundUrl, cover.back?.outsideMediaId)) {
-        references.push({
-          targetType: 'BOOK_COVER',
-          bookId: book.id,
-          bookTitle: book.title,
-          field: 'cover.back.outsideBackgroundUrl',
-          description: `Mặt ngoài bìa sau sách "${book.title}" (Outside Back Cover)`,
-        });
-      }
-
-      // Scan cover elements (front, back, inside back) for both source media and video poster media
-      const coverElementGroups: { list: any; field: string; label: string }[] = [
-        { list: cover.front?.elements, field: 'cover.front.elements', label: 'bìa trước' },
-        { list: cover.back?.elements, field: 'cover.back.elements', label: 'bìa sau' },
-        { list: cover.back?.insideElements, field: 'cover.back.insideElements', label: 'mặt trong bìa sau' },
-      ];
-      for (const group of coverElementGroups) {
-        if (!Array.isArray(group.list)) continue;
-        for (const el of group.list) {
-          const d = el?.data || {};
-          const sourceMatched = matchesMedia(d.src || d.url, d.mediaId);
-          const posterMatched = matchesMedia(d.thumbnailUrl || d.posterUrl, d.posterMediaId);
-
-          if (sourceMatched) {
-            references.push({
-              targetType: 'BOOK_COVER',
-              bookId: book.id,
-              bookTitle: book.title,
-              elementId: el.id,
-              elementType: el.type,
-              field: `${group.field}.src`,
-              description: `Phần tử ${el.type} trên ${group.label} sách "${book.title}"`,
-            });
-          }
-
-          if (posterMatched && !sourceMatched) {
-            references.push({
-              targetType: 'BOOK_COVER',
-              bookId: book.id,
-              bookTitle: book.title,
-              elementId: el.id,
-              elementType: el.type,
-              field: `${group.field}.poster`,
-              description: `Poster video trên ${group.label} sách "${book.title}"`,
-            });
-          }
-        }
-      }
-
-      if (matchesMedia(book.backgroundMusic?.src, book.backgroundMusic?.mediaId)) {
-        references.push({
-          targetType: 'AUDIO_TRACK',
-          bookId: book.id,
-          bookTitle: book.title,
-          field: 'book.backgroundMusic',
-          description: `Nhạc nền chính của sách "${book.title}"`,
-        });
-      }
-
-      const settings = (book.settings as any) || {};
-      if (Array.isArray(settings.playlistTracks)) {
-        for (const track of settings.playlistTracks) {
-          if (track && matchesMedia(track.src, track.mediaId)) {
-            references.push({
-              targetType: 'AUDIO_TRACK',
-              bookId: book.id,
-              bookTitle: book.title,
-              field: 'settings.playlistTracks',
-              description: `Bản nhạc "${track.title || track.id || ''}" trong playlist của sách "${book.title}"`,
-            });
-          }
-        }
-      }
-    }
-
-    // 2. Scan Pages (background image & audio track)
-    const pages = await this.prisma.page.findMany({
-      select: {
-        id: true,
-        bookId: true,
-        pageNumber: true,
-        chapter: true,
-        title: true,
-        background: true,
-        book: { select: { id: true, title: true } },
-        audioTrack: { select: { src: true, mediaId: true } },
-      },
-    });
-
-    for (const page of pages) {
-      const bg = (page.background as any) || {};
-      if (matchesMedia(bg.imageUrl || bg.url, bg.mediaId)) {
-        references.push({
-          targetType: 'PAGE_BACKGROUND',
-          bookId: page.bookId,
-          bookTitle: page.book?.title,
-          pageId: page.id,
-          pageNumber: page.pageNumber,
-          chapter: page.chapter || undefined,
-          field: 'page.background.imageUrl',
-          description: `Hình nền trang số ${page.pageNumber} (${page.chapter || 'Không có chương'} - ${page.title || 'Không có tiêu đề'})`,
-        });
-      }
-
-      if (matchesMedia(page.audioTrack?.src, page.audioTrack?.mediaId)) {
-        references.push({
-          targetType: 'AUDIO_TRACK',
-          bookId: page.bookId,
-          bookTitle: page.book?.title,
-          pageId: page.id,
-          pageNumber: page.pageNumber,
-          field: 'page.audioTrack',
-          description: `Nhạc nền riêng của trang số ${page.pageNumber}`,
-        });
-      }
-    }
-
-    // 3. Scan Page Elements (src, url, mediaId, thumbnailUrl, posterUrl, posterMediaId)
-    const elements = await this.prisma.pageElement.findMany({
-      select: {
-        id: true,
-        type: true,
-        slot: true,
-        pageId: true,
-        data: true,
-        page: {
-          select: {
-            pageNumber: true,
-            bookId: true,
-            book: { select: { id: true, title: true } },
-          },
-        },
-      },
-    });
-
-    for (const elem of elements) {
-      const data = (elem.data as any) || {};
-
-      const srcMatched = matchesMedia(data.src || data.url, data.mediaId);
-      const posterMatched = matchesMedia(data.thumbnailUrl || data.posterUrl, data.posterMediaId);
-
-      if (srcMatched) {
-        references.push({
-          targetType: 'PAGE_ELEMENT',
-          bookId: elem.page?.bookId,
-          bookTitle: elem.page?.book?.title,
-          pageId: elem.pageId,
-          pageNumber: elem.page?.pageNumber,
-          elementId: elem.id,
-          elementType: elem.type,
-          slot: elem.slot || undefined,
-          field: 'data.src',
-          description: `Phần tử ${elem.type} (slot: ${elem.slot || 'tự do'}) tại trang ${elem.page?.pageNumber}`,
-        });
-      }
-
-      if (posterMatched && !srcMatched) {
-        references.push({
-          targetType: 'PAGE_ELEMENT',
-          bookId: elem.page?.bookId,
-          bookTitle: elem.page?.book?.title,
-          pageId: elem.pageId,
-          pageNumber: elem.page?.pageNumber,
-          elementId: elem.id,
-          elementType: elem.type,
-          slot: elem.slot || undefined,
-          field: 'data.thumbnailUrl',
-          description: `Ảnh poster video (slot: ${elem.slot || 'tự do'}) tại trang ${elem.page?.pageNumber}`,
-        });
-      }
-    }
-
-    // 4. Scan Audio Tracks table directly
-    const audioTracks = await this.prisma.audioTrack.findMany({
-      select: { id: true, title: true, src: true, mediaId: true },
-    });
-    for (const track of audioTracks) {
-      if (matchesMedia(track.src, track.mediaId)) {
-        const alreadyFound = references.some(
-          (r) =>
-            r.targetType === 'AUDIO_TRACK' &&
-            r.field !== 'settings.playlistTracks' &&
-            r.description.includes(track.title),
-        );
-        if (!alreadyFound) {
-          references.push({
-            targetType: 'AUDIO_TRACK',
-            field: 'src',
-            description: `Bản nhạc "${track.title}"`,
-          });
-        }
-      }
-    }
+    const references = await scanMediaReferences(this.prisma, mediaId, media);
 
     return {
       media,
@@ -561,24 +322,37 @@ export class MediaService {
   /** Removes the file from Cloudinary. Returns a warning message instead of throwing on failure. */
   private async destroyRemoteAsset(media: any): Promise<string | undefined> {
     const publicId: string | undefined = media.publicId;
-    if (!publicId || (media.provider && media.provider !== 'CLOUDINARY')) return undefined;
+    if (!publicId || (media.provider && media.provider !== 'CLOUDINARY'))
+      return undefined;
 
     const credentials = this.getCloudinaryCredentials();
     if (!credentials) {
-      this.logger.warn(`Skipped Cloudinary delete for ${publicId}: Cloudinary is not configured`);
+      this.logger.warn(
+        `Skipped Cloudinary delete for ${publicId}: Cloudinary is not configured`,
+      );
       return 'Cloudinary chưa được cấu hình nên tệp trên Cloudinary chưa được xóa.';
     }
 
     // Another record may still point at the same Cloudinary file (e.g. a re-registered URL)
-    const sharedBy = await this.prisma.media.count({ where: { publicId, id: { not: media.id } } });
+    const sharedBy = await this.prisma.media.count({
+      where: { publicId, id: { not: media.id } },
+    });
     if (sharedBy > 0) {
-      this.logger.warn(`Skipped Cloudinary delete for ${publicId}: still used by ${sharedBy} other media record(s)`);
+      this.logger.warn(
+        `Skipped Cloudinary delete for ${publicId}: still used by ${sharedBy} other media record(s)`,
+      );
       return undefined;
     }
 
-    const result = await destroyCloudinaryAsset(credentials, publicId, getResourceTypeForMedia(media));
+    const result = await destroyCloudinaryAsset(
+      credentials,
+      publicId,
+      getResourceTypeForMedia(media),
+    );
     if (!result.ok) {
-      this.logger.error(`Cloudinary delete failed for ${publicId}: ${result.error}`);
+      this.logger.error(
+        `Cloudinary delete failed for ${publicId}: ${result.error}`,
+      );
       return 'Đã xóa media khỏi hệ thống nhưng không xóa được tệp trên Cloudinary.';
     }
     return undefined;
@@ -588,79 +362,7 @@ export class MediaService {
    * Bulk import or sync existing legacy cloudinaryUrls.json map into the PostgreSQL Media table.
    */
   async syncLegacyMedia(legacyMap: Record<string, string>) {
-    if (!legacyMap || typeof legacyMap !== 'object' || Array.isArray(legacyMap)) {
-      throw new BadRequestException('Dữ liệu đồng bộ phải là một object { key: url }');
-    }
-
-    let createdCount = 0;
-    let updatedCount = 0;
-    let skippedCount = 0;
-
-    for (const [key, url] of Object.entries(legacyMap)) {
-      if (!url || typeof url !== 'string' || !isHttpsUrl(url)) {
-        skippedCount++;
-        continue;
-      }
-
-      let type: MediaType = MediaType.IMAGE;
-      let folder = 'phuc_trang_memories';
-
-      if (key.startsWith('backgrounds/')) {
-        type = MediaType.BACKGROUND;
-        folder = 'phuc_trang_backgrounds';
-      } else if (key.endsWith('.mp4')) {
-        type = MediaType.VIDEO;
-      } else if (key.endsWith('.mp3') || key.endsWith('.wav') || key.endsWith('.m4a')) {
-        type = MediaType.AUDIO;
-        folder = 'phuc_trang_audio';
-      }
-
-      const urlParts = url.split('/');
-      const filename = urlParts[urlParts.length - 1];
-      const publicId = `${folder}/${filename.replace(/\.[^/.]+$/, '')}`;
-
-      const existing = await this.prisma.media.findUnique({ where: { url } });
-
-      if (existing) {
-        await this.prisma.media.update({
-          where: { id: existing.id },
-          data: {
-            type,
-            publicId: existing.publicId || publicId,
-            alt: existing.alt || key,
-            metadata: {
-              ...(existing.metadata as any || {}),
-              originalKey: key,
-              syncedFromLegacy: true,
-            },
-          },
-        });
-        updatedCount++;
-      } else {
-        await this.prisma.media.create({
-          data: {
-            type,
-            provider: 'CLOUDINARY',
-            url,
-            publicId,
-            alt: key,
-            metadata: {
-              originalKey: key,
-              syncedFromLegacy: true,
-            },
-          },
-        });
-        createdCount++;
-      }
-    }
-
-    return {
-      success: true,
-      totalProcessed: Object.keys(legacyMap).length,
-      createdCount,
-      updatedCount,
-      skippedCount,
-    };
+    return syncLegacyMediaMap(this.prisma, legacyMap);
   }
 
   /**
@@ -670,14 +372,21 @@ export class MediaService {
     let sizeValue: number | string | null = null;
     if (media.size !== null && media.size !== undefined) {
       const big = BigInt(media.size);
-      sizeValue = big <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(big) : big.toString();
+      sizeValue =
+        big <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(big) : big.toString();
     }
 
     return {
       ...media,
       size: sizeValue,
-      createdAt: media.createdAt instanceof Date ? media.createdAt.toISOString() : media.createdAt,
-      updatedAt: media.updatedAt instanceof Date ? media.updatedAt.toISOString() : media.updatedAt,
+      createdAt:
+        media.createdAt instanceof Date
+          ? media.createdAt.toISOString()
+          : media.createdAt,
+      updatedAt:
+        media.updatedAt instanceof Date
+          ? media.updatedAt.toISOString()
+          : media.updatedAt,
     };
   }
 }

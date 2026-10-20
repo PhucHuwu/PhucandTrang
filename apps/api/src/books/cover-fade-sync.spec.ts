@@ -65,7 +65,9 @@ describe('Cover Settings & Fade Effects Sync Test', () => {
     };
 
     prisma.book.findUnique.mockResolvedValue(existingBook);
-    prisma.book.update.mockImplementation(({ data }: any) => Promise.resolve({ ...existingBook, ...data }));
+    prisma.book.update.mockImplementation(({ data }: any) =>
+      Promise.resolve({ ...existingBook, ...data }),
+    );
 
     const updatedCover = {
       front: {
@@ -75,7 +77,7 @@ describe('Cover Settings & Fade Effects Sync Test', () => {
       back: {},
     };
 
-    const res = await booksService.update('book-1', { cover: updatedCover } as any, true);
+    await booksService.update('book-1', { cover: updatedCover } as any, true);
 
     expect(prisma.book.update).toHaveBeenCalledWith(
       expect.objectContaining({

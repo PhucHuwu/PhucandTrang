@@ -13,8 +13,16 @@ describe('PublishValidationService (Prompt 34)', () => {
       },
       media: {
         findMany: jest.fn().mockResolvedValue([
-          { id: 'media-valid-1', size: 1024 * 1024, url: 'https://cdn.example.com/valid.jpg' },
-          { id: 'media-large-1', size: 15 * 1024 * 1024, url: 'https://cdn.example.com/large.jpg' },
+          {
+            id: 'media-valid-1',
+            size: 1024 * 1024,
+            url: 'https://cdn.example.com/valid.jpg',
+          },
+          {
+            id: 'media-large-1',
+            size: 15 * 1024 * 1024,
+            url: 'https://cdn.example.com/large.jpg',
+          },
         ]),
       },
       audioTrack: {
@@ -73,7 +81,9 @@ describe('PublishValidationService (Prompt 34)', () => {
     expect(report.isValid).toBe(false);
     expect(report.errorCount).toBeGreaterThan(0);
 
-    const errorCodes = report.issues.filter((i) => i.severity === 'ERROR').map((i) => i.code);
+    const errorCodes = report.issues
+      .filter((i) => i.severity === 'ERROR')
+      .map((i) => i.code);
     expect(errorCodes).toContain('MISSING_COVER');
     expect(errorCodes).toContain('DELETED_AUDIO_REFERENCE');
     expect(errorCodes).toContain('BROKEN_MEDIA_ID');
@@ -119,7 +129,9 @@ describe('PublishValidationService (Prompt 34)', () => {
     expect(report.errorCount).toBe(0);
     expect(report.warningCount).toBeGreaterThan(0);
 
-    const warningCodes = report.issues.filter((i) => i.severity === 'WARNING').map((i) => i.code);
+    const warningCodes = report.issues
+      .filter((i) => i.severity === 'WARNING')
+      .map((i) => i.code);
     expect(warningCodes).toContain('VERY_LARGE_MEDIA');
     expect(warningCodes).toContain('EMPTY_PAGE');
   });

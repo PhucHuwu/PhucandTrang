@@ -60,8 +60,12 @@ describe('Global Music Playlist Compilation Contract Test', () => {
 
     expect(compiled.playlist).toBeDefined();
     expect(compiled.playlist?.length).toBe(2);
-    expect(compiled.playlist?.[0].src).toBe('https://cdn.example.com/song1.mp3');
-    expect(compiled.playlist?.[1].src).toBe('https://cdn.example.com/song2.mp3');
+    expect(compiled.playlist?.[0].src).toBe(
+      'https://cdn.example.com/song1.mp3',
+    );
+    expect(compiled.playlist?.[1].src).toBe(
+      'https://cdn.example.com/song2.mp3',
+    );
     expect(compiled.media.audio).toContain('https://cdn.example.com/song1.mp3');
     expect(compiled.media.audio).toContain('https://cdn.example.com/song2.mp3');
   });

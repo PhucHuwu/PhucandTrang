@@ -54,7 +54,11 @@ describe('Strict DTO Validations (Req 6, 7, 14, 17, 18, 19)', () => {
     });
 
     it('should require target for open-video, navigate-page and play-audio', async () => {
-      for (const action of ['open-video', 'navigate-page', 'play-audio'] as const) {
+      for (const action of [
+        'open-video',
+        'navigate-page',
+        'play-audio',
+      ] as const) {
         const dto = new ElementInteractionDto();
         dto.action = action;
         dto.target = '';

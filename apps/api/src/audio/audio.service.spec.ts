@@ -96,7 +96,10 @@ describe('AudioService Business Logic (Prompt 36)', () => {
 
   it('touchAffectedBooks should touch cache for all books using this track as background or page music', async () => {
     prisma.book.findMany.mockResolvedValue([{ id: 'book-1' }]);
-    prisma.page.findMany.mockResolvedValue([{ bookId: 'book-1' }, { bookId: 'book-2' }]);
+    prisma.page.findMany.mockResolvedValue([
+      { bookId: 'book-1' },
+      { bookId: 'book-2' },
+    ]);
 
     await service.touchAffectedBooks('track-1');
 
@@ -107,21 +110,26 @@ describe('AudioService Business Logic (Prompt 36)', () => {
   it('remove should throw NotFoundException when track does not exist', async () => {
     prisma.audioTrack.findUnique.mockResolvedValue(null);
 
-    await expect(service.remove('non-existent-id')).rejects.toThrow(NotFoundException);
+    await expect(service.remove('non-existent-id')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('remove deletes in one transaction, relies on ON DELETE SET NULL and bumps affected books once', async () => {
     prisma.audioTrack.findUnique.mockResolvedValue({ id: 'track-1' });
     prisma.book.findMany.mockResolvedValue([{ id: 'book-1' }]);
-    prisma.page.findMany.mockResolvedValue([{ bookId: 'book-1' }, { bookId: 'book-2' }]);
+    prisma.page.findMany.mockResolvedValue([
+      { bookId: 'book-1' },
+      { bookId: 'book-2' },
+    ]);
     prisma.audioTrack.delete.mockResolvedValue(mockTrack);
 
     const result = await service.remove('track-1');
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(prisma.audioTrack.delete).toHaveBeenCalledWith(
-      { where: { id: 'track-1' } },
-    );
+    expect(prisma.audioTrack.delete).toHaveBeenCalledWith({
+      where: { id: 'track-1' },
+    });
     // No manual unlink: the FK constraints null the references
     expect(prisma.book.updateMany).toHaveBeenCalledTimes(1);
     expect(prisma.book.updateMany).toHaveBeenCalledWith({

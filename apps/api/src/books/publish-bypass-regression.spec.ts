@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PublicCacheService } from '../public/public-cache.service';
 import { PublicService } from '../public/public.service';
 import { PublishValidationService } from './publish-validation.service';
-import { BookStatus, Role } from '@prisma/client';
+import { BookStatus } from '@prisma/client';
 import { NotFoundException } from '@nestjs/common';
 
 describe('Publish Bypass Protection Regression Suite (Prompt 40.1)', () => {
@@ -54,7 +54,10 @@ describe('Publish Bypass Protection Regression Suite (Prompt 40.1)', () => {
         PublicService,
         { provide: PrismaService, useValue: prisma },
         { provide: PublicCacheService, useValue: cacheService },
-        { provide: PublishValidationService, useValue: publishValidationService },
+        {
+          provide: PublishValidationService,
+          useValue: publishValidationService,
+        },
       ],
     }).compile();
 
@@ -64,7 +67,9 @@ describe('Publish Bypass Protection Regression Suite (Prompt 40.1)', () => {
 
   it('CreateBook: must strictly ignore or force DRAFT status, never allow initial PUBLISHED', async () => {
     prisma.book.findUnique.mockResolvedValue(null);
-    prisma.book.create.mockImplementation((args) => Promise.resolve({ id: 'b-new', ...args.data }));
+    prisma.book.create.mockImplementation((args) =>
+      Promise.resolve({ id: 'b-new', ...args.data }),
+    );
 
     const created = await booksService.create({
       title: 'Sách Mới',

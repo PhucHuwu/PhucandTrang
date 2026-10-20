@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Page, Book } from '@/types/book';
 import { PageTextureGenerator } from '@/components/3d/PageTextureGenerator';
 import { RefreshCw, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { DESIGN_CANVAS_HEIGHT, DESIGN_CANVAS_WIDTH } from '@phucandtrang/shared';
 
 interface LivePagePreviewProps {
   page: Page;
@@ -23,9 +24,9 @@ export default function LivePagePreview({
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const canvasWidth =
-    book?.settings?.dimensions?.canvasResolution?.width || 1024;
-    const canvasHeight =
-    book?.settings?.dimensions?.canvasResolution?.height || 1360;
+    book?.settings?.dimensions?.canvasResolution?.width || DESIGN_CANVAS_WIDTH;
+  const canvasHeight =
+    book?.settings?.dimensions?.canvasResolution?.height || DESIGN_CANVAS_HEIGHT;
 
   const triggerRender = () => {
     if (!canvasRef.current) return;

@@ -72,14 +72,30 @@ describe('CMS Persistence & Reliability Contract Tests (Prompt 40.2 Audit)', () 
       });
 
       const newElements = [
-        { type: 'IMAGE', slot: 'primaryImage', zIndex: 1, transform: { x: 0.1, y: 0.1, width: 0.4, height: 0.4 } },
-        { type: 'IMAGE', slot: 'secondaryImage', zIndex: 2, transform: { x: 0.5, y: 0.1, width: 0.4, height: 0.4 } },
+        {
+          type: 'IMAGE',
+          slot: 'primaryImage',
+          zIndex: 1,
+          transform: { x: 0.1, y: 0.1, width: 0.4, height: 0.4 },
+        },
+        {
+          type: 'IMAGE',
+          slot: 'secondaryImage',
+          zIndex: 2,
+          transform: { x: 0.5, y: 0.1, width: 0.4, height: 0.4 },
+        },
       ];
 
-      const result = await pagesService.applyLayout('p-1', 'quad-gallery', newElements);
+      const result = await pagesService.applyLayout(
+        'p-1',
+        'quad-gallery',
+        newElements,
+      );
 
       // Verify deletion of all old elements
-      expect(prisma.pageElement.deleteMany).toHaveBeenCalledWith({ where: { pageId: 'p-1' } });
+      expect(prisma.pageElement.deleteMany).toHaveBeenCalledWith({
+        where: { pageId: 'p-1' },
+      });
 
       // Verify insertion of new elements
       expect(prisma.pageElement.create).toHaveBeenCalledTimes(2);

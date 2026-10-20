@@ -22,5 +22,12 @@ export default defineConfig({
     // iPad Safari is a primary editing device
     { name: 'webkit', use: { browserName: 'webkit' } },
   ],
-  webServer: { command: `npm run dev -- --port ${port}`, url: baseURL, reuseExistingServer: !process.env.CI, timeout: 120000 },
+  // CI tests the production build (run `next build` first): dev-mode on-demand compilation
+  // triggers Fast Refresh full reloads that interrupt navigations, notably in WebKit.
+  webServer: {
+    command: process.env.CI ? `npx next start --port ${port}` : `npm run dev -- --port ${port}`,
+    url: baseURL,
+    reuseExistingServer: !process.env.CI,
+    timeout: 120000,
+  },
 });

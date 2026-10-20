@@ -13,6 +13,8 @@ async function fitAndSave(page: Page, rotation: number) {
   const entry = { id: 'page-test', bookId: 'journal-test', pageNumber: 1, order: 1, side: 'right', title: 'Trang thử', elements: [image], background: { type: 'color', color: '#fff' } };
   const journal = { id: 'journal-test', title: 'Nhật ký', pages: [entry], settings: {}, cover: { front: { elements: [] } } };
   const saved: string[] = [];
+  // Passes the middleware's session-cookie UX guard; every API call is mocked below
+  await page.context().addCookies([{ name: 'admin_access_token', value: 'test', url: test.info().project.use.baseURL! }]);
   await page.route('**/fit-test.png', (route) => route.fulfill({ contentType: 'image/png', body: png }));
   await page.route('**/api/admin/**', async (route) => {
     const req = route.request();
@@ -27,7 +29,8 @@ async function fitAndSave(page: Page, rotation: number) {
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
   });
 
-  await page.setViewportSize({ width: 1440, height: 900 });
+  // Compact editor layout: at >=1200px container width the Lớp/Thuộc tính toggles are hidden
+  await page.setViewportSize({ width: 1024, height: 900 });
   await page.goto('/admin/pages/page-test');
   await page.getByRole('button', { name: 'Lớp', exact: true }).click();
   await page.locator('.layer-row').first().click();

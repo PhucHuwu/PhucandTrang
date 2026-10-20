@@ -27,7 +27,12 @@ export class PublicCacheService {
     return entry as CacheEntry<T>;
   }
 
-  set<T>(key: string, document: T, etag: string, ttlMs: number = this.CACHE_TTL_MS): void {
+  set<T>(
+    key: string,
+    document: T,
+    etag: string,
+    ttlMs: number = this.CACHE_TTL_MS,
+  ): void {
     this.cache.set(key, {
       document,
       etag,

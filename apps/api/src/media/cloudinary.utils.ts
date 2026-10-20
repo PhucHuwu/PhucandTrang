@@ -107,9 +107,13 @@ export interface CloudinaryDestroyResult {
 }
 
 /** Cloudinary resource_type a stored media row lives under (audio is stored as "video"). */
-export function getResourceTypeForMedia(media: { type?: MediaType | string; metadata?: any }): string {
+export function getResourceTypeForMedia(media: {
+  type?: MediaType | string;
+  metadata?: any;
+}): string {
   const fromUpload = media.metadata?.resourceType;
-  if (fromUpload === 'image' || fromUpload === 'video' || fromUpload === 'raw') return fromUpload;
+  if (fromUpload === 'image' || fromUpload === 'video' || fromUpload === 'raw')
+    return fromUpload;
   return getResourceTypeForType(media.type as MediaType);
 }
 
@@ -124,7 +128,11 @@ export async function destroyCloudinaryAsset(
   fetchImpl: typeof fetch = fetch,
 ): Promise<CloudinaryDestroyResult> {
   const timestamp = Math.floor(Date.now() / 1000);
-  const params: Record<string, any> = { public_id: publicId, timestamp, invalidate: true };
+  const params: Record<string, any> = {
+    public_id: publicId,
+    timestamp,
+    invalidate: true,
+  };
   const signature = generateCloudinarySignature(params, credentials.apiSecret);
 
   const body = new URLSearchParams({
@@ -153,7 +161,11 @@ export async function destroyCloudinaryAsset(
     if (data?.result === 'ok' || data?.result === 'not found') {
       return { ok: true, result: data.result };
     }
-    return { ok: false, result: data?.result, error: `Unexpected result: ${data?.result}` };
+    return {
+      ok: false,
+      result: data?.result,
+      error: `Unexpected result: ${data?.result}`,
+    };
   } catch (err: any) {
     return { ok: false, error: err?.message || String(err) };
   }

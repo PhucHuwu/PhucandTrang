@@ -31,10 +31,7 @@ export class AudioController {
   }
 
   @Put(':id')
-  async update(
-    @Param('id') id: string,
-    @Body() dto: UpdateAudioTrackDto,
-  ) {
+  async update(@Param('id') id: string, @Body() dto: UpdateAudioTrackDto) {
     return this.audioService.update(id, dto);
   }
 

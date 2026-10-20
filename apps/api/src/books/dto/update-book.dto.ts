@@ -1,12 +1,10 @@
 import {
   IsString,
   IsOptional,
-  IsEnum,
   IsObject,
   IsDateString,
   ValidateIf,
 } from 'class-validator';
-import { BookStatus } from '@prisma/client';
 
 export class UpdateBookDto {
   @IsString()

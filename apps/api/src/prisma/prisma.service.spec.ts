@@ -33,8 +33,12 @@ describe('PrismaService Lifecycle & Hardened Shutdown (Prompt 13.9 Req 2, 11, 12
   describe('Hardened onModuleDestroy Cleanup', () => {
     it('should disconnect Prisma and close the pool on shutdown', async () => {
       const service = new PrismaService();
-      const disconnectSpy = jest.spyOn(service, '$disconnect').mockResolvedValue(undefined as any);
-      const poolEndSpy = jest.spyOn((service as any).pool, 'end').mockResolvedValue(undefined as any);
+      const disconnectSpy = jest
+        .spyOn(service, '$disconnect')
+        .mockResolvedValue(undefined as any);
+      const poolEndSpy = jest
+        .spyOn((service as any).pool, 'end')
+        .mockResolvedValue(undefined as any);
 
       await service.onModuleDestroy();
 
@@ -47,7 +51,9 @@ describe('PrismaService Lifecycle & Hardened Shutdown (Prompt 13.9 Req 2, 11, 12
       const disconnectSpy = jest
         .spyOn(service, '$disconnect')
         .mockRejectedValue(new Error('Network disconnected already'));
-      const poolEndSpy = jest.spyOn((service as any).pool, 'end').mockResolvedValue(undefined as any);
+      const poolEndSpy = jest
+        .spyOn((service as any).pool, 'end')
+        .mockResolvedValue(undefined as any);
 
       // Should not throw or crash shutdown
       await expect(service.onModuleDestroy()).resolves.not.toThrow();

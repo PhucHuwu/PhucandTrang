@@ -13,14 +13,16 @@ import { PublicCacheService } from '../public/public-cache.service';
 import { derivePageSideEnum } from '../utils/page-utils';
 import { safeDeepMerge, LAYOUT_PRESETS } from '@phucandtrang/shared';
 import { SavePageDto } from './dto/save-page.dto';
-import { nullableJson, requiredJson } from '../common/prisma-json';
-import { canonicalizeMediaData } from '../common/media-data';
-
-const PAGE_DETAIL_INCLUDE = {
-  elements: { orderBy: { zIndex: 'asc' as const } },
-  layoutTemplate: true,
-  audioTrack: true,
-};
+import { requiredJson } from '../common/prisma-json';
+import {
+  assertLayoutTemplateExists,
+  buildAppliedLayoutElement,
+  buildDuplicatedElement,
+  buildElementFromPrototype,
+  renumberBookPages,
+  resolveElementMediaUrls,
+} from './page-helpers';
+import { savePageAtomically } from './page-save';
 
 @Injectable()
 export class PagesService {
@@ -29,99 +31,16 @@ export class PagesService {
     private cacheService: PublicCacheService,
   ) {}
 
-  private async resolveElementMediaUrls<T extends { elements?: any[] }>(page: T): Promise<T> {
-    const ids = new Set<string>();
-    for (const el of page.elements || []) {
-      const data = (el.data as any) || {};
-      if (data.mediaId) ids.add(data.mediaId);
-      if (data.posterMediaId) ids.add(data.posterMediaId);
-    }
-
-    if (ids.size === 0) return page;
-
-    const media = await this.prisma.media.findMany({
-      where: { id: { in: Array.from(ids) } },
-      select: { id: true, url: true, alt: true },
-    });
-    const mediaMap = new Map(media.map((item) => [item.id, item]));
-
-    return {
-      ...page,
-      elements: (page.elements || []).map((el) => {
-        const data = { ...((el.data as any) || {}) };
-        const source = data.mediaId ? mediaMap.get(data.mediaId) : undefined;
-        const poster = data.posterMediaId ? mediaMap.get(data.posterMediaId) : undefined;
-
-        if (source) {
-          data.src = source.url;
-          data.alt = data.alt || source.alt;
-        }
-        if (poster) {
-          data.thumbnailUrl = poster.url;
-        }
-
-        return { ...el, data };
-      }),
-    } as T;
-  }
-
-  /**
-   * Rejects unknown layout template ids with a 400 instead of letting the FK constraint
-   * surface as a 500. `undefined`/`null` (no template) is always accepted.
-   */
-  private async assertLayoutTemplateExists(client: any, layoutTemplateId?: string | null) {
-    if (layoutTemplateId === undefined || layoutTemplateId === null) return;
-    const preset = LAYOUT_PRESETS[layoutTemplateId];
-    if (preset) {
-      // Built-in presets are valid even if boot-time seeding has not inserted the row yet.
-      await client.layoutTemplate.upsert({
-        where: { id: preset.id },
-        create: {
-          id: preset.id,
-          name: preset.name,
-          description: preset.description,
-          slots: preset.slots as any,
-          prototypes: preset.elementPrototypes as any,
-          isSystem: true,
-        },
-        update: {},
-      });
-      return;
-    }
-    const tpl = await client.layoutTemplate.findUnique({
-      where: { id: layoutTemplateId },
-      select: { id: true },
-    });
-    if (!tpl) {
-      throw new BadRequestException(`Layout template không tồn tại: ${layoutTemplateId}`);
-    }
-  }
-
   /**
    * Option B Normalization:
    * Normalizes contiguous physical sequence: order = 0..N-1, side = derivePageSideEnum(order).
    * Strictly preserves existing display metadata: pageNumber is NEVER overwritten.
    */
-  async normalizeBookPageSequence(bookId: string, customTx?: any): Promise<void> {
-    const execute = async (tx: any) => {
-      const pages = await tx.page.findMany({
-        where: { bookId },
-        orderBy: [{ order: 'asc' }, { pageNumber: 'asc' }, { createdAt: 'asc' }],
-        select: { id: true, order: true, side: true, pageNumber: true },
-      });
-
-      // Update physical order and side; strictly preserve display pageNumber
-      for (let i = 0; i < pages.length; i++) {
-        const side = derivePageSideEnum(i);
-        await tx.page.update({
-          where: { id: pages[i].id },
-          data: {
-            order: i,
-            side,
-          },
-        });
-      }
-    };
+  async normalizeBookPageSequence(
+    bookId: string,
+    customTx?: any,
+  ): Promise<void> {
+    const execute = (tx: any) => renumberBookPages(tx, bookId);
 
     if (customTx) {
       await execute(customTx);
@@ -145,7 +64,9 @@ export class PagesService {
       },
       orderBy: { order: 'asc' },
     });
-    return Promise.all(pages.map((page) => this.resolveElementMediaUrls(page)));
+    return Promise.all(
+      pages.map((page) => resolveElementMediaUrls(this.prisma, page)),
+    );
   }
 
   async findOne(id: string) {
@@ -157,8 +78,9 @@ export class PagesService {
         audioTrack: true,
       },
     });
-    if (!page) throw new NotFoundException(`Không tìm thấy trang với ID: ${id}`);
-    return this.resolveElementMediaUrls(page);
+    if (!page)
+      throw new NotFoundException(`Không tìm thấy trang với ID: ${id}`);
+    return resolveElementMediaUrls(this.prisma, page);
   }
 
   async create(dto: CreatePageDto) {
@@ -181,7 +103,7 @@ export class PagesService {
           );
         }
 
-        await this.assertLayoutTemplateExists(tx, dto.layoutTemplateId);
+        await assertLayoutTemplateExists(tx, dto.layoutTemplateId);
 
         // Option B: append-only physical order (never assume order = pageNumber)
         const maxOrderPage = await tx.page.findFirst({
@@ -226,30 +148,8 @@ export class PagesService {
         }
 
         for (const proto of prototypes) {
-          const { zIndex: _ignore, ...cleanTransform } = proto.transform || {};
-          const elementData: any = { ...(proto.defaultData || {}) };
-          if (proto.slot === 'title' && dto.title) {
-            elementData.text = dto.title;
-          } else if (proto.slot === 'subtitle' && dto.chapter) {
-            elementData.text = dto.chapter;
-          } else if (proto.slot === 'quote' && dto.quote) {
-            elementData.text = dto.quote;
-          }
-
           await tx.pageElement.create({
-            data: {
-              pageId: page.id,
-              type: proto.defaultType,
-              slot: proto.slot,
-              zIndex: proto.zIndex,
-              order: proto.zIndex,
-              visible: true,
-              locked: false,
-              opacity: 1.0,
-              transform: cleanTransform,
-              style: proto.style || {},
-              data: elementData,
-            },
+            data: buildElementFromPrototype(page.id, proto, dto),
           });
         }
 
@@ -294,14 +194,20 @@ export class PagesService {
       }
     }
 
-    if (dto.layoutTemplateId !== undefined && dto.layoutTemplateId !== page.layoutTemplateId) {
-      await this.assertLayoutTemplateExists(this.prisma, dto.layoutTemplateId);
+    if (
+      dto.layoutTemplateId !== undefined &&
+      dto.layoutTemplateId !== page.layoutTemplateId
+    ) {
+      await assertLayoutTemplateExists(this.prisma, dto.layoutTemplateId);
     }
 
     // Safe merge for partial JSON objects if PATCH (cleanly accept updated background without stale field resurrection)
-    const background = isPatch && dto.background
-      ? (dto.background.type || dto.background.imageUrl || dto.background.color ? dto.background : safeDeepMerge(page.background as any, dto.background))
-      : dto.background;
+    const background =
+      isPatch && dto.background
+        ? dto.background.type || dto.background.imageUrl || dto.background.color
+          ? dto.background
+          : safeDeepMerge(page.background as any, dto.background)
+        : dto.background;
 
     const updated = await this.prisma.page.update({
       where: { id },
@@ -310,13 +216,23 @@ export class PagesService {
         ...(dto.chapter !== undefined ? { chapter: dto.chapter } : {}),
         ...(dto.title !== undefined ? { title: dto.title } : {}),
         ...(dto.quote !== undefined ? { quote: dto.quote } : {}),
-        ...(dto.handwriting !== undefined ? { handwriting: dto.handwriting } : {}),
-        ...(dto.layoutTemplateId !== undefined ? { layoutTemplateId: dto.layoutTemplateId } : {}),
+        ...(dto.handwriting !== undefined
+          ? { handwriting: dto.handwriting }
+          : {}),
+        ...(dto.layoutTemplateId !== undefined
+          ? { layoutTemplateId: dto.layoutTemplateId }
+          : {}),
         ...(dto.layoutMode !== undefined ? { layoutMode: dto.layoutMode } : {}),
-        ...(dto.sourceTemplateId !== undefined ? { sourceTemplateId: dto.sourceTemplateId } : {}),
-        ...(dto.isCustomized !== undefined ? { isCustomized: dto.isCustomized } : {}),
+        ...(dto.sourceTemplateId !== undefined
+          ? { sourceTemplateId: dto.sourceTemplateId }
+          : {}),
+        ...(dto.isCustomized !== undefined
+          ? { isCustomized: dto.isCustomized }
+          : {}),
         ...(background !== undefined ? { background: background as any } : {}),
-        ...(dto.audioTrackId !== undefined ? { audioTrackId: dto.audioTrackId } : {}),
+        ...(dto.audioTrackId !== undefined
+          ? { audioTrackId: dto.audioTrackId }
+          : {}),
       },
       include: {
         elements: { orderBy: { zIndex: 'asc' } },
@@ -365,7 +281,8 @@ export class PagesService {
           where: { id },
           select: { order: true },
         });
-        if (!source) throw new NotFoundException(`Không tìm thấy trang với ID: ${id}`);
+        if (!source)
+          throw new NotFoundException(`Không tìm thấy trang với ID: ${id}`);
 
         let targetOrder: number;
         if (insertAfter) {
@@ -397,7 +314,9 @@ export class PagesService {
             pageNumber: targetPageNum,
             side: derivedSide,
             order: targetOrder,
-            chapter: original.chapter ? `${original.chapter} (Bản sao)` : undefined,
+            chapter: original.chapter
+              ? `${original.chapter} (Bản sao)`
+              : undefined,
             title: original.title ? `${original.title} (Copy)` : undefined,
             quote: original.quote,
             handwriting: original.handwriting,
@@ -408,20 +327,7 @@ export class PagesService {
             background: requiredJson(original.background),
             audioTrackId: original.audioTrackId,
             elements: {
-              create: original.elements.map((el) => ({
-                type: el.type,
-                slot: el.slot,
-                order: el.order,
-                zIndex: el.zIndex,
-                visible: el.visible,
-                locked: el.locked,
-                opacity: el.opacity,
-                transform: requiredJson(el.transform),
-                style: nullableJson(el.style),
-                // findOne resolves media URLs at runtime; never persist them back
-                data: requiredJson(canonicalizeMediaData(el.type, el.data as any)),
-                interaction: nullableJson(el.interaction),
-              })),
+              create: original.elements.map(buildDuplicatedElement),
             },
           },
         });
@@ -452,7 +358,10 @@ export class PagesService {
       await this.normalizeBookPageSequence(page.bookId, tx);
     });
     await this.cacheService.touchBook(page.bookId);
-    return { success: true, message: `Đã xóa trang ${id} cùng tất cả element liên quan` };
+    return {
+      success: true,
+      message: `Đã xóa trang ${id} cùng tất cả element liên quan`,
+    };
   }
 
   async reorder(bookId: string, dto: ReorderPagesDto) {
@@ -472,7 +381,9 @@ export class PagesService {
 
       // 1. Check duplicate IDs
       if (requestedIdSet.size !== requestedIds.length) {
-        throw new BadRequestException('Danh sách reorder chứa ID trang bị trùng lặp.');
+        throw new BadRequestException(
+          'Danh sách reorder chứa ID trang bị trùng lặp.',
+        );
       }
 
       // 2. Check complete page set length
@@ -505,7 +416,13 @@ export class PagesService {
       return tx.page.findMany({
         where: { bookId },
         orderBy: { order: 'asc' },
-        select: { id: true, pageNumber: true, order: true, side: true, title: true },
+        select: {
+          id: true,
+          pageNumber: true,
+          order: true,
+          side: true,
+          title: true,
+        },
       });
     });
 
@@ -524,7 +441,7 @@ export class PagesService {
     const existing = await this.findOne(pageId);
 
     const result = await this.prisma.$transaction(async (tx) => {
-      await this.assertLayoutTemplateExists(tx, layoutTemplateId);
+      await assertLayoutTemplateExists(tx, layoutTemplateId);
 
       // 1. Delete all existing elements on this page
       await tx.pageElement.deleteMany({
@@ -533,22 +450,8 @@ export class PagesService {
 
       // 2. Insert new elements
       for (const el of elements) {
-        const { zIndex: _ignore, ...cleanTransform } = el.transform || {};
         await tx.pageElement.create({
-          data: {
-            pageId,
-            type: el.type,
-            slot: el.slot || null,
-            zIndex: el.zIndex,
-            order: el.order !== undefined ? el.order : el.zIndex,
-            visible: el.visible !== false,
-            locked: Boolean(el.locked),
-            opacity: el.opacity !== undefined ? el.opacity : 1.0,
-            transform: cleanTransform,
-            style: el.style || {},
-            data: requiredJson(canonicalizeMediaData(el.type, el.data)),
-            interaction: nullableJson(el.interaction ?? null),
-          },
+          data: buildAppliedLayoutElement(pageId, el),
         });
       }
 
@@ -572,172 +475,14 @@ export class PagesService {
     });
 
     await this.cacheService.touchBook(existing.bookId);
-    return this.resolveElementMediaUrls(result);
+    return resolveElementMediaUrls(this.prisma, result);
   }
 
   /**
    * Atomic page save (page fields + element upserts) used by the editor autosave.
-   * - Optimistic concurrency via `baseUpdatedAt` (409 PAGE_CONFLICT on mismatch).
-   * - style / data / interaction / background are replaced wholesale (no deep merge);
-   *   transforms are merged because they may be partial.
-   * - Elements missing from the payload are never deleted; foreign elements are skipped.
+   * See savePageAtomically for the concurrency and merge rules.
    */
   async savePage(pageId: string, dto: SavePageDto) {
-    const items = dto.elements ?? [];
-    const ids = items.map((item) => item.id);
-    if (new Set(ids).size !== ids.length) {
-      throw new BadRequestException('Danh sách element chứa ID bị trùng lặp.');
-    }
-
-    const { page, skippedElementIds, bookId } = await this.prisma.$transaction(
-      async (tx) => {
-        const current = await tx.page.findUnique({
-          where: { id: pageId },
-          select: { id: true, bookId: true, updatedAt: true },
-        });
-        if (!current) throw new NotFoundException(`Không tìm thấy trang với ID: ${pageId}`);
-
-        const throwConflict = (currentUpdatedAt: Date) => {
-          throw new ConflictException({
-            code: 'PAGE_CONFLICT',
-            message: 'Trang đã được thay đổi ở nơi khác',
-            currentUpdatedAt: currentUpdatedAt.toISOString(),
-          });
-        };
-
-        const baseUpdatedAt = dto.baseUpdatedAt ? new Date(dto.baseUpdatedAt) : undefined;
-        if (baseUpdatedAt && current.updatedAt.toISOString() !== baseUpdatedAt.toISOString()) {
-          throwConflict(current.updatedAt);
-        }
-
-        const fields = dto.page ?? {};
-        if (fields.layoutTemplateId !== undefined) {
-          await this.assertLayoutTemplateExists(tx, fields.layoutTemplateId);
-        }
-
-        const pageData: Record<string, any> = {
-          ...(fields.title !== undefined ? { title: fields.title } : {}),
-          ...(fields.chapter !== undefined ? { chapter: fields.chapter } : {}),
-          ...(fields.quote !== undefined ? { quote: fields.quote } : {}),
-          ...(fields.handwriting !== undefined ? { handwriting: fields.handwriting } : {}),
-          ...(fields.background !== undefined ? { background: requiredJson(fields.background) } : {}),
-          ...(fields.audioTrackId !== undefined ? { audioTrackId: fields.audioTrackId } : {}),
-          ...(fields.layoutTemplateId !== undefined ? { layoutTemplateId: fields.layoutTemplateId } : {}),
-          ...(fields.sourceTemplateId !== undefined ? { sourceTemplateId: fields.sourceTemplateId } : {}),
-          ...(fields.layoutMode !== undefined ? { layoutMode: fields.layoutMode } : {}),
-          ...(fields.isCustomized !== undefined ? { isCustomized: fields.isCustomized } : {}),
-          // Always bump so every save yields a fresh baseUpdatedAt for the client
-          updatedAt: new Date(),
-        };
-
-        // Conditional write closes the race between the check above and this update.
-        const written = await tx.page.updateMany({
-          where: {
-            id: pageId,
-            ...(baseUpdatedAt ? { updatedAt: current.updatedAt } : {}),
-          },
-          data: pageData,
-        });
-        if (written.count === 0) {
-          const latest = await tx.page.findUnique({
-            where: { id: pageId },
-            select: { updatedAt: true },
-          });
-          if (!latest) throw new NotFoundException(`Không tìm thấy trang với ID: ${pageId}`);
-          throwConflict(latest.updatedAt);
-        }
-
-        const skipped: string[] = [];
-        if (items.length > 0) {
-          const existing = await tx.pageElement.findMany({
-            where: { id: { in: ids } },
-            select: { id: true, pageId: true, type: true, transform: true },
-          });
-          const existingMap = new Map<string, { id: string; pageId: string; type: string; transform: any }>(
-            existing.map((el: any) => [el.id, el]),
-          );
-
-          for (const item of items) {
-            const { zIndex: _ignore, ...cleanTransform } = (item.transform as any) || {};
-            const found = existingMap.get(item.id);
-
-            if (found) {
-              if (found.pageId !== pageId) {
-                skipped.push(item.id);
-                continue;
-              }
-              await tx.pageElement.update({
-                where: { id: item.id },
-                data: {
-                  ...(item.slot !== undefined ? { slot: item.slot } : {}),
-                  ...(item.zIndex !== undefined ? { zIndex: item.zIndex } : {}),
-                  ...(item.order !== undefined ? { order: item.order } : {}),
-                  ...(item.visible !== undefined ? { visible: item.visible } : {}),
-                  ...(item.locked !== undefined ? { locked: item.locked } : {}),
-                  ...(item.opacity !== undefined ? { opacity: item.opacity } : {}),
-                  // Transforms may be partial (validated leniently), so they are merged.
-                  ...(item.transform !== undefined
-                    ? { transform: safeDeepMerge((found.transform as any) || {}, cleanTransform) }
-                    : {}),
-                  ...(item.style !== undefined ? { style: nullableJson(item.style) } : {}),
-                  ...(item.data !== undefined
-                    ? { data: requiredJson(canonicalizeMediaData(found.type, item.data)) }
-                    : {}),
-                  ...(item.interaction !== undefined
-                    ? { interaction: nullableJson(item.interaction) }
-                    : {}),
-                },
-              });
-              continue;
-            }
-
-            if (!item.type) {
-              skipped.push(item.id);
-              continue;
-            }
-
-            // Re-create a missing element (e.g. undo of a delete) with its original id.
-            const zIndex = item.zIndex ?? 1;
-            await tx.pageElement.create({
-              data: {
-                id: item.id,
-                pageId,
-                type: item.type,
-                slot: item.slot ?? null,
-                zIndex,
-                order: item.order ?? zIndex,
-                visible: item.visible ?? true,
-                locked: item.locked ?? false,
-                opacity: item.opacity ?? 1.0,
-                transform: requiredJson(cleanTransform),
-                style: nullableJson(item.style),
-                data: requiredJson(canonicalizeMediaData(item.type, item.data)),
-                interaction: nullableJson(item.interaction),
-              },
-            });
-          }
-        }
-
-        await tx.book.update({
-          where: { id: current.bookId },
-          data: { contentRevision: { increment: 1 } },
-          select: { contentRevision: true },
-        });
-
-        const saved = await tx.page.findUnique({
-          where: { id: pageId },
-          include: PAGE_DETAIL_INCLUDE,
-        });
-
-        return { page: saved, skippedElementIds: skipped, bookId: current.bookId };
-      },
-      { timeout: 15000 },
-    );
-
-    await this.cacheService.invalidateBookCache(bookId);
-    return {
-      page: await this.resolveElementMediaUrls(page),
-      skippedElementIds,
-    };
+    return savePageAtomically(this.prisma, this.cacheService, pageId, dto);
   }
 }

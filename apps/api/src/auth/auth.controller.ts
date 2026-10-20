@@ -1,4 +1,13 @@
-import { Controller, Post, Get, Body, HttpCode, HttpStatus, Request, ForbiddenException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  HttpCode,
+  HttpStatus,
+  Request,
+  ForbiddenException,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { Public } from './admin-access.guard';
@@ -18,21 +27,30 @@ function safeEqual(a: string, b: string): boolean {
  * carries `x-bff-secret` matching BFF_SHARED_SECRET, otherwise any caller could rotate it to dodge
  * the per-client limit. Without BFF_SHARED_SECRET configured the header is trusted as before.
  */
-export function resolveClient(req: any): { clientId: string; sourceId: string } {
+export function resolveClient(req: any): {
+  clientId: string;
+  sourceId: string;
+} {
   const header = (name: string): string | undefined => {
     const value = req?.headers?.[name];
     return Array.isArray(value) ? value[0] : value;
   };
-  const clean = (value: string | undefined) => (value || '').trim().slice(0, 64) || 'unknown';
+  const clean = (value: string | undefined) =>
+    (value || '').trim().slice(0, 64) || 'unknown';
   // The connecting address (set by the hosting proxy, not by the caller). For logins through the BFF
   // this is the BFF itself; for direct callers it is the caller, who cannot dodge it by rotating x-client-ip.
-  const sourceId = clean(header('x-forwarded-for')?.split(',')[0] || req?.ip || req?.socket?.remoteAddress);
+  const sourceId = clean(
+    header('x-forwarded-for')?.split(',')[0] ||
+      req?.ip ||
+      req?.socket?.remoteAddress,
+  );
 
   const sharedSecret = process.env.BFF_SHARED_SECRET;
   let trustClientIp: boolean;
   if (sharedSecret) {
     const provided = header('x-bff-secret');
-    trustClientIp = typeof provided === 'string' && safeEqual(provided, sharedSecret);
+    trustClientIp =
+      typeof provided === 'string' && safeEqual(provided, sharedSecret);
   } else {
     if (!missingBffSecretWarned) {
       missingBffSecretWarned = true;
