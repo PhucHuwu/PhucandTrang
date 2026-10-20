@@ -1,5 +1,3 @@
-import * as fs from 'fs';
-import * as path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
@@ -9,14 +7,108 @@ dotenv.config();
 
 /**
  * PROMPT 25: One-Time Canonical Import / Migration Script
- * 
- * Audits all elements, covers, and pages across PostgreSQL.
- * Matches any raw Cloudinary URLs against the Media table (by publicId or URL matching).
- * Assigns canonical mediaId / posterMediaId everywhere.
- * Re-compiles a clean, pure canonical snapshot and updates Book.publishedSnapshot.
+ *
+ * Audits covers, page backgrounds and elements of the journal and assigns canonical
+ * mediaId / posterMediaId wherever a raw URL exactly matches a Media record.
+ *
+ * Safety:
+ * - Dry run by default: only prints the planned changes. Pass `--apply` to write.
+ * - Exact URL matching only (after trimming); no substring/fuzzy matching.
+ * - All writes run in one transaction and bump Book.contentRevision once.
+ * - Never touches publishedSnapshot: the admin must review the draft and Publish from the UI.
  */
+
+export interface MigrationChange {
+  kind: 'cover' | 'page-background' | 'element';
+  id: string;
+  description: string;
+}
+
+export interface MigrationPlan {
+  cover: any | null;
+  pageBackgrounds: Array<{ pageId: string; background: any }>;
+  elements: Array<{ elementId: string; data: any }>;
+  changes: MigrationChange[];
+}
+
+export function buildExactUrlLookup(media: Array<{ id: string; url?: string | null }>) {
+  const map = new Map<string, string>();
+  for (const m of media) {
+    if (m.url) map.set(m.url.trim(), m.id);
+  }
+  return (url?: unknown): string | null => {
+    if (typeof url !== 'string' || !url.trim()) return null;
+    return map.get(url.trim()) ?? null;
+  };
+}
+
+/** Pure planning step: computes the writes without touching the database. */
+export function planLegacyMigration(
+  book: { id: string; cover: any; pages: Array<{ id: string; background: any; elements: Array<{ id: string; data: any }> }> },
+  findMediaIdForUrl: (url?: unknown) => string | null,
+): MigrationPlan {
+  const plan: MigrationPlan = { cover: null, pageBackgrounds: [], elements: [], changes: [] };
+
+  const cover = JSON.parse(JSON.stringify(book.cover || {}));
+  let coverModified = false;
+  const assignCover = (side: any, urlKey: string, idKey: string, label: string) => {
+    if (!side) return;
+    const id = findMediaIdForUrl(side[urlKey]);
+    if (id && side[idKey] !== id) {
+      side[idKey] = id;
+      coverModified = true;
+      plan.changes.push({ kind: 'cover', id: book.id, description: `${label}.${idKey} = ${id}` });
+    }
+  };
+  assignCover(cover.front, 'backgroundUrl', 'mediaId', 'cover.front');
+  assignCover(cover.back, 'insideBackgroundUrl', 'insideMediaId', 'cover.back');
+  assignCover(cover.back, 'outsideBackgroundUrl', 'outsideMediaId', 'cover.back');
+  if (coverModified) plan.cover = cover;
+
+  for (const page of book.pages) {
+    const bg = { ...((page.background as any) || {}) };
+    if (bg.imageUrl && !bg.mediaId) {
+      const bgMediaId = findMediaIdForUrl(bg.imageUrl);
+      if (bgMediaId) {
+        bg.mediaId = bgMediaId;
+        plan.pageBackgrounds.push({ pageId: page.id, background: bg });
+        plan.changes.push({ kind: 'page-background', id: page.id, description: `background.mediaId = ${bgMediaId}` });
+      }
+    }
+
+    for (const el of page.elements) {
+      const data = { ...((el.data as any) || {}) };
+      const notes: string[] = [];
+
+      if (data.src && !data.mediaId) {
+        const matchedId = findMediaIdForUrl(data.src);
+        if (matchedId) {
+          data.mediaId = matchedId;
+          notes.push(`mediaId = ${matchedId}`);
+        }
+      }
+      if (data.thumbnailUrl && !data.posterMediaId) {
+        const matchedPosterId = findMediaIdForUrl(data.thumbnailUrl);
+        if (matchedPosterId) {
+          data.posterMediaId = matchedPosterId;
+          notes.push(`posterMediaId = ${matchedPosterId}`);
+        }
+      }
+
+      if (notes.length > 0) {
+        plan.elements.push({ elementId: el.id, data });
+        plan.changes.push({ kind: 'element', id: el.id, description: notes.join(', ') });
+      }
+    }
+  }
+
+  return plan;
+}
+
 async function main() {
+  const apply = process.argv.includes('--apply');
   console.log('🚀 Running Prompt 25 Legacy Content Migration & Canonical Media Mapping...');
+  console.log(apply ? '✍️  Mode: APPLY (changes will be written)' : '🔍 Mode: DRY RUN (no writes; pass --apply to write)');
 
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
@@ -31,44 +123,16 @@ async function main() {
   const prisma = new PrismaClient({ adapter });
 
   try {
-    // 1. Fetch all media records to build a URL -> mediaId lookup map
-    const allMedia = await prisma.media.findMany();
+    const allMedia = await prisma.media.findMany({ select: { id: true, url: true } });
     console.log(`📦 Loaded ${allMedia.length} Media records from PostgreSQL library.`);
+    const findMediaIdForUrl = buildExactUrlLookup(allMedia);
 
-    const urlToMediaIdMap = new Map<string, string>();
-    const publicIdToMediaIdMap = new Map<string, string>();
-
-    for (const m of allMedia) {
-      if (m.url) urlToMediaIdMap.set(m.url.trim(), m.id);
-      if (m.publicId) publicIdToMediaIdMap.set(m.publicId.trim(), m.id);
-    }
-
-    const findMediaIdForUrl = (url?: string): string | null => {
-      if (!url) return null;
-      const cleanUrl = url.trim();
-      if (urlToMediaIdMap.has(cleanUrl)) {
-        return urlToMediaIdMap.get(cleanUrl)!;
-      }
-      for (const [mUrl, id] of urlToMediaIdMap.entries()) {
-        if (cleanUrl.includes(mUrl) || mUrl.includes(cleanUrl)) {
-          return id;
-        }
-      }
-      return null;
-    };
-
-    // 2. Fetch the target book
     const book = await prisma.book.findFirst({
-      orderBy: { createdAt: 'asc' },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       include: {
-        backgroundMusic: true,
         pages: {
           orderBy: { order: 'asc' },
-          include: {
-            elements: { orderBy: { zIndex: 'asc' } },
-            layoutTemplate: true,
-            audioTrack: true,
-          },
+          include: { elements: { orderBy: { zIndex: 'asc' } } },
         },
       },
     });
@@ -79,225 +143,57 @@ async function main() {
     }
 
     console.log(`📖 Auditing book "${book.title}" (${book.pages.length} pages)...`);
+    const plan = planLegacyMigration(book as any, findMediaIdForUrl);
 
-    // 3. Migrate Book Cover mediaIds
-    const cover = (book.cover as any) || {};
-    let coverModified = false;
-
-    if (cover.front) {
-      const frontMediaId = findMediaIdForUrl(cover.front.backgroundUrl);
-      if (frontMediaId && cover.front.mediaId !== frontMediaId) {
-        cover.front.mediaId = frontMediaId;
-        coverModified = true;
-      }
-    }
-    if (cover.back) {
-      const insideMediaId = findMediaIdForUrl(cover.back.insideBackgroundUrl);
-      if (insideMediaId && cover.back.insideMediaId !== insideMediaId) {
-        cover.back.insideMediaId = insideMediaId;
-        coverModified = true;
-      }
-      const outsideMediaId = findMediaIdForUrl(cover.back.outsideBackgroundUrl);
-      if (outsideMediaId && cover.back.outsideMediaId !== outsideMediaId) {
-        cover.back.outsideMediaId = outsideMediaId;
-        coverModified = true;
-      }
+    if (plan.changes.length === 0) {
+      console.log('✅ Nothing to migrate: all references already canonical (or no exact URL match).');
+      return;
     }
 
-    if (coverModified) {
-      await prisma.book.update({
-        where: { id: book.id },
-        data: { cover },
-      });
-      console.log('✅ Updated Book cover with canonical mediaId references.');
+    for (const change of plan.changes) {
+      console.log(`  • [${change.kind}] ${change.id}: ${change.description}`);
+    }
+    console.log(
+      `📋 Planned: cover=${plan.cover ? 1 : 0}, backgrounds=${plan.pageBackgrounds.length}, elements=${plan.elements.length}`,
+    );
+
+    if (!apply) {
+      console.log('🔍 Dry run complete. Re-run with --apply to write these changes.');
+      return;
     }
 
-    // 4. Migrate Pages & PageElements
-    let updatedElementsCount = 0;
-
-    for (const page of book.pages) {
-      // Check page background
-      const bg = (page.background as any) || {};
-      if (bg.imageUrl && !bg.mediaId) {
-        const bgMediaId = findMediaIdForUrl(bg.imageUrl);
-        if (bgMediaId) {
-          bg.mediaId = bgMediaId;
-          await prisma.page.update({
-            where: { id: page.id },
-            data: { background: bg },
-          });
+    await prisma.$transaction(
+      async (tx) => {
+        if (plan.cover) {
+          await tx.book.update({ where: { id: book.id }, data: { cover: plan.cover } });
         }
-      }
-
-      // Check each element
-      for (const el of page.elements) {
-        const data = (el.data as any) || {};
-        let modified = false;
-
-        // Image / Video main mediaId
-        if (data.src && !data.mediaId) {
-          const matchedId = findMediaIdForUrl(data.src);
-          if (matchedId) {
-            data.mediaId = matchedId;
-            modified = true;
-          }
+        for (const bg of plan.pageBackgrounds) {
+          await tx.page.update({ where: { id: bg.pageId }, data: { background: bg.background } });
         }
-
-        // Video poster mediaId
-        if (data.thumbnailUrl && !data.posterMediaId) {
-          const matchedPosterId = findMediaIdForUrl(data.thumbnailUrl);
-          if (matchedPosterId) {
-            data.posterMediaId = matchedPosterId;
-            modified = true;
-          }
+        for (const el of plan.elements) {
+          await tx.pageElement.update({ where: { id: el.elementId }, data: { data: el.data } });
         }
-
-        if (modified) {
-          await prisma.pageElement.update({
-            where: { id: el.id },
-            data: { data },
-          });
-          updatedElementsCount++;
-        }
-      }
-    }
-
-    console.log(`✅ Audited and migrated ${updatedElementsCount} elements with canonical mediaIds.`);
-
-    // 5. Re-query complete clean state to generate finalized publishedSnapshot
-    const refreshedBook = await prisma.book.findUnique({
-      where: { id: book.id },
-      include: {
-        backgroundMusic: true,
-        pages: {
-          orderBy: { order: 'asc' },
-          include: {
-            elements: {
-              where: { visible: true },
-              orderBy: { zIndex: 'asc' },
-            },
-            layoutTemplate: true,
-            audioTrack: true,
-          },
-        },
-        versions: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: { version: true },
-        },
+        await tx.book.update({
+          where: { id: book.id },
+          data: { contentRevision: { increment: 1 } },
+        });
       },
-    });
+      { timeout: 120_000, maxWait: 15_000 },
+    );
 
-    if (refreshedBook) {
-      // Map and build canonical published snapshot
-      const rawPages = [...(refreshedBook.pages || [])].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
-      const compiledPages = rawPages.map((page: any, idx: number) => {
-        const bg = (page.background as any) || { type: 'color', color: '#F9F5EC' };
-        return {
-          id: page.id,
-          order: page.order ?? idx,
-          displayPageNumber: page.pageNumber ?? idx,
-          pageNumber: page.pageNumber ?? idx,
-          side: idx % 2 === 0 ? 'left' : 'right',
-          chapter: page.chapter || null,
-          title: page.title || null,
-          quote: page.quote || null,
-          handwriting: page.handwriting || null,
-          layout: page.layoutTemplateId || 'single-hero',
-          layoutMode: page.layoutMode || 'PRESET',
-          background: bg,
-          elements: (page.elements || []).map((el: any) => ({
-            id: el.id,
-            type: el.type,
-            slot: el.slot || null,
-            order: el.order ?? el.zIndex ?? 1,
-            zIndex: el.zIndex ?? 1,
-            opacity: el.opacity ?? 1.0,
-            transform: el.transform,
-            style: el.style,
-            data: el.data,
-            interaction: el.interaction,
-          })),
-          audio: page.audioTrack
-            ? {
-                id: page.audioTrack.id,
-                title: page.audioTrack.title,
-                artist: page.audioTrack.artist,
-                src: page.audioTrack.src,
-                mediaId: page.audioTrack.mediaId,
-                volume: page.audioTrack.volume ?? 0.8,
-                loop: page.audioTrack.loop ?? true,
-                startAt: page.audioTrack.startAt ?? 0.0,
-                fadeIn: page.audioTrack.fadeIn ?? 0.0,
-                fadeOut: page.audioTrack.fadeOut ?? 0.0,
-                durationSeconds: page.audioTrack.durationSeconds,
-                autoPlay: page.audioTrack.autoPlay ?? true,
-              }
-            : null,
-        };
-      });
-
-      const compiledDoc = {
-        id: refreshedBook.id,
-        title: refreshedBook.title,
-        description: refreshedBook.description || null,
-        contentRevision: refreshedBook.publishedRevision || 1,
-        couple: {
-          he: refreshedBook.heName,
-          she: refreshedBook.sheName,
-          anniversaryDate: refreshedBook.anniversaryDate
-            ? new Date(refreshedBook.anniversaryDate).toISOString()
-            : '2022-10-20T00:00:00Z',
-          proposalQuote: refreshedBook.proposalQuote,
-        },
-        cover: refreshedBook.cover,
-        audio: refreshedBook.backgroundMusic
-          ? {
-              id: refreshedBook.backgroundMusic.id,
-              title: refreshedBook.backgroundMusic.title,
-              artist: refreshedBook.backgroundMusic.artist,
-              src: refreshedBook.backgroundMusic.src,
-              mediaId: refreshedBook.backgroundMusic.mediaId,
-              autoPlay: refreshedBook.backgroundMusic.autoPlay ?? true,
-              loop: refreshedBook.backgroundMusic.loop ?? true,
-              volume: refreshedBook.backgroundMusic.volume ?? 0.8,
-              startAt: refreshedBook.backgroundMusic.startAt ?? 0.0,
-              fadeIn: refreshedBook.backgroundMusic.fadeIn ?? 2.0,
-              fadeOut: refreshedBook.backgroundMusic.fadeOut ?? 2.0,
-              durationSeconds: refreshedBook.backgroundMusic.durationSeconds,
-            }
-          : null,
-        settings: refreshedBook.settings,
-        pages: compiledPages,
-        media: {
-          allUrls: [],
-          images: [],
-          videos: [],
-          audio: refreshedBook.backgroundMusic ? [refreshedBook.backgroundMusic.src] : [],
-          backgrounds: [],
-        },
-        publishedAt: refreshedBook.publishedAt ? new Date(refreshedBook.publishedAt).toISOString() : new Date().toISOString(),
-        version: refreshedBook.versions?.[0]?.version || '2.0.0',
-      };
-
-      await prisma.book.update({
-        where: { id: refreshedBook.id },
-        data: {
-          publishedSnapshot: compiledDoc as any,
-          publishedRevision: refreshedBook.publishedRevision || 1,
-          publishedAt: refreshedBook.publishedAt || new Date(),
-        },
-      });
-
-      console.log('🎉 PublishedSnapshot compiled and verified successfully in PostgreSQL database.');
-    }
+    console.log(`✅ Applied ${plan.changes.length} canonical mediaId changes to the draft.`);
+    console.log(
+      'ℹ️ publishedSnapshot was NOT modified. Review the draft in the Admin preview, then Publish from the Admin UI to go live.',
+    );
   } finally {
     await prisma.$disconnect();
     await pool.end();
   }
 }
 
-main().catch((e) => {
-  console.error('Fatal error during migration:', e);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((e) => {
+    console.error('Fatal error during migration:', e);
+    process.exit(1);
+  });
+}

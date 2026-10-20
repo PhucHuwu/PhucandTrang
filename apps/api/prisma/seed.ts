@@ -37,6 +37,25 @@ async function main() {
 
   const forceCanonicalReset = process.env.SEED_FORCE_CANONICAL_BOOK === 'true';
 
+  // Force mode deletes every page of the live journal; never allow it by accident in production.
+  if (
+    forceCanonicalReset &&
+    isProduction &&
+    process.env.SEED_CONFIRM_DESTRUCTIVE !== 'yes-wipe-pages'
+  ) {
+    throw new Error(
+      'FATAL: SEED_FORCE_CANONICAL_BOOK=true wipes all CMS pages. In production you must also set ' +
+        'SEED_CONFIRM_DESTRUCTIVE=yes-wipe-pages to confirm.',
+    );
+  }
+
+  // Canonical content (layout templates, pages, version, publishedSnapshot) is only written when the
+  // journal does not exist yet or force mode is on; otherwise CMS edits are preserved.
+  const journalAlreadyExists = Boolean(
+    await prisma.book.findFirst({ orderBy: { createdAt: 'asc' }, select: { id: true } }),
+  );
+  const writeCanonicalContent = !journalAlreadyExists || forceCanonicalReset;
+
   // 1. Seed Admin User
   const enableDevSeed = process.env.ENABLE_DEV_SEED === 'true' || !isProduction;
   const adminEmail = process.env.SEED_ADMIN_EMAIL || (enableDevSeed ? 'admin@phucandtrang.love' : undefined);
@@ -44,26 +63,27 @@ async function main() {
 
   let admin: any = null;
 
-  if (adminEmail && adminPassword) {
-    const existing = await prisma.user.findUnique({ where: { email: adminEmail } });
+  // Login is password-only and falls back to any ADMIN, so an existing admin under a different
+  // email must be reused rather than shadowed by a second seeded account.
+  const existingAdmin =
+    (adminEmail ? await prisma.user.findUnique({ where: { email: adminEmail } }) : null) ||
+    (await prisma.user.findFirst({ where: { role: Role.ADMIN }, orderBy: { createdAt: 'desc' } }));
+
+  if (existingAdmin) {
+    // Never rotate credentials from the seed; use `npm run admin:set-password` instead
+    admin = existingAdmin;
+    console.log(`ℹ️ Admin user ${admin.email} already exists. Password left unchanged.`);
+  } else if (adminEmail && adminPassword) {
     const passwordHash = await bcrypt.hash(adminPassword, 10);
-    if (existing) {
-      admin = await prisma.user.update({
-        where: { email: adminEmail },
-        data: { passwordHash, role: Role.ADMIN },
-      });
-      console.log(`✅ Admin user password updated for ${admin.email}`);
-    } else {
-      admin = await prisma.user.create({
-        data: {
-          email: adminEmail,
-          passwordHash,
-          name: 'Phúc & Trang Admin',
-          role: Role.ADMIN,
-        },
-      });
-      console.log(`✅ Admin user seeded: ${admin.email}`);
-    }
+    admin = await prisma.user.create({
+      data: {
+        email: adminEmail,
+        passwordHash,
+        name: 'Phúc & Trang Admin',
+        role: Role.ADMIN,
+      },
+    });
+    console.log(`✅ Admin user seeded: ${admin.email}`);
   } else {
     throw new Error(
       'FATAL: SEED_ADMIN_PASSWORD or DEV_ADMIN_PASSWORD environment variable is required for seeding!',
@@ -170,6 +190,11 @@ async function main() {
   }
 
   // 4. Seed Real Layout Templates (Full slots and element prototypes)
+  if (!writeCanonicalContent) {
+    console.log(
+      'ℹ️ Journal already exists: layout templates left untouched (missing presets are created by the API on boot).',
+    );
+  } else {
   for (const [key, t] of Object.entries(REAL_LAYOUT_PRESETS)) {
     await prisma.layoutTemplate.upsert({
       where: { id: t.id },
@@ -190,6 +215,7 @@ async function main() {
     });
   }
   console.log(`✅ Seeded all 9 layout templates with complete prototypes.`);
+  }
 
   // 5. Seed Master Book: "Chúng Mình"
   const firstCoverUrl = 'https://res.cloudinary.com/dlvpiesfj/image/upload/v1789904212/phuc_trang_backgrounds/first-cover.jpg';
@@ -350,40 +376,17 @@ async function main() {
       console.warn(
         '⚠️ FORCE CANONICAL SEED ENABLED: Existing CMS content is being overwritten with canonical source.',
       );
-      // Cleanly remove any existing pages and elements to guarantee exactly canonical 21 pages
-      await prisma.page.deleteMany({ where: { bookId: existingBook.id } });
-
-      book = await prisma.book.update({
-        where: { id: existingBook.id },
-        data: {
-          title: 'Chúng Mình',
-          cover: canonicalCover,
-          settings: canonicalSettings,
-          backgroundMusicId: audioTrack.id,
-          contentRevision: { increment: 1 },
-        },
-      });
-    } else {
-      book = await prisma.book.create({
-        data: {
-          title: 'Chúng Mình',
-          description: 'Cuốn nhật ký tình yêu của hai mình từ ngày 20 tháng 10 năm 2022.',
-          status: BookStatus.PUBLISHED,
-          heName: 'Phúc',
-          sheName: 'Trang',
-          anniversaryDate: new Date('2022-10-20T00:00:00Z'),
-          proposalQuote: 'Thế cậu đồng ý làm bạn gái tớ không?',
-          backgroundMusicId: audioTrack.id,
-          contentRevision: 1,
-          ownerId: admin.id,
-          cover: canonicalCover,
-          settings: canonicalSettings,
-        },
-      });
-      console.log(`✅ Book entity created: "${book.title}"`);
+      // The wipe + rebuild itself runs in one transaction below.
+      book = existingBook;
     }
 
     shouldSeedPages = true;
+  }
+
+  if (!shouldSeedPages) {
+    console.log(
+      'ℹ️ Skipped pages, initial BookVersion and publishedSnapshot (journal exists, force mode off). Publish from the Admin UI.',
+    );
   }
 
   if (shouldSeedPages) {
@@ -698,6 +701,44 @@ async function main() {
     },
   ];
 
+  // 7-9. Rebuild pages, version and publishedSnapshot atomically: a failure half-way through a
+  // forced rebuild must never leave the live journal with a partial set of pages.
+  await prisma.$transaction(async (db) => {
+  if (existingBook && forceCanonicalReset) {
+    // Cleanly remove any existing pages and elements to guarantee exactly canonical 21 pages
+    await db.page.deleteMany({ where: { bookId: existingBook.id } });
+
+    book = await db.book.update({
+      where: { id: existingBook.id },
+      data: {
+        title: 'Chúng Mình',
+        cover: canonicalCover,
+        settings: canonicalSettings,
+        backgroundMusicId: audioTrack.id,
+        contentRevision: { increment: 1 },
+      },
+    });
+  } else {
+    // Created inside the transaction so a failed first seed leaves no half-built journal behind
+    book = await db.book.create({
+      data: {
+        title: 'Chúng Mình',
+        description: 'Cuốn nhật ký tình yêu của hai mình từ ngày 20 tháng 10 năm 2022.',
+        status: BookStatus.PUBLISHED,
+        heName: 'Phúc',
+        sheName: 'Trang',
+        anniversaryDate: new Date('2022-10-20T00:00:00Z'),
+        proposalQuote: 'Thế cậu đồng ý làm bạn gái tớ không?',
+        backgroundMusicId: audioTrack.id,
+        contentRevision: 1,
+        ownerId: admin.id,
+        cover: canonicalCover,
+        settings: canonicalSettings,
+      },
+    });
+    console.log(`✅ Book entity created: "${book.title}"`);
+  }
+
   // 7. Insert all 21 pages and elements into PostgreSQL
   for (let i = 0; i < pagesData.length; i++) {
     const p = pagesData[i];
@@ -705,7 +746,7 @@ async function main() {
     const derivedSide = derivePageSideEnum(order);
     const bgMediaId = getMediaId(p.bg);
 
-    const pageRecord = await prisma.page.upsert({
+    const pageRecord = await db.page.upsert({
       where: {
         bookId_pageNumber: {
           bookId: book.id,
@@ -753,7 +794,7 @@ async function main() {
     });
 
     // Delete existing elements to ensure idempotent refresh
-    await prisma.pageElement.deleteMany({ where: { pageId: pageRecord.id } });
+    await db.pageElement.deleteMany({ where: { pageId: pageRecord.id } });
 
     const elementsToCreate: any[] = [];
     let currentZ = 1;
@@ -904,7 +945,7 @@ async function main() {
 
     // Insert all elements for this page
     for (const elem of elementsToCreate) {
-      await prisma.pageElement.create({
+      await db.pageElement.create({
         data: {
           pageId: pageRecord.id,
           type: elem.type,
@@ -925,7 +966,7 @@ async function main() {
   console.log(`✅ Seeded all 21 pages and elements into PostgreSQL.`);
 
   // 8. Seed Initial Version Snapshot with full complete pages & elements snapshot
-  const fullBookForSnapshot = await prisma.book.findUnique({
+  const fullBookForSnapshot = await db.book.findUnique({
     where: { id: book.id },
     include: {
       backgroundMusic: true,
@@ -940,7 +981,7 @@ async function main() {
     },
   });
 
-  await prisma.bookVersion.upsert({
+  await db.bookVersion.upsert({
     where: { id: 'initial-version-200' },
     update: {
       snapshot: fullBookForSnapshot as any,
@@ -1030,7 +1071,7 @@ async function main() {
     version: '2.0.0',
   };
 
-  await prisma.book.update({
+  await db.book.update({
     where: { id: book.id },
     data: {
       publishedSnapshot: compiledPublishedDoc as any,
@@ -1039,6 +1080,7 @@ async function main() {
     },
   });
   console.log('✅ Canonical publishedSnapshot initialized for production viewers.');
+  }, { timeout: 180_000, maxWait: 30_000 });
 }
 
   console.log('🎉 Database seeding completed successfully! Ready for production.');

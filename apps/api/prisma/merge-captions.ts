@@ -48,16 +48,32 @@ async function main() {
     merged += plans.length;
     if (!apply) continue;
 
-    await prisma.$transaction(async (tx) => {
-      for (const plan of plans) {
-        const media = page.elements.find((el) => el.id === plan.mediaId)!;
+    // Re-read the page inside the transaction so edits made since the dry-run scan are not
+    // overwritten, and re-plan from that fresh state.
+    const applied = await prisma.$transaction(async (tx) => {
+      const fresh = await tx.pageElement.findMany({ where: { pageId: page.id } });
+      const freshPlans = planCaptionMerge(fresh as any);
+      for (const plan of freshPlans) {
+        const media = fresh.find((el) => el.id === plan.mediaId)!;
         await tx.pageElement.update({
           where: { id: plan.mediaId },
           data: { data: { ...((media.data as any) || {}), caption: plan.text } },
         });
         await tx.pageElement.delete({ where: { id: plan.captionId } });
       }
+      if (freshPlans.length > 0) {
+        // Draft changed: bump contentRevision so caches/preview pick it up
+        await tx.book.update({
+          where: { id: page.bookId },
+          data: { contentRevision: { increment: 1 } },
+        });
+      }
+      return freshPlans.length;
     });
+    if (applied !== plans.length) {
+      console.log(`Trang ${page.pageNumber}: dữ liệu đã thay đổi, áp dụng ${applied}/${plans.length} theo dữ liệu mới nhất.`);
+      merged += applied - plans.length;
+    }
   }
 
   console.log(`${apply ? 'Đã gộp' : 'Sẽ gộp'} ${merged} tiêu đề; ${unmatched} tiêu đề không tìm được ảnh, giữ nguyên.`);
