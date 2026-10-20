@@ -1,6 +1,18 @@
 import * as THREE from 'three';
 import { Page, Book } from '@/types/book';
 import { PageTextureGenerator } from './PageTextureGenerator';
+import { detectInitialTier, QualityTier } from './qbject/quality';
+
+// How many spreads around the current one are generated eagerly, and how many generated
+// face textures (each a full-size canvas + GPU upload) may be retained at once.
+const TEXTURE_BUDGET: Record<QualityTier, { windowSpreads: number; maxTextures: number }> = {
+  low: { windowSpreads: 2, maxTextures: 10 },
+  medium: { windowSpreads: 3, maxTextures: 16 },
+  high: { windowSpreads: 3, maxTextures: 16 },
+};
+
+/** Returns false when the face cannot be released right now (e.g. it is on screen). */
+export type FaceTextureReleaser = (faceIndex: number) => boolean;
 
 export interface TextureCacheEntry {
   dataUrl: string;
@@ -17,6 +29,18 @@ export class LazyPageTextureManager {
   private generationQueue: Promise<unknown> = Promise.resolve();
   private windowRevision = 0;
   private canGenerate = () => true;
+  private releaseFace?: FaceTextureReleaser;
+  private retainMin = 0;
+  private retainMax = Infinity;
+  public readonly maxTextures: number;
+
+  /**
+   * Lets the manager evict generated textures outside the active window. The releaser must
+   * swap the face back to a placeholder so the evicted texture is no longer referenced.
+   */
+  public setFaceReleaser(releaser: FaceTextureReleaser) {
+    this.releaseFace = releaser;
+  }
 
   public setGenerationGate(gate: () => boolean) {
     this.canGenerate = gate;
@@ -28,11 +52,13 @@ export class LazyPageTextureManager {
     } while (!this.destroyed && !this.canGenerate());
   }
 
-  // Window distance: eagerly generate ±6 pages ahead of time to eliminate hitching
-  public readonly WINDOW_SIZE = 6;
+  // Window distance in spreads: eagerly generate the spreads around the current one to eliminate hitching
+  public readonly WINDOW_SIZE: number;
 
-  constructor(book: Book) {
+  constructor(book: Book, tier: QualityTier = typeof navigator !== 'undefined' ? detectInitialTier() : 'medium') {
     this.book = book;
+    this.WINDOW_SIZE = TEXTURE_BUDGET[tier].windowSpreads;
+    this.maxTextures = TEXTURE_BUDGET[tier].maxTextures;
     this.placeholderDataUrl = this.createParchmentPlaceholder();
   }
 
@@ -88,6 +114,7 @@ export class LazyPageTextureManager {
         }
         this.cache.set(pageIndex, entry);
         this.inFlightGenerations.delete(pageIndex);
+        this.evictOutsideWindow();
         return entry;
       })
       .catch((err) => {
@@ -182,6 +209,9 @@ export class LazyPageTextureManager {
 
     const minIdx = Math.max(0, targetFace - this.WINDOW_SIZE * 2);
     const maxIdx = Math.min(totalTextures - 1, targetFace + this.WINDOW_SIZE * 2);
+    this.retainMin = minIdx;
+    this.retainMax = maxIdx;
+    this.evictOutsideWindow();
 
     const indices = Array.from({ length: maxIdx - minIdx + 1 }, (_, i) => minIdx + i)
       .sort((a, b) => Math.abs(a - targetFace) - Math.abs(b - targetFace));
@@ -189,14 +219,35 @@ export class LazyPageTextureManager {
       if (this.destroyed || revision !== this.windowRevision) return;
       if (!this.cache.has(i)) {
         const entry = await this.getPageTextureEntry(i);
-          if (!this.destroyed && onPageTextureReady) {
-            onPageTextureReady(i, entry.dataUrl, entry.canvasTexture);
-          }
+        // The window may have moved on while this face was generating, in which case it was
+        // either evicted already or will be; do not hand a texture to a face we no longer retain.
+        if (!this.destroyed && onPageTextureReady && this.cache.get(i) === entry) {
+          onPageTextureReady(i, entry.dataUrl, entry.canvasTexture);
+        }
+      } else {
+        this.cache.get(i)!.lastAccessed = Date.now();
       }
     }
+  }
 
-    // Page materials already retain these textures. Keep their cache entries too so
-    // returning to a visited spread never rasterizes or uploads the same page again.
+  /**
+   * LRU eviction: faces inside the active window are always kept; beyond that, the least
+   * recently used faces are released (face swapped back to the placeholder) and disposed until
+   * the budget is met. Faces the releaser reports as visible are skipped.
+   * Evicted faces are regenerated lazily by updateActiveWindow when the reader comes back.
+   */
+  private evictOutsideWindow() {
+    if (this.destroyed || !this.releaseFace || this.cache.size <= this.maxTextures) return;
+    const candidates = Array.from(this.cache.entries())
+      .filter(([index]) => index < this.retainMin || index > this.retainMax)
+      .sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
+    for (const [index, entry] of candidates) {
+      if (this.cache.size <= this.maxTextures) break;
+      if (!this.releaseFace(index)) continue;
+      this.cache.delete(index);
+      entry.canvasTexture?.dispose();
+      entry.canvasTexture = undefined;
+    }
   }
 
   public getCacheSize(): number {
@@ -212,5 +263,6 @@ export class LazyPageTextureManager {
     }
     this.cache.clear();
     this.inFlightGenerations.clear();
+    this.releaseFace = undefined;
   }
 }

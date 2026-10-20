@@ -16,7 +16,14 @@ export default class SlidingNumber extends EventEmitter {
 	private nudgeDelta: number = 0;
 	private readonly MIN_GRAVITY_FORCE: number = 0.001; // TODO: make configurable
 	private readonly MIN_INERTIA_THRESHOLD: number = 1 / 5; // Constant for minimum allowed inertia ratio
-	public gravity: number = 0;
+	private gravityValue: number = 0;
+	public get gravity() {
+		return this.gravityValue;
+	}
+	public set gravity(value: number) {
+		this.gravityValue = value;
+		this.wake();
+	}
 
 	constructor(
 		defaultValue: number,
@@ -31,8 +38,8 @@ export default class SlidingNumber extends EventEmitter {
 		this.maxValue = 100;
 		this.locked = false;
 		this.dampenDistance = dampenDistance;
-		this.gravity = gravity;
-		this.runAnimation();
+		this.gravityValue = gravity;
+		this.wake();
 	}
 
 	private update(dt: number) {
@@ -120,41 +127,62 @@ export default class SlidingNumber extends EventEmitter {
 		}
 	}
 
-	private runAnimation() {
+	// Nothing left to simulate: no pending nudge, no motion and gravity (if any) has nowhere to pull
+	private isIdle() {
+		if (this.locked || this.nudgeDelta || this.inertia) return false;
+		if (this.gravityValue && this.hasLimits()) {
+			return this.value === this.minValue || this.value === this.maxValue;
+		}
+		return true;
+	}
+
+	// The frame loop only runs while the value is animating and stops itself once idle
+	private wake() {
+		if (this.destroyed || this.animationFrame) return;
 		let previousTime = performance.now();
 
 		const animate = ((currentTime: number) => {
-			let dt = Math.min((currentTime - previousTime) / 1000, 0.05);
-			previousTime = currentTime;
+			this.animationFrame = 0;
+			if (this.destroyed) return;
+			// rAF timestamps can precede the performance.now() taken when the loop was woken
+			let dt = Math.max(0, Math.min((currentTime - previousTime) / 1000, 0.05));
+			previousTime = Math.max(previousTime, currentTime);
 			if (!document.hidden) this.update(dt);
 
-			this.animationFrame = requestAnimationFrame(animate);
+			if (!this.isIdle()) this.animationFrame = requestAnimationFrame(animate);
 		}).bind(this);
 
-		animate(performance.now());
+		this.animationFrame = requestAnimationFrame(animate);
 	}
 
 	private animationFrame = 0;
+	private destroyed = false;
 	public destroy() {
+		this.destroyed = true;
 		cancelAnimationFrame(this.animationFrame);
+		this.animationFrame = 0;
 	}
 
 	public nudge(amount: number): void {
 		const prevValue = this.value;
 		this.setValue(this.value + amount);
 		this.nudgeDelta += this.value - prevValue;
+		this.wake();
 	}
 
 	public setMin(minValue: number): void {
 		this.minValue = minValue;
+		this.wake();
 	}
 
 	public setMax(maxValue: number): void {
 		this.maxValue = maxValue;
+		this.wake();
 	}
 
 	public lock(): void {
 		this.locked = true;
+		this.wake();
 	}
 
 	public release(): void {
@@ -162,6 +190,7 @@ export default class SlidingNumber extends EventEmitter {
 		if (this.isSettled()) {
 			this.triggerEvent("settled");
 		}
+		this.wake();
 	}
 
 	private hasLimits() {
@@ -184,6 +213,7 @@ export default class SlidingNumber extends EventEmitter {
 	public setValue(newValue: number) {
 		this.value = clamp(newValue, this.minValue, this.maxValue);
 		this.triggerEvent("valueChange", [{ newValue: this.value }]);
+		this.wake();
 	}
 
 	public getValue(): number {

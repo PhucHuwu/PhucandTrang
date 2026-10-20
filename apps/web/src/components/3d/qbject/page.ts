@@ -6,7 +6,6 @@ import {
 	lerp,
 	clamp,
 } from "./util";
-import { PaperTextureManager } from "./PaperTextureManager";
 
 export default class Page {
 	public textureUrls;

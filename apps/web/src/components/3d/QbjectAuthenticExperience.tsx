@@ -1,18 +1,20 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import * as THREE from 'three';
 import Flipbook from './qbject/flipbook';
-import { PageTextureGenerator } from './PageTextureGenerator';
+import { clearDecodedImageCache } from './PageTextureGenerator';
 import { AtmosphericSystem } from './AtmosphericSystem';
 import { LazyPageTextureManager } from './LazyPageTextureManager';
 import { MediaPreloader } from './MediaPreloader';
 import VintageMusicPlayer from '@/components/VintageMusicPlayer';
 import { ensureCustomFontLoaded } from '@/data/fontLoader';
-import { fetchPublishedBook } from '@/services/bookApi';
+import { fetchPublishedBook, isBookFetchError } from '@/services/bookApi';
 import { Book } from '@/types/book';
 import { BookOpen, RefreshCw, Play, Pause } from 'lucide-react';
 import { deriveFaceIndex, computeActiveAreaPageRect } from '@phucandtrang/shared';
+
+// Faces rasterized before the book is revealed (front cover + first spreads)
+const INITIAL_FACES = 13;
 
 interface QbjectAuthenticExperienceProps {
   customBookData?: Book;
@@ -29,6 +31,7 @@ export default function QbjectAuthenticExperience({
   const [loadingProgress, setLoadingProgress] = useState(0.04);
   const [bookData, setBookData] = useState<Book | null>(customBookData || null);
   const [error, setError] = useState<string | null>(null);
+  const [notPublished, setNotPublished] = useState(false);
   const [isAutoFlipping, setIsAutoFlipping] = useState(false);
   const autoFlipTimerRef = useRef<NodeJS.Timeout | null>(null);
   const flipbookInstanceRef = useRef<Flipbook | null>(null);
@@ -41,10 +44,30 @@ export default function QbjectAuthenticExperience({
 
     let destroyed = false;
     let progressFrame = 0;
+    // Owned by this effect run only, so a StrictMode re-run never tears down the other run's instances
+    let lazyManager: LazyPageTextureManager | null = null;
+    let mediaPreloader: MediaPreloader | null = null;
+    let flipbook: Flipbook | null = null;
+
+    // Idempotent; also called by the init flow when the effect was cleaned up while it was awaiting
+    const teardown = () => {
+      cancelAnimationFrame(progressFrame);
+      mediaPreloader?.destroy();
+      if (mediaPreloaderRef.current === mediaPreloader) mediaPreloaderRef.current = null;
+      mediaPreloader = null;
+      lazyManager?.destroy();
+      if (lazyTextureManagerRef.current === lazyManager) lazyTextureManagerRef.current = null;
+      lazyManager = null;
+      // Also destroys the atmospheric system and releases the WebGL context
+      flipbook?.destroy();
+      if (flipbookInstanceRef.current === flipbook) flipbookInstanceRef.current = null;
+      flipbook = null;
+    };
 
     const initOriginalFlipbook = async () => {
       try {
         setError(null);
+        setNotPublished(false);
         setLoadingProgress(0.04);
 
         // 1. If customBookData provided (e.g. preview mode), use it; otherwise fetch published book
@@ -68,11 +91,11 @@ export default function QbjectAuthenticExperience({
         setLoadingProgress(0.15);
 
         // 3. Prompt 26: Initialize Lazy Texture Manager
-        const lazyManager = new LazyPageTextureManager(book);
+        lazyManager = new LazyPageTextureManager(book);
         lazyTextureManagerRef.current = lazyManager;
 
         // Prompt 27: Initialize MediaPreloader for priority-driven background preloading
-        const mediaPreloader = new MediaPreloader(book);
+        mediaPreloader = new MediaPreloader(book);
         mediaPreloaderRef.current = mediaPreloader;
         mediaPreloader.init(0);
 
@@ -81,17 +104,18 @@ export default function QbjectAuthenticExperience({
         const placeholderUrl = lazyManager.getPlaceholder();
 
         // Prepare the opening window before revealing the book.
-        const initialFacesCount = Math.min(totalFaces, lazyManager.WINDOW_SIZE * 2 + 1);
+        const initialFacesCount = Math.min(totalFaces, INITIAL_FACES, lazyManager.maxTextures);
         const pageUrls: string[] = new Array(totalFaces).fill(placeholderUrl);
 
         for (let i = 0; i < initialFacesCount; i++) {
-          if (destroyed) return;
+          if (destroyed) return teardown();
           const url = await lazyManager.getPageTextureUrl(i);
+          if (destroyed) return teardown();
           pageUrls[i] = url;
           setLoadingProgress(0.2 + ((i + 1) / initialFacesCount) * 0.65);
         }
 
-        if (destroyed) return;
+        if (destroyed) return teardown();
         setLoadingProgress(0.88);
 
         // 5. Dynamically derive 3D raycast pageActiveAreas from book.pages elements
@@ -137,7 +161,7 @@ export default function QbjectAuthenticExperience({
           ? rawDeskColor
           : undefined;
 
-        const flipbook = new Flipbook({
+        flipbook = new Flipbook({
           containerEl: container,
           pageWidth: book.settings.dimensions.pageWidth,
           pageHeight: book.settings.dimensions.pageHeight,
@@ -165,16 +189,13 @@ export default function QbjectAuthenticExperience({
         });
 
         // Apply theme desk color to 3D desk plane if customized
-        if (deskColorHex !== undefined) {
-          const deskMesh = (flipbook as any).scene?.children?.find(
-            (c: any) => c.geometry?.type === 'PlaneGeometry' && c.material
-          );
-          if (deskMesh?.material) {
-            deskMesh.material.color = new THREE.Color(deskColorHex);
-          }
+        if (deskColorHex !== undefined && !Number.isNaN(deskColorHex)) {
+          flipbook.setDeskColor(deskColorHex);
         }
 
         flipbookInstanceRef.current = flipbook;
+        const book3d = flipbook;
+        const textures = lazyManager;
 
         // 7. Attach 3D atmospheric environment (butterflies, floating petals, fairy dust)
         if (book.settings.atmospheric?.enabled !== false) {
@@ -187,51 +208,57 @@ export default function QbjectAuthenticExperience({
               dustCount: atmos?.dustCount,
             }
           );
-          flipbook.atmospheric = atmospheric;
+          book3d.atmospheric = atmospheric;
         }
 
         setTotalPages(Math.ceil(pageUrls.length / 2));
         let readyReported = false;
-        lazyManager.setGenerationGate(() => readyReported && flipbook.isTextureWorkSafe());
+        textures.setGenerationGate(() => readyReported && book3d.isTextureWorkSafe());
+        // Evicted faces fall back to the parchment placeholder; visible faces are never released
+        textures.setFaceReleaser((faceIdx) => {
+          if (destroyed || book3d.isFaceVisible(faceIdx)) return false;
+          book3d.releaseFaceTexture(faceIdx, placeholderUrl);
+          return true;
+        });
 
         // Preload rest of window around page 0
-        lazyManager.updateActiveWindow(0, (faceIdx, textureUrl, directTexture) => {
-          if (!destroyed && flipbook) {
-            flipbook.updateFaceTexture(faceIdx, textureUrl, directTexture);
+        textures.updateActiveWindow(0, (faceIdx, textureUrl, directTexture) => {
+          if (!destroyed) {
+            book3d.updateFaceTexture(faceIdx, textureUrl, directTexture);
           }
         });
 
         let lastPage = -1;
         let warmingTextures = false;
         const checkProgress = () => {
-          if (!destroyed && flipbook) {
+          if (!destroyed) {
             if (!readyReported) {
-              const progress = Math.max(0.88, Math.min(1, flipbook.loadingProgress));
+              const progress = Math.max(0.88, Math.min(1, book3d.loadingProgress));
               setLoadingProgress((prev) => (Math.abs(prev - progress) > 0.005 ? progress : prev));
             }
-            if (flipbook.isReady && !readyReported && !warmingTextures) {
+            if (book3d.isReady && !readyReported && !warmingTextures) {
               warmingTextures = true;
-              flipbook.prepareOpeningTextures(initialFacesCount).then(() => {
+              book3d.prepareOpeningTextures(initialFacesCount).then(() => {
                 if (destroyed) return;
                 readyReported = true;
                 setLoadingProgress(1);
                 setIsReady(true);
               });
             }
-            const current = Math.round((flipbook as any).progress?.getValue?.() || 0);
+            const current = Math.round((book3d as any).progress?.getValue?.() || 0);
             if (current !== lastPage) {
               lastPage = current;
               setCurrentPage(current);
 
               // Prompt 26: Trigger lazy loading for window around new currentPage with zero-lag directTexture
-              lazyManager.updateActiveWindow(current, (faceIdx, textureUrl, directTexture) => {
-                if (!destroyed && flipbookInstanceRef.current) {
-                  flipbookInstanceRef.current.updateFaceTexture(faceIdx, textureUrl, directTexture);
+              textures.updateActiveWindow(current, (faceIdx, textureUrl, directTexture) => {
+                if (!destroyed) {
+                  book3d.updateFaceTexture(faceIdx, textureUrl, directTexture);
                 }
               });
 
               // Prompt 27: Re-prioritize media preloading based on current spread
-              mediaPreloader.updatePagePriorities(current);
+              mediaPreloader?.updatePagePriorities(current);
             }
             progressFrame = requestAnimationFrame(checkProgress);
           }
@@ -239,8 +266,14 @@ export default function QbjectAuthenticExperience({
         progressFrame = requestAnimationFrame(checkProgress);
       } catch (err: any) {
         if (!destroyed) {
-          console.error('[Flipbook] Initialization error:', err);
-          setError(err?.message || 'Không thể hiển thị cuốn sách');
+          if (isBookFetchError(err) && err.kind === 'not-published') {
+            console.info('[Flipbook] The journal has not been published yet.');
+            setNotPublished(true);
+            setError('Nhật ký đang được chuẩn bị, hãy quay lại sau nhé');
+          } else {
+            console.error('[Flipbook] Initialization error:', err);
+            setError(err?.message || 'Không thể hiển thị cuốn sách');
+          }
         }
       }
     };
@@ -249,17 +282,12 @@ export default function QbjectAuthenticExperience({
 
     return () => {
       destroyed = true;
-      cancelAnimationFrame(progressFrame);
       if (autoFlipTimerRef.current) {
         clearInterval(autoFlipTimerRef.current);
         autoFlipTimerRef.current = null;
       }
-      mediaPreloaderRef.current?.destroy();
-      mediaPreloaderRef.current = null;
-      lazyTextureManagerRef.current?.destroy();
-      lazyTextureManagerRef.current = null;
-      flipbookInstanceRef.current?.destroy();
-      flipbookInstanceRef.current = null;
+      teardown();
+      clearDecodedImageCache();
       if (container) {
         container.innerHTML = '';
       }
@@ -356,10 +384,21 @@ export default function QbjectAuthenticExperience({
           <div className="w-16 h-16 rounded-full bg-rosewood-500/20 border border-rosewood-400/40 flex items-center justify-center mb-4 text-rosewood-300">
             <BookOpen className="w-8 h-8" />
           </div>
-          <h3 className="font-serif text-2xl text-rosewood-100 mb-2">Không thể tải cuốn nhật ký</h3>
-          <p className="font-serif text-xs text-stone-400 max-w-sm mb-6 leading-relaxed">
-            {error}. Vui lòng kiểm tra lại kết nối mạng hoặc thử lại.
-          </p>
+          {notPublished ? (
+            <>
+              <h3 className="font-serif text-2xl text-rosewood-100 mb-2">Chúng Mình</h3>
+              <p className="font-serif text-xs text-stone-400 max-w-sm mb-6 leading-relaxed">
+                {error}
+              </p>
+            </>
+          ) : (
+            <>
+              <h3 className="font-serif text-2xl text-rosewood-100 mb-2">Không thể tải cuốn nhật ký</h3>
+              <p className="font-serif text-xs text-stone-400 max-w-sm mb-6 leading-relaxed">
+                {error}. Vui lòng kiểm tra lại kết nối mạng hoặc thử lại.
+              </p>
+            </>
+          )}
           <button
             onClick={() => window.location.reload()}
             className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-rosewood-500 hover:bg-rosewood-600 active:scale-95 text-white font-serif text-xs tracking-wider transition-all shadow-lg"

@@ -147,9 +147,10 @@ export default class Flipbook {
 		};
 
 		this.scene = new THREE.Scene();
+		const viewport = this.getViewportSize();
 		this.camera = new THREE.PerspectiveCamera(
 			this.settings.cameraFov,
-			window.innerWidth / window.innerHeight,
+			viewport.width / viewport.height,
 			1200,
 			9000,
 		);
@@ -160,8 +161,9 @@ export default class Flipbook {
 		// this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
 		// this.renderer.toneMappingExposure = 1.2;
 		// Phones report DPR 3+; rendering the scene (and its soft shadows) at that density is too heavy
-		this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO[this.quality.tier]));
-		this.renderer.setSize(window.innerWidth, window.innerHeight);
+		this.renderer.setPixelRatio(this.getTargetPixelRatio(this.quality.tier));
+		this.renderer.setSize(viewport.width, viewport.height);
+		this.lastViewport = { ...viewport, pixelRatio: this.renderer.getPixelRatio() };
 		this.renderer.shadowMap.enabled = true;
 		this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 		this.renderer.domElement.classList.add("flipbook-canvas");
@@ -315,25 +317,22 @@ export default class Flipbook {
 		deskMesh.castShadow = true;
 		deskMesh.renderOrder = 100;
 		this.scene.add(deskMesh);
+		this.deskMesh = deskMesh;
 
 		this.updateVerticalMode();
 		this.applySettings(params.settings || {}, true);
 
 		// event listeners
-		window.addEventListener(
-			"resize",
-			this.resizeHandler,
-			false,
-		);
+		if (typeof ResizeObserver !== "undefined") {
+			this.resizeObserver = new ResizeObserver(this.resizeHandler);
+			this.resizeObserver.observe(this.containerEl);
+		} else {
+			window.addEventListener("resize", this.resizeHandler, false);
+		}
+		this.watchPixelRatio();
 
 		// process interactive areas
-		this.renderer.domElement.addEventListener("mousemove", event => {
-			this.sceneMousePos.x = (event.clientX / window.innerWidth) * 2 - 1;
-			this.sceneMousePos.y =
-				-(event.clientY / window.innerHeight) * 2 + 1;
-
-			this.updateCursor();
-		});
+		this.renderer.domElement.addEventListener("mousemove", this.mouseMoveHandler);
 
 		this.swipeHandler = new SwipeHandler(this.renderer.domElement);
 		this.swipeHandler.addCallback("swipeStart", () => {
@@ -368,35 +367,9 @@ export default class Flipbook {
 		});
 		*/
 
-		this.renderer.domElement.addEventListener("click", event => {
-			this.sceneMousePos.x = (event.clientX / window.innerWidth) * 2 - 1;
-			this.sceneMousePos.y =
-				-(event.clientY / window.innerHeight) * 2 + 1;
-			this.onBookClick(this.sceneMousePos);
-		});
+		this.renderer.domElement.addEventListener("click", this.clickHandler);
 
-		this.wrapperLinkEl.addEventListener("dblclick", () => {
-			if (!document.fullscreenElement) {
-				if (this.containerEl.requestFullscreen) {
-					this.containerEl.requestFullscreen().catch(err => {
-						console.error(
-							"Failed to enter a full-screen mode",
-							err,
-						);
-					});
-				} else {
-					console.error(
-						"Fullscreen API is not supported in this browser.",
-					);
-				}
-			} else {
-				if (document.exitFullscreen) {
-					document.exitFullscreen().catch(err => {
-						console.error("Failed to exit a full-screen mode", err);
-					});
-				}
-			}
-		});
+		this.wrapperLinkEl.addEventListener("dblclick", this.dblClickHandler);
 
 		this.cameraSideShift.setMin(-1); // look at the left page
 		this.cameraSideShift.setMax(1); // look at the right page
@@ -526,7 +499,58 @@ export default class Flipbook {
 	}
 
 	private disposed = false;
+	private deskMesh: THREE.Mesh;
+	private resizeObserver?: ResizeObserver;
+	private pixelRatioQuery?: MediaQueryList;
+	private lastViewport = { width: 0, height: 0, pixelRatio: 0 };
+	// Plain objects animated by the intro; killed on destroy together with camera/light/settings tweens
+	private tweenTargets = new Set<object>();
 	private resizeHandler = () => this.onWindowResize();
+	private pixelRatioHandler = () => {
+		if (this.disposed) return;
+		this.watchPixelRatio();
+		this.onWindowResize();
+	};
+	private setPointerFromEvent(event: MouseEvent) {
+		const rect = this.renderer.domElement.getBoundingClientRect();
+		const width = rect.width || 1;
+		const height = rect.height || 1;
+		this.sceneMousePos.x = ((event.clientX - rect.left) / width) * 2 - 1;
+		this.sceneMousePos.y = -((event.clientY - rect.top) / height) * 2 + 1;
+	}
+	private mouseMoveHandler = (event: MouseEvent) => {
+		if (this.disposed) return;
+		this.setPointerFromEvent(event);
+		this.updateCursor();
+	};
+	private clickHandler = (event: MouseEvent) => {
+		if (this.disposed) return;
+		this.setPointerFromEvent(event);
+		this.onBookClick(this.sceneMousePos);
+	};
+	private dblClickHandler = () => {
+		if (this.disposed) return;
+		if (!document.fullscreenElement) {
+			if (this.containerEl.requestFullscreen) {
+				this.containerEl.requestFullscreen().catch(err => {
+					console.error(
+						"Failed to enter a full-screen mode",
+						err,
+					);
+				});
+			} else {
+				console.error(
+					"Fullscreen API is not supported in this browser.",
+				);
+			}
+		} else {
+			if (document.exitFullscreen) {
+				document.exitFullscreen().catch(err => {
+					console.error("Failed to exit a full-screen mode", err);
+				});
+			}
+		}
+	};
 	private keydownHandler = (event: KeyboardEvent) => {
 		if (this.disposed || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
 		const target = event.target as HTMLElement | null;
@@ -550,18 +574,38 @@ export default class Flipbook {
 	private loadingManager = new THREE.LoadingManager();
 	public get isReady() { return this.introPhase === "COMPLETED" && this.initCompleted; }
 	public destroy() {
+		if (this.disposed) return;
 		this.disposed = true;
 		for (const pending of this.pendingFaceTextures.values()) pending.texture?.dispose();
 		this.pendingFaceTextures.clear();
+		this.resizeObserver?.disconnect();
+		this.resizeObserver = undefined;
 		window.removeEventListener("resize", this.resizeHandler);
+		this.pixelRatioQuery?.removeEventListener("change", this.pixelRatioHandler);
+		this.pixelRatioQuery = undefined;
 		document.removeEventListener("keydown", this.keydownHandler);
+		this.renderer.domElement.removeEventListener("mousemove", this.mouseMoveHandler);
+		this.renderer.domElement.removeEventListener("click", this.clickHandler);
+		this.wrapperLinkEl.removeEventListener("dblclick", this.dblClickHandler);
 		this.swipeHandler?.destroy();
 		cancelAnimationFrame(this.animationFrame);
+		this.animationFrame = 0;
 		this.progress.destroy();
 		this.cameraSideShift.destroy();
-		this.videoOverlay.close();
+		this.videoOverlay.destroy();
 		gsap.killTweensOf(this.camera.position);
 		gsap.killTweensOf(this.camera.quaternion);
+		gsap.killTweensOf(this.settings);
+		gsap.killTweensOf(this.spotLight);
+		gsap.killTweensOf(this.ambientLight);
+		this.tweenTargets.forEach(target => gsap.killTweensOf(target));
+		this.tweenTargets.clear();
+		this.atmosphericSystem?.destroy?.();
+		this.atmosphericSystem = undefined;
+		this.pageHelpers.forEach(helper => helper.destroy());
+		this.pageHelpers = [];
+		this.spotLightHelper?.dispose();
+		this.spotShadowHelper?.dispose();
 		const geometries = new Set<THREE.BufferGeometry>();
 		const materials = new Set<THREE.Material>();
 		const textures = new Set<THREE.Texture>();
@@ -576,8 +620,58 @@ export default class Flipbook {
 		textures.forEach(texture => texture.dispose());
 		materials.forEach(material => material.dispose());
 		geometries.forEach(geometry => geometry.dispose());
+		this.spotLight.shadow.map?.dispose();
+		this.spotLight.shadow.map = null;
+		this.spotLight.dispose();
 		this.renderer.dispose();
+		// Release the GL context now instead of waiting for GC; browsers cap live contexts per page.
+		this.renderer.forceContextLoss();
 		this.wrapperLinkEl.remove();
+	}
+
+	public setDeskColor(color: THREE.ColorRepresentation) {
+		if (this.disposed) return;
+		const material = this.deskMesh.material as THREE.MeshStandardMaterial;
+		material.color = new THREE.Color(color);
+	}
+
+	private getViewportSize() {
+		const width = this.containerEl.clientWidth || window.innerWidth || 1;
+		const height = this.containerEl.clientHeight || window.innerHeight || 1;
+		return { width, height };
+	}
+
+	private getTargetPixelRatio(tier: QualityTier) {
+		return Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO[tier]);
+	}
+
+	// matchMedia only reports the DPR it was created for, so re-arm it after every change
+	private watchPixelRatio() {
+		this.pixelRatioQuery?.removeEventListener("change", this.pixelRatioHandler);
+		this.pixelRatioQuery = undefined;
+		if (typeof window.matchMedia !== "function") return;
+		const query = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+		query.addEventListener?.("change", this.pixelRatioHandler);
+		this.pixelRatioQuery = query;
+	}
+
+	/** Whether the face is on one of the pages that can currently be seen (top pages and the one turning). */
+	public isFaceVisible(faceIndex: number): boolean {
+		const pageIndex = Math.floor(faceIndex / 2);
+		const progress = this.progress.getValue();
+		return pageIndex >= Math.floor(progress) - 1 && pageIndex <= Math.ceil(progress);
+	}
+
+	/** Drops a face back to a lightweight placeholder so its generated texture can be freed. */
+	public releaseFaceTexture(faceIndex: number, placeholderUrl: string) {
+		if (this.disposed) return;
+		const pending = this.pendingFaceTextures.get(faceIndex);
+		if (pending) {
+			this.pendingFaceTextures.delete(faceIndex);
+		}
+		const page = this.pages[Math.floor(faceIndex / 2)];
+		if (!page) return;
+		page.setSideTexture(faceIndex % 2 === 0 ? "front" : "back", placeholderUrl);
 	}
 
 	private onSwipeMove(swipe: Swipe) {
@@ -734,8 +828,10 @@ export default class Flipbook {
 
 	private applyQuality(tier: QualityTier) {
 		if (this.disposed) return;
-		this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO[tier]));
-		this.renderer.setSize(window.innerWidth, window.innerHeight);
+		const viewport = this.getViewportSize();
+		this.renderer.setPixelRatio(this.getTargetPixelRatio(tier));
+		this.renderer.setSize(viewport.width, viewport.height);
+		this.lastViewport = { ...viewport, pixelRatio: this.renderer.getPixelRatio() };
 		this.atmosphericSystem?.setQuality?.(EFFECT_SHARE[tier]);
 		this.quality.reset();
 	}
@@ -747,7 +843,8 @@ export default class Flipbook {
 
 	private updateVerticalMode() {
 		const bookAspect = (this.pageWidth * 2) / this.pageHeight;
-		const screenAspect = window.innerWidth / window.innerHeight;
+		const viewport = this.getViewportSize();
+		const screenAspect = viewport.width / viewport.height;
 		// TODO: tweak the breakpoint
 		this.isVerticalMode = bookAspect > screenAspect;
 		if (this.isVerticalMode) {
@@ -758,10 +855,18 @@ export default class Flipbook {
 	}
 
 	private onWindowResize() {
+		if (this.disposed) return;
+		const viewport = this.getViewportSize();
+		const pixelRatio = this.getTargetPixelRatio(this.quality.tier);
+		const last = this.lastViewport;
+		// ResizeObserver also reports the initial size on observe(); nothing to do then
+		if (last.width === viewport.width && last.height === viewport.height && last.pixelRatio === pixelRatio) return;
+		this.lastViewport = { ...viewport, pixelRatio };
 		this.updateVerticalMode();
-		this.camera.aspect = window.innerWidth / window.innerHeight;
+		this.camera.aspect = viewport.width / viewport.height;
 		this.camera.updateProjectionMatrix();
-		this.renderer.setSize(window.innerWidth, window.innerHeight);
+		if (this.renderer.getPixelRatio() !== pixelRatio) this.renderer.setPixelRatio(pixelRatio);
+		this.renderer.setSize(viewport.width, viewport.height);
 		this.render();
 	}
 
@@ -1038,6 +1143,7 @@ export default class Flipbook {
 
 		const ease = "power2.inOut";
 
+		if (this.disposed) return;
 		gsap.to(this.camera.position, {
 			z: targetPos.position.z,
 			duration: zDuration / 1000,
@@ -1045,6 +1151,7 @@ export default class Flipbook {
 		});
 
 		const animateRest = () => {
+			if (this.disposed) return;
 			gsap.to(this.camera.position, {
 				x: targetPos.position.x,
 				duration: restDuration / 1000,
@@ -1197,6 +1304,7 @@ export default class Flipbook {
 			"page-zoom",
 			1100,
 		);
+		if (this.disposed) return;
 		this.isChangingFocus = false;
 
 		this.updateCursor();
@@ -1232,14 +1340,17 @@ export default class Flipbook {
 
 		this.isChangingFocus = true;
 		await this.restoreCamera(1100);
+		if (this.disposed) return;
 		this.isChangingFocus = false;
 
 		this.updateCursor();
 	}
 
 	private async playIntro() {
+		if (this.disposed) return;
 		const transitionToBottomView = async (durationMs: number) => {
 			const animation = { progress: 0 };
+			this.tweenTargets.add(animation);
 			await gsap.to(animation, {
 				progress: 1,
 				duration: durationMs / 1000,
@@ -1260,6 +1371,7 @@ export default class Flipbook {
 
 		const openFirstPage = async (durationMs: number) => {
 			const animation = { progress: 0 };
+			this.tweenTargets.add(animation);
 			this.progress.lock();
 			this.progress.setMin(0);
 			this.progress.setMax(1);
@@ -1268,6 +1380,7 @@ export default class Flipbook {
 				duration: durationMs / 1000,
 				ease: "power2.inOut",
 				onUpdate: () => {
+					if (this.disposed) return;
 					this.progress.setValue(animation.progress);
 				},
 				onComplete: () => {
@@ -1294,6 +1407,7 @@ export default class Flipbook {
 			});
 		};
 
+		const isDisposed = () => this.disposed;
 		async function animateLogoFlash(durationMs: number): Promise<void> {
 			const phase1Duration = durationMs * 0.45;
 			const phase2Duration = durationMs * 0.3;
@@ -1311,9 +1425,11 @@ export default class Flipbook {
 				"translateX(-50%) translateY(-50%) scale(1.2)";
 
 			await sleep(phase1Duration);
+			if (isDisposed()) return;
 
 			// Phase 2: Maintain maximum shininess
 			await sleep(phase2Duration);
+			if (isDisposed()) return;
 
 			// Phase 3: Decrease shininess and opacity
 			logoEl.style.transition = `filter ${phase3Duration}ms ease-in, opacity ${phase3Duration}ms ease-in`;
@@ -1337,6 +1453,7 @@ export default class Flipbook {
 				duration: intensifyDurationMs / 1000,
 				ease: "power2.inOut",
 				onComplete: () => {
+					if (this.disposed) return;
 					gsap.to(this.spotLight, {
 						intensity: spotLightIntensity,
 						duration: (durationMs - intensifyDurationMs) / 1000,
@@ -1391,6 +1508,7 @@ export default class Flipbook {
 		logoEl.style.opacity = "1";
 
 		await sleep(500); // let logo and progress settle
+		if (this.disposed) return;
 
 		// perform initial setup
 		this.update(1);
@@ -1407,6 +1525,7 @@ export default class Flipbook {
 			1.95,
 		);
 		await this.watchArea(logoCorners);
+		if (this.disposed) return;
 
 		// run the main loop
 		this.runAnimation();
@@ -1414,14 +1533,19 @@ export default class Flipbook {
 		this.introOverlay.dom.progress.style.opacity = "0";
 
 		await sleep(200); // make sure all the hard work is done
+		if (this.disposed) return;
 
 		animateLightFlash(2500);
 		await animateLogoFlash(2500);
+		if (this.disposed) return;
 		transitionToBottomView(3000);
 		await sleep(2000);
+		if (this.disposed) return;
 		openFirstPage(3500);
 		await sleep(1000);
+		if (this.disposed) return;
 		await transitionRaise(4000);
+		if (this.disposed) return;
 
 		// finalize
 		this.introOverlay.dom.container.style.display = "none";

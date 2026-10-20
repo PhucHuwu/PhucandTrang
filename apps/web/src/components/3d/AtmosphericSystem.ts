@@ -534,8 +534,11 @@ export class AtmosphericSystem {
   destroy() {
     if (this.dustParticles) {
       this.dustParticles.geometry.dispose();
-      (this.dustParticles.material as THREE.Material).dispose();
+      const material = this.dustParticles.material as THREE.PointsMaterial;
+      material.map?.dispose();
+      material.dispose();
       this.scene.remove(this.dustParticles);
+      this.dustParticles = null;
     }
     if (this.foliageMesh) {
       const material = this.foliageMesh.material as THREE.MeshBasicMaterial;
@@ -554,6 +557,7 @@ export class AtmosphericSystem {
         (m.material as THREE.Material).dispose();
       });
       this.scene.remove(this.glowingHearts);
+      this.glowingHearts = null;
     }
     if (this.butterflyMesh) {
       const material = this.butterflyMesh.material as THREE.MeshBasicMaterial;
@@ -565,5 +569,6 @@ export class AtmosphericSystem {
       this.butterflyMesh = null;
     }
     this.butterflies = [];
+    this.wingPhaseAttribute = null;
   }
 }

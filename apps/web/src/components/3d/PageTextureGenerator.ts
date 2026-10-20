@@ -25,6 +25,7 @@ import {
   ensureCanvasFontLoaded,
   ensureCustomFontLoaded,
 } from '@/data/fontLoader';
+import { detectInitialTier } from './qbject/quality';
 
 // Re-export types for consumers
 export type { PageMediaItem, PageLayoutType };
@@ -37,8 +38,69 @@ export const DEFAULT_CANVAS_HEIGHT = 1360;
  */
 const decodedImages = new Map<string, { image: HTMLImageElement; bytes: number }>();
 const pendingImages = new Map<string, Promise<HTMLImageElement>>();
-const DECODED_IMAGE_BUDGET = 128 * 1024 * 1024;
+const DEFAULT_DECODED_IMAGE_BUDGET = 128 * 1024 * 1024;
+const LOW_TIER_DECODED_IMAGE_BUDGET = 48 * 1024 * 1024;
+let decodedImageBudget: number | null = null;
 let decodedImageBytes = 0;
+// Bumped on clear so loads that were still in flight do not refill the cache afterwards
+let decodedImageEpoch = 0;
+
+function getDecodedImageBudget(): number {
+  if (decodedImageBudget === null) {
+    decodedImageBudget =
+      typeof navigator !== 'undefined' && detectInitialTier() === 'low'
+        ? LOW_TIER_DECODED_IMAGE_BUDGET
+        : DEFAULT_DECODED_IMAGE_BUDGET;
+  }
+  return decodedImageBudget;
+}
+
+function trimDecodedImages(budget: number) {
+  while (decodedImageBytes > budget && decodedImages.size) {
+    const oldest = decodedImages.entries().next().value!;
+    decodedImageBytes -= oldest[1].bytes;
+    decodedImages.delete(oldest[0]);
+  }
+}
+
+/** Drops every decoded image held by the shared cache (call when the viewer unmounts). */
+export function clearDecodedImageCache() {
+  decodedImageEpoch++;
+  pendingImages.clear();
+  decodedImages.clear();
+  decodedImageBytes = 0;
+}
+
+/**
+ * Cloudinary can render a still frame of a video: /video/upload/so_0/<id>.jpg.
+ * Returns null for any other URL, which must not be loaded as an image.
+ */
+export function deriveVideoPosterUrl(videoUrl?: string): string | null {
+  if (!videoUrl) return null;
+  try {
+    const url = new URL(videoUrl);
+    if (!/(^|\.)cloudinary\.com$/i.test(url.hostname) || !url.pathname.includes('/video/upload/')) {
+      return null;
+    }
+    url.pathname = url.pathname
+      .replace('/video/upload/', '/video/upload/so_0/')
+      .replace(/\.[a-z0-9]+$/i, '.jpg');
+    if (!url.pathname.endsWith('.jpg')) url.pathname += '.jpg';
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** Poster image for a VIDEO element: explicit thumbnail first, then a Cloudinary frame. */
+function resolveVideoPosterUrl(data: { thumbnailUrl?: string; src?: string }): string | null {
+  return data.thumbnailUrl || deriveVideoPosterUrl(data.src);
+}
+
+/** Loads and decodes an image into the shared cache used by the page renderer. */
+export function preloadDecodedImage(src: string): Promise<HTMLImageElement> {
+  return loadImageAsync(src);
+}
 
 function loadImageAsync(src: string): Promise<HTMLImageElement> {
   const cached = decodedImages.get(src);
@@ -50,6 +112,7 @@ function loadImageAsync(src: string): Promise<HTMLImageElement> {
   const pending = pendingImages.get(src);
   if (pending) return pending;
 
+  const epoch = decodedImageEpoch;
   const request = new Promise<HTMLImageElement>((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -58,12 +121,9 @@ function loadImageAsync(src: string): Promise<HTMLImageElement> {
       // onload alone does not guarantee decoded pixels are ready for drawImage.
       try { await img.decode(); } catch { /* Loaded images can still be drawable after decode rejection. */ }
       const bytes = img.naturalWidth * img.naturalHeight * 4;
-      if (bytes <= DECODED_IMAGE_BUDGET) {
-        while (decodedImageBytes + bytes > DECODED_IMAGE_BUDGET && decodedImages.size) {
-          const oldest = decodedImages.entries().next().value!;
-          decodedImageBytes -= oldest[1].bytes;
-          decodedImages.delete(oldest[0]);
-        }
+      const budget = getDecodedImageBudget();
+      if (epoch === decodedImageEpoch && bytes <= budget && !decodedImages.has(src)) {
+        trimDecodedImages(budget - bytes);
         decodedImages.set(src, { image: img, bytes });
         decodedImageBytes += bytes;
       }
@@ -80,7 +140,9 @@ function loadImageAsync(src: string): Promise<HTMLImageElement> {
     img.src = src;
   });
   pendingImages.set(src, request);
-  void request.finally(() => pendingImages.delete(src));
+  void request.finally(() => {
+    if (pendingImages.get(src) === request) pendingImages.delete(src);
+  });
   return request;
 }
 
@@ -216,9 +278,9 @@ export class PageTextureGenerator {
         const data = el.data as { src?: string };
         if (data.src) urlsToLoad.add(data.src);
       } else if (el.type === 'VIDEO') {
-        const data = el.data as { thumbnailUrl?: string; src?: string };
-        if (data.thumbnailUrl) urlsToLoad.add(data.thumbnailUrl);
-        else if (data.src) urlsToLoad.add(data.src);
+        // Never download/decode the video file itself as an image.
+        const posterUrl = resolveVideoPosterUrl(el.data as { thumbnailUrl?: string; src?: string });
+        if (posterUrl) urlsToLoad.add(posterUrl);
       } else if (el.type === 'DECORATION') {
         const data = el.data as { assetUrl?: string };
         if (data.assetUrl) urlsToLoad.add(data.assetUrl);
@@ -756,10 +818,11 @@ export class PageTextureGenerator {
     imageCache: Map<string, HTMLImageElement>,
     varContext?: VariableContext
   ) {
-    const posterUrl = el.data.thumbnailUrl || el.data.src;
-    if (!posterUrl) return;
-    const img = imageCache.get(posterUrl);
-    if (!img || img.width <= 1) return;
+    // Videos open muted in the overlay (product decision: background music stays on); this only draws the poster.
+    const posterUrl = resolveVideoPosterUrl(el.data);
+    const img = posterUrl ? imageCache.get(posterUrl) : undefined;
+    // No poster: leave the box empty, as before (the page background acts as the placeholder).
+    if (!posterUrl || !img || img.width <= 1) return;
 
     // Render as Image first
     this.renderImageElement(

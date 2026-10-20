@@ -56,6 +56,9 @@ export default function VintageMusicPlayer({
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fadeIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Set when a track switch should start playing once the new source is ready
+  const playOnTrackChangeRef = useRef(false);
 
   const currentTrack: AudioTrack | undefined = queue[currentIndex] || queue[0];
   const songSrc = currentTrack?.src;
@@ -155,7 +158,8 @@ export default function VintageMusicPlayer({
           }
           setIsPlaying(true);
           setShowToast(true);
-          setTimeout(() => setShowToast(false), 4500);
+          if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+          toastTimerRef.current = setTimeout(() => setShowToast(false), 4500);
           applyFadeIn();
         })
         .catch(() => {
@@ -164,21 +168,39 @@ export default function VintageMusicPlayer({
     }
   }, [applyFadeIn, songSrc, startAt]);
 
+  const restartCurrentTrack = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = 0;
+    audio.play().catch(() => setIsPlaying(false));
+  }, []);
+
+  // Switch track; playback starts from the effect below once the new src is rendered
+  const switchToTrack = useCallback((index: number) => {
+    playOnTrackChangeRef.current = true;
+    if (index === currentIndex) {
+      startPlayback();
+      playOnTrackChangeRef.current = false;
+      return;
+    }
+    setCurrentIndex(index);
+  }, [currentIndex, startPlayback]);
+
+  // Runs after the <audio> element received the new src, so startPlayback sees the current track
+  useEffect(() => {
+    if (!playOnTrackChangeRef.current) return;
+    playOnTrackChangeRef.current = false;
+    startPlayback();
+  }, [currentIndex, startPlayback]);
+
   // Next Track in Playlist
   const handleNextTrack = useCallback(() => {
     if (queue.length <= 1) {
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current.play();
-      }
+      restartCurrentTrack();
       return;
     }
-    const nextIdx = (currentIndex + 1) % queue.length;
-    setCurrentIndex(nextIdx);
-    setTimeout(() => {
-      startPlayback();
-    }, 100);
-  }, [currentIndex, queue.length, startPlayback]);
+    switchToTrack((currentIndex + 1) % queue.length);
+  }, [currentIndex, queue.length, restartCurrentTrack, switchToTrack]);
 
   // Previous Track in Playlist
   const handlePrevTrack = useCallback(() => {
@@ -188,26 +210,19 @@ export default function VintageMusicPlayer({
       }
       return;
     }
-    const prevIdx = (currentIndex - 1 + queue.length) % queue.length;
-    setCurrentIndex(prevIdx);
-    setTimeout(() => {
-      startPlayback();
-    }, 100);
-  }, [currentIndex, queue.length, startPlayback]);
+    switchToTrack((currentIndex - 1 + queue.length) % queue.length);
+  }, [currentIndex, queue.length, switchToTrack]);
 
   // Handle Track Completion: Automatically play next song in Playlist!
   const handleSongEnded = useCallback(() => {
     if (queue.length > 1) {
       handleNextTrack();
     } else if (loop) {
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current.play();
-      }
+      restartCurrentTrack();
     } else {
       setIsPlaying(false);
     }
-  }, [handleNextTrack, loop, queue.length]);
+  }, [handleNextTrack, loop, queue.length, restartCurrentTrack]);
 
   // Trigger Autoplay ONLY ONCE when reader first starts opening the book (page > 0)
   // Strictly respects user pause: NEVER restart if user manually paused!
@@ -251,6 +266,10 @@ export default function VintageMusicPlayer({
   useEffect(() => {
     return () => {
       clearFade();
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+      playOnTrackChangeRef.current = false;
+      audioRef.current?.pause();
     };
   }, [clearFade]);
 
@@ -278,7 +297,7 @@ export default function VintageMusicPlayer({
         ref={audioRef}
         src={songSrc}
         loop={loop}
-        preload="auto"
+        preload="metadata"
         onEnded={handleSongEnded}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
@@ -386,11 +405,8 @@ export default function VintageMusicPlayer({
               <button
                 key={track.id || idx}
                 onClick={() => {
-                  setCurrentIndex(idx);
                   isManuallyPausedRef.current = false;
-                  setTimeout(() => {
-                    startPlayback();
-                  }, 100);
+                  switchToTrack(idx);
                 }}
                 className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition ${
                   idx === currentIndex

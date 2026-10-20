@@ -84,6 +84,12 @@ export default class VideoOverlay {
 		video.preload = "none";
 	}
 
+	public destroy() {
+		this.close();
+		this.onCloseRequest = undefined;
+		this.dom.container.remove();
+	}
+
 	public isOpen() {
 		return this.dom.container.classList.contains("active");
 	}

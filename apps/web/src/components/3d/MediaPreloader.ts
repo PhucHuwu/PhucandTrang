@@ -17,9 +17,25 @@
  * - Deduplication via URL set.
  * - Abort / Cancellation support when switching pages or destroying.
  * - Non-blocking: background loading does not delay first meaningful render.
+ * - On low-tier / small-screen devices only pages near the current spread are preloaded.
+ * - Images near the current spread are decoded into the same cache PageTextureGenerator
+ *   draws from; distant ones only warm the HTTP cache so they cannot evict nearby decoded images.
  */
 
 import { Book, Page } from '@/types/book';
+import { deriveVideoPosterUrl, preloadDecodedImage } from './PageTextureGenerator';
+import { detectInitialTier } from './qbject/quality';
+
+// Face distance from the current spread that is still preloaded on constrained devices
+const CONSTRAINED_WINDOW_FACES = 6;
+// Priorities at or below this value are decoded into the shared renderer cache
+const SHARED_CACHE_MAX_PRIORITY = 3;
+
+function isConstrainedDevice(): boolean {
+  if (typeof window === 'undefined') return false;
+  const coarse = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+  return detectInitialTier() === 'low' || window.innerWidth < 768 || coarse;
+}
 
 export type PreloadItemType = 'image' | 'video-poster' | 'audio-meta';
 
@@ -47,6 +63,7 @@ export class MediaPreloader {
   private totalLoaded = 0;
   private destroyed = false;
   private onProgressCallback?: (progress: PreloadProgress) => void;
+  private readonly constrained = isConstrainedDevice();
 
   constructor(book: Book, onProgress?: (progress: PreloadProgress) => void) {
     this.book = book;
@@ -94,9 +111,19 @@ export class MediaPreloader {
     const currentFace = currentSpread * 2;
     const pages = this.book.pages || [];
 
+    if (this.constrained) {
+      // Forget queued page media that drifted out of the window; it is re-queued when the reader gets close
+      this.queue = this.queue.filter(
+        (item) =>
+          item.pageIndex === undefined ||
+          Math.abs(item.pageIndex + 1 - currentFace) <= CONSTRAINED_WINDOW_FACES
+      );
+    }
+
     pages.forEach((page, pageIdx) => {
       const faceIdx = pageIdx + 1; // 0 is front cover
       const distance = Math.abs(faceIdx - currentFace);
+      if (this.constrained && distance > CONSTRAINED_WINDOW_FACES) return;
 
       let priority = 4;
       if (distance <= 1) {
@@ -125,7 +152,7 @@ export class MediaPreloader {
           this.enqueue(d.src, 'image', priority, pageIdx);
         }
         if (el.type === 'VIDEO') {
-          const poster = d.thumbnailUrl || d.poster;
+          const poster = d.thumbnailUrl || d.poster || deriveVideoPosterUrl(d.src);
           if (poster) {
             this.enqueue(poster, 'video-poster', priority, pageIdx);
           }
@@ -189,7 +216,9 @@ export class MediaPreloader {
     this.activeControllers.add(controller);
 
     try {
-      if (item.type === 'image' || item.type === 'video-poster') {
+      if ((item.type === 'image' || item.type === 'video-poster') && item.priority <= SHARED_CACHE_MAX_PRIORITY) {
+        await preloadDecodedImage(item.url);
+      } else if (item.type === 'image' || item.type === 'video-poster') {
         await this.preloadImage(item.url, controller.signal);
       } else if (item.type === 'audio-meta') {
         await this.preloadAudioMetadata(item.url, controller.signal);
