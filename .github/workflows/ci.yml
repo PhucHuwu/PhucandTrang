@@ -118,6 +118,9 @@ jobs:
       - name: Install Playwright browser
         working-directory: apps/web
         run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Build web
+        working-directory: apps/web
+        run: npx next build
       - name: Run Playwright
         working-directory: apps/web
         run: npx playwright test --project=${{ matrix.browser }} --timeout=180000

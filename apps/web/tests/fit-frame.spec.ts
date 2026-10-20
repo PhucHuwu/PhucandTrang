@@ -27,7 +27,8 @@ async function fitAndSave(page: Page, rotation: number) {
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
   });
 
-  await page.setViewportSize({ width: 1440, height: 900 });
+  // Compact editor layout: at >=1200px container width the Lớp/Thuộc tính toggles are hidden
+  await page.setViewportSize({ width: 1024, height: 900 });
   await page.goto('/admin/pages/page-test');
   await page.getByRole('button', { name: 'Lớp', exact: true }).click();
   await page.locator('.layer-row').first().click();
