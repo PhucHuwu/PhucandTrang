@@ -68,8 +68,8 @@ model Book {
   sheName           String        @default("Trang")
   anniversaryDate   DateTime      @default("2022-10-20T00:00:00Z")
   proposalQuote     String?       @default("Thế cậu đồng ý làm bạn gái tớ không?")
-  cover             Json          // { front: { backgroundUrl, title, titleFont, counterBadge, elements }, back: { insideBackgroundUrl, outsideBackgroundUrl, elements } }
-  settings          Json          // { dimensions: { pageWidth, pageHeight, canvasResolution }, camera: { fov, distance }, theme: { ... }, atmospheric: { ... } }
+  cover             Json // { front: { backgroundUrl, title, titleFont, counterBadge, elements }, back: { insideBackgroundUrl, outsideBackgroundUrl, elements } }
+  settings          Json // { dimensions: { pageWidth, pageHeight, canvasResolution }, camera: { fov, distance }, theme: { ... }, atmospheric: { ... } }
   contentRevision   Int           @default(1) @map("content_revision")
   publishedRevision Int           @default(0) @map("published_revision")
   publishedSnapshot Json?         @map("published_snapshot")
@@ -84,6 +84,7 @@ model Book {
   updatedAt         DateTime      @updatedAt
 
   @@index([status])
+  @@index([backgroundMusicId])
   @@map("books")
 }
 
@@ -103,7 +104,7 @@ model Page {
   layoutMode       LayoutMode      @default(PRESET)
   sourceTemplateId String?
   isCustomized     Boolean         @default(false)
-  background       Json            // { type: "image"|"color", imageUrl, color, headerFade, gutterFade }
+  background       Json // { type: "image"|"color", imageUrl, color, headerFade, gutterFade }
   audioTrackId     String?         @map("audio_track_id")
   audioTrack       AudioTrack?     @relation("PageAudioTrack", fields: [audioTrackId], references: [id], onDelete: SetNull)
   elements         PageElement[]
@@ -112,6 +113,8 @@ model Page {
 
   @@unique([bookId, pageNumber])
   @@index([bookId, order])
+  @@index([layoutTemplateId])
+  @@index([audioTrackId])
   @@map("pages")
 }
 
@@ -126,10 +129,10 @@ model PageElement {
   visible     Boolean     @default(true)
   locked      Boolean     @default(false)
   opacity     Float       @default(1.0)
-  transform   Json        // { x, y, width, height, rotation, scale, zIndex }
-  style       Json?       // { fontFamily, fontSize, color, padding, border, shadow... }
-  data        Json        // { text, textLines, src, alt, caption, aspectRatio, ... }
-  interaction Json?       // { enabled, action, target, title, activeArea }
+  transform   Json // { x, y, width, height, rotation, scale, zIndex }
+  style       Json? // { fontFamily, fontSize, color, padding, border, shadow... }
+  data        Json // { text, textLines, src, alt, caption, aspectRatio, ... }
+  interaction Json? // { enabled, action, target, title, activeArea }
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
@@ -174,24 +177,25 @@ model Media {
 }
 
 model AudioTrack {
-  id              String      @id @default(uuid())
+  id              String   @id @default(uuid())
   title           String
   artist          String?
   src             String
-  mediaId         String?     @map("media_id")
-  media           Media?      @relation(fields: [mediaId], references: [id], onDelete: SetNull)
-  volume          Float       @default(0.8)
-  loop            Boolean     @default(true)
-  startAt         Float       @default(0.0)
-  fadeIn          Float       @default(0.0)
-  fadeOut         Float       @default(0.0)
+  mediaId         String?  @map("media_id")
+  media           Media?   @relation(fields: [mediaId], references: [id], onDelete: SetNull)
+  volume          Float    @default(0.8)
+  loop            Boolean  @default(true)
+  startAt         Float    @default(0.0)
+  fadeIn          Float    @default(0.0)
+  fadeOut         Float    @default(0.0)
   durationSeconds Float?
-  autoPlay        Boolean     @default(true)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  books           Book[]      @relation("BookBackgroundMusic")
-  pages           Page[]      @relation("PageAudioTrack")
+  autoPlay        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  books           Book[]   @relation("BookBackgroundMusic")
+  pages           Page[]   @relation("PageAudioTrack")
 
+  @@index([mediaId])
   @@map("audio_tracks")
 }
 
@@ -207,5 +211,7 @@ model BookVersion {
   createdAt   DateTime @default(now())
 
   @@index([bookId, version])
+  @@index([bookId, createdAt])
+  @@index([createdById])
   @@map("book_versions")
 }
