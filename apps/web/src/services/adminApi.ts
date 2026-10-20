@@ -333,8 +333,9 @@ export function isRouteMissingError(err: unknown): boolean {
   return typeof message === 'string' && /Cannot (GET|POST|PUT|PATCH|DELETE) \//.test(message);
 }
 
+/** Only an edit conflict; a 409 for duplicate data (code DUPLICATE) is a plain error, not a conflict. */
 export function isPageConflictError(err: unknown): err is AdminApiError {
-  return err instanceof AdminApiError && err.status === 409 && (err.code === 'PAGE_CONFLICT' || !err.code);
+  return err instanceof AdminApiError && err.status === 409 && err.code === 'PAGE_CONFLICT';
 }
 
 // While the backend rollout lags behind the frontend, remember that the atomic endpoint is missing

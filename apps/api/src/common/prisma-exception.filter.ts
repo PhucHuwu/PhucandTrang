@@ -11,6 +11,8 @@ interface MappedPrismaError {
   status: number;
   error: string;
   message: string;
+  /** Machine-readable code, so clients can tell a duplicate apart from an edit conflict (both 409). */
+  code?: string;
 }
 
 const PRISMA_ERROR_MAP: Record<string, MappedPrismaError> = {
@@ -18,6 +20,7 @@ const PRISMA_ERROR_MAP: Record<string, MappedPrismaError> = {
     status: HttpStatus.CONFLICT,
     error: 'Conflict',
     message: 'Dữ liệu bị trùng với một bản ghi đã tồn tại.',
+    code: 'DUPLICATE',
   },
   P2003: {
     status: HttpStatus.BAD_REQUEST,
@@ -68,6 +71,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
       statusCode: mapped.status,
       error: mapped.error,
       message: mapped.message,
+      ...(mapped.code ? { code: mapped.code } : {}),
     });
   }
 }

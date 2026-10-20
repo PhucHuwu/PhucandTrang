@@ -231,16 +231,22 @@ export class LazyPageTextureManager {
   }
 
   /**
-   * LRU eviction: faces inside the active window are always kept; beyond that, the least
-   * recently used faces are released (face swapped back to the placeholder) and disposed until
-   * the budget is met. Faces the releaser reports as visible are skipped.
+   * Faces inside the active window are always kept; beyond that, the faces farthest from the
+   * current spread are released first (swapped back to the placeholder) and disposed until the
+   * budget is met. Distance rather than LRU: when flipping back, the faces just passed were used
+   * most recently but the reader is heading away from them, while the oldest ones are next.
+   * Faces the releaser reports as visible are skipped.
    * Evicted faces are regenerated lazily by updateActiveWindow when the reader comes back.
    */
   private evictOutsideWindow() {
     if (this.destroyed || !this.releaseFace || this.cache.size <= this.maxTextures) return;
+    const center = (this.retainMin + this.retainMax) / 2;
     const candidates = Array.from(this.cache.entries())
       .filter(([index]) => index < this.retainMin || index > this.retainMax)
-      .sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
+      .sort(
+        (a, b) =>
+          Math.abs(b[0] - center) - Math.abs(a[0] - center) || a[1].lastAccessed - b[1].lastAccessed
+      );
     for (const [index, entry] of candidates) {
       if (this.cache.size <= this.maxTextures) break;
       if (!this.releaseFace(index)) continue;

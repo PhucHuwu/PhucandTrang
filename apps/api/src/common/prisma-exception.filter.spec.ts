@@ -62,6 +62,7 @@ describe('PrismaExceptionFilter', () => {
       statusCode: 409,
       error: 'Conflict',
       message: 'Dữ liệu bị trùng với một bản ghi đã tồn tại.',
+      code: 'DUPLICATE',
     });
     const serialized = JSON.stringify(body);
     expect(serialized).not.toMatch(/prisma|pageNumber|bookId|constraint/i);

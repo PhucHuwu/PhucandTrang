@@ -213,6 +213,18 @@ export default function VintageMusicPlayer({
     switchToTrack((currentIndex - 1 + queue.length) % queue.length);
   }, [currentIndex, queue.length, switchToTrack]);
 
+  // Skip buttons are an explicit request to play, so they lift an earlier manual pause
+  // (otherwise startPlayback would pause again as soon as play() resolves)
+  const handleNextClick = useCallback(() => {
+    isManuallyPausedRef.current = false;
+    handleNextTrack();
+  }, [handleNextTrack]);
+
+  const handlePrevClick = useCallback(() => {
+    isManuallyPausedRef.current = false;
+    handlePrevTrack();
+  }, [handlePrevTrack]);
+
   // Handle Track Completion: Automatically play next song in Playlist!
   const handleSongEnded = useCallback(() => {
     if (queue.length > 1) {
@@ -324,7 +336,7 @@ export default function VintageMusicPlayer({
         {queue.length > 1 && (
           <div className="flex items-center gap-1 bg-[#FAF6EE]/90 backdrop-blur-md border border-[#D4AF37]/40 px-2 py-1.5 rounded-full shadow-lg">
             <button
-              onClick={handlePrevTrack}
+              onClick={handlePrevClick}
               className="p-1 rounded-full hover:bg-rosewood-100 text-[#4A1521] transition active:scale-90"
               title="Bài trước đó"
             >
@@ -343,7 +355,7 @@ export default function VintageMusicPlayer({
             </button>
 
             <button
-              onClick={handleNextTrack}
+              onClick={handleNextClick}
               className="p-1 rounded-full hover:bg-rosewood-100 text-[#4A1521] transition active:scale-90"
               title="Bài kế tiếp"
             >
