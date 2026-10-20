@@ -5,12 +5,42 @@ export interface AdminUser {
   role: string;
 }
 
+/** Error thrown by adminFetch; keeps the HTTP status and parsed body for callers that branch on them. */
+export class AdminApiError extends Error {
+  status: number;
+  body: any;
+  code?: string;
+
+  constructor(message: string, status: number, body: any) {
+    super(message);
+    this.name = 'AdminApiError';
+    this.status = status;
+    this.body = body;
+    this.code = body && typeof body === 'object' && typeof body.code === 'string' ? body.code : undefined;
+  }
+}
+
+/** Builds the same-origin BFF proxy URL for a backend endpoint. */
+export function adminProxyUrl(endpoint: string): string {
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+  return `/api/admin/proxy/${cleanEndpoint}`;
+}
+
+// Callbacks run synchronously right before the 401 redirect (e.g. the page editor stashes a local draft).
+const beforeUnauthorizedRedirect = new Set<() => void>();
+
+export function onBeforeUnauthorizedRedirect(callback: () => void): () => void {
+  beforeUnauthorizedRedirect.add(callback);
+  return () => {
+    beforeUnauthorizedRedirect.delete(callback);
+  };
+}
+
 /**
  * Universal fetcher for Admin APIs through Next.js BFF proxy.
  */
 async function adminFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
-  const proxyUrl = `/api/admin/proxy/${cleanEndpoint}`;
+  const proxyUrl = adminProxyUrl(endpoint);
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -23,14 +53,22 @@ async function adminFetch<T>(endpoint: string, options: RequestInit = {}): Promi
   });
 
   if (res.status === 401) {
+    const message = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
     if (typeof window !== 'undefined' && !window.location.pathname.includes('/admin/login')) {
+      beforeUnauthorizedRedirect.forEach((callback) => {
+        try {
+          callback();
+        } catch {
+          // A failing draft writer must never block the redirect
+        }
+      });
       window.location.href = '/admin/login?error=unauthorized';
     }
-    throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    throw new AdminApiError(message, 401, null);
   }
 
   if (res.status === 403) {
-    throw new Error('Bạn không có quyền thực hiện thao tác này.');
+    throw new AdminApiError('Bạn không có quyền thực hiện thao tác này.', 403, null);
   }
 
   let data: any = null;
@@ -46,7 +84,7 @@ async function adminFetch<T>(endpoint: string, options: RequestInit = {}): Promi
       (typeof data === 'object' && data?.message) ||
       res.statusText ||
       `Lỗi kết nối máy chủ (${res.status})`;
-    throw new Error(Array.isArray(errorMsg) ? errorMsg.join(', ') : errorMsg);
+    throw new AdminApiError(Array.isArray(errorMsg) ? errorMsg.join(', ') : errorMsg, res.status, data);
   }
 
   return data as T;
@@ -256,6 +294,112 @@ export async function batchUpdateElements(pageId: string, elements: any[]): Prom
     method: 'PATCH',
     body: JSON.stringify({ elements }),
   });
+}
+
+export interface SavePageElementPayload {
+  id: string;
+  type?: string;
+  slot?: string | null;
+  zIndex?: number;
+  order?: number;
+  visible?: boolean;
+  locked?: boolean;
+  opacity?: number;
+  transform?: Record<string, any>;
+  style?: Record<string, any> | null;
+  data?: Record<string, any>;
+  interaction?: Record<string, any> | null;
+}
+
+export interface SavePagePayload {
+  page?: Record<string, any>;
+  elements?: SavePageElementPayload[];
+  baseUpdatedAt?: string;
+}
+
+export interface SavePageResult {
+  /** Full page from the server (atomic endpoint only; null on the legacy two-request path). */
+  page: any | null;
+  skippedElementIds: string[];
+  /** False when the backend has no atomic save endpoint yet and the legacy path was used. */
+  atomic: boolean;
+}
+
+/** Nest answers unknown routes with 404 `Cannot POST /api/...`; a missing page is a 404 with our own message. */
+export function isRouteMissingError(err: unknown): boolean {
+  if (!(err instanceof AdminApiError) || err.status !== 404) return false;
+  const message = typeof err.body === 'string' ? err.body : err.body?.message;
+  return typeof message === 'string' && /Cannot (GET|POST|PUT|PATCH|DELETE) \//.test(message);
+}
+
+export function isPageConflictError(err: unknown): err is AdminApiError {
+  return err instanceof AdminApiError && err.status === 409 && (err.code === 'PAGE_CONFLICT' || !err.code);
+}
+
+// While the backend rollout lags behind the frontend, remember that the atomic endpoint is missing
+// for a while instead of paying an extra 404 on every autosave.
+const SAVE_ENDPOINT_RECHECK_MS = 5 * 60 * 1000;
+let saveEndpointMissingUntil = 0;
+
+export function isAtomicSaveKnownMissing(): boolean {
+  return Date.now() < saveEndpointMissingUntil;
+}
+
+/**
+ * Atomic page save (page fields + elements in one transaction, optimistic concurrency via
+ * baseUpdatedAt). style/data/interaction are replaced wholesale; null clears them.
+ * Must reach `fetch` without awaiting anything first so it also works from pagehide (keepalive).
+ */
+export async function saveAdminPageAtomic(
+  pageId: string,
+  payload: SavePagePayload,
+  options: { keepalive?: boolean } = {}
+): Promise<{ page: any; skippedElementIds: string[] }> {
+  return adminFetch<{ page: any; skippedElementIds: string[] }>(`pages/${pageId}/save`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    keepalive: options.keepalive || undefined,
+  });
+}
+
+/**
+ * Saves a page through the atomic endpoint, falling back to the legacy PATCH page + batch elements
+ * requests when the backend does not have the endpoint yet. The legacy path has no conflict
+ * detection, deep-merges JSON fields and cannot re-create deleted elements.
+ */
+export async function saveAdminPage(
+  pageId: string,
+  payload: SavePagePayload,
+  options: { keepalive?: boolean } = {}
+): Promise<SavePageResult> {
+  if (!isAtomicSaveKnownMissing()) {
+    try {
+      const result = await saveAdminPageAtomic(pageId, payload, options);
+      return { page: result?.page ?? null, skippedElementIds: result?.skippedElementIds ?? [], atomic: true };
+    } catch (err) {
+      if (!isRouteMissingError(err)) throw err;
+      saveEndpointMissingUntil = Date.now() + SAVE_ENDPOINT_RECHECK_MS;
+    }
+  }
+
+  await updateAdminPage(pageId, payload.page ?? {}, true);
+
+  const elements = payload.elements ?? [];
+  if (elements.length === 0) return { page: null, skippedElementIds: [], atomic: false };
+
+  // The legacy batch DTO rejects unknown keys (type/slot) and ignores null style/interaction.
+  const legacyElements = elements.map(({ type: _type, slot: _slot, style, interaction, ...rest }) => ({
+    ...rest,
+    ...(style ? { style } : {}),
+    ...(interaction ? { interaction } : {}),
+  }));
+  const updated = await batchUpdateElements(pageId, legacyElements);
+  const updatedIds = new Set<string>(Array.isArray(updated) ? updated.map((el: any) => el?.id) : []);
+  return {
+    page: null,
+    skippedElementIds: Array.isArray(updated) ? elements.map((el) => el.id).filter((id) => !updatedIds.has(id)) : [],
+    atomic: false,
+  };
 }
 
 export async function duplicateAdminElement(elementId: string, offsetX = 0.02, offsetY = 0.02): Promise<any> {

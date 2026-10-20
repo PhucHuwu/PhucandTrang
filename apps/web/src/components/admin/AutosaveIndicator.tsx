@@ -26,6 +26,18 @@ export default function AutosaveIndicator({
     );
   }
 
+  if (status === 'conflict') {
+    return (
+      <div
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-950/60 border border-orange-500/50 text-orange-300 text-xs font-mono"
+        title={errorMessage || 'Trang đã được thay đổi ở nơi khác'}
+      >
+        <AlertCircle className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+        <span>Xung đột</span>
+      </div>
+    );
+  }
+
   if (status === 'error') {
     return (
       <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-rose-950/60 border border-rose-600/50 text-rose-300 text-xs font-mono">

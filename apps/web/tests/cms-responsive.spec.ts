@@ -4,7 +4,9 @@ const element = { id: 'text-test', type: 'TEXT', zIndex: 1, visible: true, locke
 const entry = { id: 'page-test', bookId: 'journal-test', pageNumber: 1, order: 1, side: 'right', title: 'Trang thử nghiệm', elements: [element], background: { type: 'color', color: '#fff' } };
 const journal = { id: 'journal-test', title: 'Nhật ký kiểm thử', pages: [entry], settings: {}, cover: { front: { elements: [element] } } };
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page, baseURL }) => {
+  // Passes the middleware's session-cookie UX guard; every API call is mocked below
+  await page.context().addCookies([{ name: 'admin_access_token', value: 'test', url: baseURL! }]);
   await page.route('**/api/admin/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     let body: unknown = {};

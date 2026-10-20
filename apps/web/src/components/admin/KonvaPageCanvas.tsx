@@ -14,6 +14,7 @@ import {
 } from 'react-konva';
 import type Konva from 'konva';
 import { Page, PageElement, Book } from '@/types/book';
+import { resolveTextTypography, textFontShorthand } from '@/components/admin/editorTextTypography';
 import {
   CAPTION_FONT,
   PAGE_NUMBER_FONT,
@@ -50,6 +51,8 @@ interface KonvaPageCanvasProps {
   ) => void;
   scale: number;
   snappingEnabled?: boolean;
+  /** Called with true when a drag / transform gesture starts and false when it ends. */
+  onGestureChange?: (active: boolean) => void;
 }
 
 // Custom hook to load an image safely for Konva
@@ -61,69 +64,61 @@ function useKonvaImage(src?: string) {
       setImage(null);
       return;
     }
+    let cancelled = false;
     const img = new window.Image();
     img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      if (!cancelled) setImage(img);
+    };
+    img.onerror = () => {
+      if (!cancelled) setImage(null);
+    };
     img.src = src;
-    img.onload = () => setImage(img);
-    img.onerror = () => setImage(null);
+    return () => {
+      // A slower load for a previous src must not replace the current image
+      cancelled = true;
+      img.onload = null;
+      img.onerror = null;
+    };
   }, [src]);
 
   return image;
 }
 
+let measureCtx: CanvasRenderingContext2D | null = null;
+
 /**
- * Single source of truth for Konva text typography — shared by the KonvaText props and by the
- * pre-draw font load, so the editor never paints a face it did not wait for.
+ * Same greedy word wrap as the 3D viewer (PageTextureGenerator.wrapText): breaks only at spaces,
+ * never inside a word, so editor line breaks match the published page.
  */
-function resolveKonvaTextFont(element: PageElement): {
-  fontFamily: string;
-  fontSize: number;
-  fontStyle: string;
-} {
-  const s = element.style || {};
-  const d = element.data as any;
+function wrapTextLikeViewer(text: string, font: string, letterSpacing: number, maxWidth: number): string[] {
+  if (!text) return [];
+  if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
+  const ctx = measureCtx;
+  if (!ctx) return text.split('\n');
+  ctx.font = font;
+  (ctx as any).letterSpacing = letterSpacing ? `${letterSpacing}px` : '0px';
 
-  const fontFamily =
-    s.fontFamily ||
-    (d?.variant === 'handwriting'
-      ? 'Dancing Script'
-      : d?.variant === 'quote'
-      ? 'Dancing Script'
-      : d?.variant === 'chapter-label'
-      ? 'Montserrat'
-      : 'Cormorant Garamond');
-
-  const fontSize =
-    s.fontSize ||
-    (d?.variant === 'title'
-      ? 38
-      : d?.variant === 'chapter-label'
-      ? 20
-      : d?.variant === 'quote'
-      ? 26
-      : d?.variant === 'handwriting'
-      ? 32
-      : d?.variant === 'caption'
-      ? 19
-      : 22);
-
-  const fontStyle =
-    s.fontStyle === 'italic' ||
-    d?.variant === 'quote' ||
-    d?.variant === 'handwriting' ||
-    d?.variant === 'caption'
-      ? 'italic'
-      : s.fontWeight === 'bold' || d?.variant === 'title' || d?.variant === 'chapter-label'
-      ? 'bold'
-      : 'normal';
-
-  return { fontFamily, fontSize, fontStyle };
-}
-
-/** Canvas font shorthand Konva assigns for a text element — the exact string its draw resolves. */
-function konvaTextFontShorthand(element: PageElement): string {
-  const { fontFamily, fontSize, fontStyle } = resolveKonvaTextFont(element);
-  return `${fontStyle} ${fontSize}px ${fontFamily}`;
+  const wrapped: string[] = [];
+  for (const para of text.split('\n')) {
+    if (para.trim() === '') {
+      wrapped.push('');
+      continue;
+    }
+    const words = para.split(' ');
+    let current = '';
+    for (const word of words) {
+      const test = current ? `${current} ${word}` : word;
+      if (ctx.measureText(test).width > maxWidth && current) {
+        wrapped.push(current);
+        current = word;
+      } else {
+        current = test;
+      }
+    }
+    if (current) wrapped.push(current);
+  }
+  return wrapped;
 }
 
 /** True when every shorthand already resolves — a warm session needs no load and no Stage re-key. */
@@ -144,7 +139,9 @@ function KonvaElementItem({
   onChange,
   onDragMoveSnap,
   onDragEndSnap,
+  onGestureChange,
   varContext,
+  book,
 }: {
   element: PageElement;
   isSelected: boolean;
@@ -152,7 +149,9 @@ function KonvaElementItem({
   onChange: (newAttrs: { x: number; y: number; width: number; height: number; rotation: number }) => void;
   onDragMoveSnap?: (id: string, currentX: number, currentY: number, width: number, height: number, shiftKey: boolean) => { x: number; y: number };
   onDragEndSnap?: () => void;
+  onGestureChange?: (active: boolean) => void;
   varContext?: any;
+  book?: Partial<Book> | null;
 }) {
   const groupRef = useRef<Konva.Group | null>(null);
   const t = normalizedToCanvasTransform(element.transform);
@@ -170,11 +169,36 @@ function KonvaElementItem({
   const s = element.style || {};
   const d = element.data as any;
 
-  // Text variant styling — shared with the pre-draw font load (see resolveKonvaTextFont)
-  const { fontFamily, fontSize, fontStyle } = resolveKonvaTextFont(element);
-
-  const rawText = d?.text ?? (d?.textLines ? d.textLines.join('\n') : '');
-  const displayText = varContext ? TextVariableResolver.resolve(rawText, varContext) : rawText;
+  // Text: same typography, wrapping and placement rules as PageTextureGenerator.renderTextElement
+  const textLayout = useMemo(() => {
+    if (element.type !== 'TEXT') return null;
+    const typo = resolveTextTypography(element, book, t.width);
+    const font = textFontShorthand(element, book);
+    const letterSpacing = s.letterSpacing || 0;
+    const lines: string[] = [];
+    for (const raw of typo.lines) {
+      const resolved = varContext ? TextVariableResolver.resolve(raw, varContext) : raw;
+      lines.push(...wrapTextLikeViewer(resolved, font, letterSpacing, typo.wrapWidth));
+    }
+    // Konva truncates lines wider than `width`; the viewer lets an unbreakable word overflow instead
+    let widest = 0;
+    if (measureCtx) {
+      measureCtx.font = font;
+      for (const line of lines) widest = Math.max(widest, measureCtx.measureText(line).width + letterSpacing * line.length);
+    }
+    const width = Math.max(t.width, Math.ceil(widest) + 1);
+    const x = typo.align === 'center' ? (t.width - width) / 2 : typo.align === 'right' ? t.width - width : 0;
+    return {
+      ...typo,
+      text: lines.join('\n'),
+      // Konva has no separate weight prop: its fontStyle accepts "italic bold"
+      konvaFontStyle: `${typo.fontStyle} ${typo.fontWeight}`,
+      x,
+      // The viewer centres the line block vertically in the element box (it may overflow the box)
+      y: (t.height - lines.length * typo.lineHeightPx) / 2,
+      width,
+    };
+  }, [element, book, t.width, t.height, s.letterSpacing, varContext]);
 
   // Render polaroid frame if enabled
   const usePolaroid = s.polaroidFrame !== false;
@@ -216,6 +240,8 @@ function KonvaElementItem({
       draggable={!isLocked}
       onClick={onSelect}
       onTap={onSelect}
+      onDragStart={() => onGestureChange?.(true)}
+      onTransformStart={() => onGestureChange?.(true)}
       onDragMove={(e) => {
         if (onDragMoveSnap) {
           const shiftKey = Boolean((e.evt as MouseEvent)?.shiftKey);
@@ -233,6 +259,7 @@ function KonvaElementItem({
       }}
       onDragEnd={(e) => {
         if (onDragEndSnap) onDragEndSnap();
+        onGestureChange?.(false);
         onChange({
           x: e.target.x(),
           y: e.target.y(),
@@ -242,6 +269,7 @@ function KonvaElementItem({
         });
       }}
       onTransformEnd={() => {
+        onGestureChange?.(false);
         const node = groupRef.current;
         if (!node) return;
         const scaleX = node.scaleX();
@@ -382,18 +410,20 @@ function KonvaElementItem({
       )}
 
       {/* TEXT Element */}
-      {element.type === 'TEXT' && (
+      {element.type === 'TEXT' && textLayout && (
         <KonvaText
-          width={t.width}
-          text={displayText}
-          fontFamily={fontFamily}
-          fontSize={fontSize}
-          fontStyle={fontStyle}
-          fill={s.color || '#292522'}
-          align={(s.textAlign as any) || 'left'}
-          lineHeight={s.lineHeight ? s.lineHeight / fontSize : 1.35}
+          x={textLayout.x}
+          y={textLayout.y}
+          width={textLayout.width}
+          text={textLayout.text}
+          fontFamily={textLayout.fontFamily}
+          fontSize={textLayout.fontSize}
+          fontStyle={textLayout.konvaFontStyle}
+          fill={textLayout.color}
+          align={textLayout.align}
+          lineHeight={textLayout.lineHeightPx / textLayout.fontSize}
           letterSpacing={s.letterSpacing || 0}
-          wrap="word"
+          wrap="none"
           shadowColor={s.shadow?.color}
           shadowBlur={s.shadow?.blur}
           shadowOffset={s.shadow ? { x: s.shadow.offsetX, y: s.shadow.offsetY } : undefined}
@@ -444,14 +474,51 @@ export default function KonvaPageCanvas({
   onUpdateActiveArea,
   scale,
   snappingEnabled = true,
+  onGestureChange,
 }: KonvaPageCanvasProps) {
   const stageRef = useRef<Konva.Stage | null>(null);
   const transformerRef = useRef<Konva.Transformer | null>(null);
   const activeAreaRef = useRef<Konva.Rect | null>(null);
   const activeAreaTransformerRef = useRef<Konva.Transformer | null>(null);
 
-  // Active magnetic snapping guide lines
+  // Active magnetic snapping guide lines. dragmove fires per pointer event; the guides are
+  // committed to state at most once per animation frame and only when they actually change.
   const [activeGuides, setActiveGuides] = useState<SnapGuideLine[]>([]);
+  const pendingGuidesRef = useRef<SnapGuideLine[]>([]);
+  const committedGuidesKeyRef = useRef('[]');
+  const guidesFrameRef = useRef<number | null>(null);
+
+  const scheduleGuides = (guides: SnapGuideLine[]) => {
+    pendingGuidesRef.current = guides;
+    if (guidesFrameRef.current !== null) return;
+    guidesFrameRef.current = window.requestAnimationFrame(() => {
+      guidesFrameRef.current = null;
+      const next = pendingGuidesRef.current;
+      const key = JSON.stringify(next);
+      if (key === committedGuidesKeyRef.current) return;
+      committedGuidesKeyRef.current = key;
+      setActiveGuides(next);
+    });
+  };
+
+  const clearGuides = () => {
+    if (guidesFrameRef.current !== null) {
+      window.cancelAnimationFrame(guidesFrameRef.current);
+      guidesFrameRef.current = null;
+    }
+    pendingGuidesRef.current = [];
+    if (committedGuidesKeyRef.current !== '[]') {
+      committedGuidesKeyRef.current = '[]';
+      setActiveGuides([]);
+    }
+  };
+
+  useEffect(
+    () => () => {
+      if (guidesFrameRef.current !== null) window.cancelAnimationFrame(guidesFrameRef.current);
+    },
+    []
+  );
 
   // Konva rasterizes into its own canvas, so text is painted with whatever faces are loaded at
   // draw time and never waits for a webfont — an element-style stack silently falls through to
@@ -462,10 +529,10 @@ export default function KonvaPageCanvas({
     const shorthands = new Set<string>([CAPTION_FONT, PAGE_NUMBER_FONT]);
     for (const el of page.elements || []) {
       if (el.visible === false) continue;
-      if (el.type === 'TEXT') shorthands.add(konvaTextFontShorthand(el));
+      if (el.type === 'TEXT') shorthands.add(textFontShorthand(el, book));
     }
     return Array.from(shorthands);
-  }, [page.elements]);
+  }, [page.elements, book]);
 
   const [fontsReady, setFontsReady] = useState(() => canvasFontsReady(pageFontShorthands));
 
@@ -488,10 +555,14 @@ export default function KonvaPageCanvas({
   );
 
   // Variable context for template resolving
-  const varContext = TextVariableResolver.createContext({
-    book: book || undefined,
-    page,
-  });
+  const varContext = useMemo(
+    () =>
+      TextVariableResolver.createContext({
+        book: book || undefined,
+        page,
+      }),
+    [book, page]
+  );
 
   // Sort elements by canonical zIndex ascending
   const sortedElements = [...(page.elements || [])].filter((el) => el.visible !== false);
@@ -592,7 +663,7 @@ export default function KonvaPageCanvas({
   ) => {
     // If Shift key is held down or snapping is toggled OFF, disable magnetic snapping
     if (!snappingEnabled || shiftKey) {
-      setActiveGuides([]);
+      scheduleGuides([]);
       return { x: currentX, y: currentY };
     }
 
@@ -622,12 +693,12 @@ export default function KonvaPageCanvas({
       enabled: true,
     });
 
-    setActiveGuides(snapResult.guides);
+    scheduleGuides(snapResult.guides);
     return { x: snapResult.x, y: snapResult.y };
   };
 
   const handleDragEndSnap = () => {
-    setActiveGuides([]);
+    clearGuides();
   };
 
   return (
@@ -757,6 +828,8 @@ export default function KonvaPageCanvas({
               onSelect={() => onSelectElement(el.id)}
               onDragMoveSnap={handleDragMoveSnap}
               onDragEndSnap={handleDragEndSnap}
+              onGestureChange={onGestureChange}
+              book={book}
               onChange={(newAttrs) => {
                 const normalized = canvasToNormalizedTransform(
                   {
@@ -819,7 +892,10 @@ export default function KonvaPageCanvas({
                 strokeWidth={2}
                 dash={[8, 5]}
                 draggable={true}
+                onDragStart={() => onGestureChange?.(true)}
+                onTransformStart={() => onGestureChange?.(true)}
                 onDragEnd={(e) => {
+                  onGestureChange?.(false);
                   const node = e.target;
                   const relative = computeRelativeActiveArea(selectedElement.transform, {
                     left: node.x() / canvasW,
@@ -830,6 +906,7 @@ export default function KonvaPageCanvas({
                   onUpdateActiveArea?.(selectedElement.id, relative);
                 }}
                 onTransformEnd={() => {
+                  onGestureChange?.(false);
                   const node = activeAreaRef.current;
                   if (!node) return;
                   const width = Math.max(2, node.width() * Math.abs(node.scaleX()));

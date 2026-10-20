@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import EditorWorkspace from '@/components/admin/EditorWorkspace';
 import { useCanvasViewport } from '@/hooks/useCanvasViewport';
 import Link from 'next/link';
@@ -20,6 +20,7 @@ import AdvancedVideoEditor from '@/components/admin/AdvancedVideoEditor';
 import AdvancedShapeEditor from '@/components/admin/AdvancedShapeEditor';
 import InteractionEditor from '@/components/admin/InteractionEditor';
 import { usePageHistory } from '@/hooks/usePageHistory';
+import { useUndoRedoShortcuts } from '@/hooks/useUndoRedoShortcuts';
 import {
   ArrowLeft,
   Save,
@@ -72,7 +73,14 @@ export default function BookCoverEditorPage() {
   const [videoMedia, setVideoMedia] = useState<any[]>([]);
 
   // Virtual Page representing current cover side for the visual editor engine
-  const [virtualPage, setVirtualPage] = useState<Page | null>(null);
+  const [virtualPage, setVirtualPageState] = useState<Page | null>(null);
+  // Synchronous mirror so edits are computed (and history recorded) outside setState updaters
+  const virtualPageRef = useRef<Page | null>(null);
+  const setVirtualPage = useCallback((next: Page | null) => {
+    virtualPageRef.current = next;
+    setVirtualPageState(next);
+  }, []);
+  const gestureRef = useRef(false);
   const { viewportRef, scale: canvasScale, zoom: setCanvasScale, fitViewport } = useCanvasViewport(Boolean(virtualPage));
 
   // Undo / Redo History Hook
@@ -93,6 +101,17 @@ export default function BookCoverEditorPage() {
       }
     },
   });
+
+  const updateVirtualPage = useCallback(
+    (update: (prev: Page) => Page, description: string) => {
+      const prev = virtualPageRef.current;
+      if (!prev) return;
+      const next = update(prev);
+      setVirtualPage(next);
+      recordHistory(next, description);
+    },
+    [setVirtualPage, recordHistory]
+  );
 
   // Construct virtual Page model from current Book.cover side
   const buildVirtualPage = useCallback((b: Book, side: CoverSide): Page => {
@@ -183,44 +202,21 @@ export default function BookCoverEditorPage() {
     setSelectedElementId(null);
   };
 
-  // Keyboard Shortcuts: Ctrl/Cmd + Z (Undo), Ctrl/Cmd + Shift + Z (Redo)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
-      ) {
-        return;
-      }
-
-      const isMac = typeof window !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
-
-      if (isCmdOrCtrl && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        if (e.shiftKey) {
-          if (canRedo) performRedo();
-        } else {
-          if (canUndo) performUndo();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [canUndo, canRedo, performUndo, performRedo]);
+  // Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z / Ctrl+Y redo (ignored mid-drag and inside form controls)
+  useUndoRedoShortcuts({
+    canUndo,
+    canRedo,
+    undo: performUndo,
+    redo: performRedo,
+    isBlocked: () => gestureRef.current,
+  });
 
   const selectedElement = (virtualPage?.elements || []).find((el) => el.id === selectedElementId);
 
   // Update selected element property
   const updateSelectedElement = useCallback((updater: (el: any) => any) => {
     if (!selectedElementId) return;
-    setVirtualPage((prevPage) => {
-      if (!prevPage) return prevPage;
+    updateVirtualPage((prevPage) => {
       const updatedElements = (prevPage.elements || []).map((el) => {
         if (el.id === selectedElementId) {
           return updater(el) as PageElement;
@@ -231,16 +227,14 @@ export default function BookCoverEditorPage() {
         ...prevPage,
         elements: updatedElements,
       };
-      recordHistory(nextPage, 'Chỉnh sửa thuộc tính phần tử bìa');
       return nextPage;
-    });
-  }, [selectedElementId, recordHistory]);
+    }, 'Chỉnh sửa thuộc tính phần tử bìa');
+  }, [selectedElementId, updateVirtualPage]);
 
   // Update transform from Konva Canvas drag/resize/rotate
   const handleUpdateElementTransform = useCallback(
     (id: string, normalizedTransform: { x: number; y: number; width: number; height: number; rotation: number }) => {
-      setVirtualPage((prevPage) => {
-        if (!prevPage) return prevPage;
+      updateVirtualPage((prevPage) => {
         const updatedElements = (prevPage.elements || []).map((el) => {
           if (el.id === id) {
             return {
@@ -257,17 +251,15 @@ export default function BookCoverEditorPage() {
           ...prevPage,
           elements: updatedElements,
         };
-        recordHistory(nextPage, 'Di chuyển / co giãn phần tử bìa');
         return nextPage;
-      });
+      }, 'Di chuyển / co giãn phần tử bìa');
     },
-    [recordHistory]
+    [updateVirtualPage]
   );
 
   const handleUpdateActiveArea = useCallback(
     (id: string, activeArea: { left: number; top: number; width: number; height: number }) => {
-      setVirtualPage((prevPage) => {
-        if (!prevPage) return prevPage;
+      updateVirtualPage((prevPage) => {
         const nextPage = {
           ...prevPage,
           elements: prevPage.elements.map((el) =>
@@ -282,11 +274,10 @@ export default function BookCoverEditorPage() {
               : el
           ),
         };
-        recordHistory(nextPage, 'Cập nhật vùng tương tác bìa');
         return nextPage;
-      });
+      }, 'Cập nhật vùng tương tác bìa');
     },
-    [recordHistory]
+    [updateVirtualPage]
   );
 
   // Add Element to Cover
@@ -342,12 +333,10 @@ export default function BookCoverEditorPage() {
       data: defaultData,
     } as any;
 
-    setVirtualPage((prev) => {
-      if (!prev) return prev;
+    updateVirtualPage((prev) => {
       const nextPage = { ...prev, elements: [...prev.elements, newElement] };
-      recordHistory(nextPage, `Thêm phần tử ${type} vào bìa`);
       return nextPage;
-    });
+    }, `Thêm phần tử ${type} vào bìa`);
     setSelectedElementId(newElement.id);
   };
 
@@ -368,12 +357,10 @@ export default function BookCoverEditorPage() {
       },
     };
 
-    setVirtualPage((prev) => {
-      if (!prev) return prev;
+    updateVirtualPage((prev) => {
       const nextPage = { ...prev, elements: [...prev.elements, dup] };
-      recordHistory(nextPage, 'Nhân bản phần tử bìa');
       return nextPage;
-    });
+    }, 'Nhân bản phần tử bìa');
     setSelectedElementId(dup.id);
     setToast('Đã nhân bản phần tử trên bìa!');
     setTimeout(() => setToast(null), 2500);
@@ -384,13 +371,11 @@ export default function BookCoverEditorPage() {
     if (!virtualPage) return;
     if (!confirm('Bạn có chắc chắn muốn xóa phần tử này khỏi bìa sách?')) return;
 
-    setVirtualPage((prev) => {
-      if (!prev) return prev;
+    updateVirtualPage((prev) => {
       const remaining = prev.elements.filter((el) => el.id !== elementId);
       const nextPage = { ...prev, elements: remaining };
-      recordHistory(nextPage, 'Xóa phần tử trên bìa');
       return nextPage;
-    });
+    }, 'Xóa phần tử trên bìa');
     setSelectedElementId(null);
   };
 
@@ -626,21 +611,17 @@ export default function BookCoverEditorPage() {
             selectedElementId={selectedElementId}
             onSelectElement={setSelectedElementId}
             onUpdateElement={(elId, updater) => {
-              setVirtualPage((prev) => {
-                if (!prev) return prev;
+              updateVirtualPage((prev) => {
                 const nextElements = prev.elements.map((el) => (el.id === elId ? updater(el) : el));
                 const nextPage = { ...prev, elements: nextElements };
-                recordHistory(nextPage, 'Cập nhật layer bìa');
                 return nextPage;
-              });
+              }, 'Cập nhật layer bìa');
             }}
             onReorderElements={(newElements) => {
-              setVirtualPage((prev) => {
-                if (!prev) return prev;
+              updateVirtualPage((prev) => {
                 const nextPage = { ...prev, elements: newElements };
-                recordHistory(nextPage, 'Sắp xếp z-index bìa');
                 return nextPage;
-              });
+              }, 'Sắp xếp z-index bìa');
             }}
             onDuplicateElement={handleDuplicateSelected}
             onDeleteElement={handleDeleteElement}
@@ -662,6 +643,9 @@ export default function BookCoverEditorPage() {
               onUpdateActiveArea={handleUpdateActiveArea}
               scale={canvasScale}
               snappingEnabled={snappingEnabled}
+              onGestureChange={(active) => {
+                gestureRef.current = active;
+              }}
             />
           </div>
         </main>
@@ -717,12 +701,10 @@ export default function BookCoverEditorPage() {
                 <BackgroundEditor
                   background={virtualPage.background || { type: 'color', color: '#1A0E15' }}
                   onChange={(newBg) => {
-                    setVirtualPage((prev) => {
-                      if (!prev) return prev;
+                    updateVirtualPage((prev) => {
                       const nextPage = { ...prev, background: newBg };
-                      recordHistory(nextPage, 'Cập nhật nền bìa');
                       return nextPage;
-                    });
+                    }, 'Cập nhật nền bìa');
                   }}
                   disabled={false}
                 />

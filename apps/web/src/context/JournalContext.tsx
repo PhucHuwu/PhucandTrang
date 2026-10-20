@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { getJournal } from '@/services/adminApi';
 import { Book } from '@/types/book';
 
@@ -25,16 +25,22 @@ export function JournalProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Only the most recent refresh may write state; an older response arriving late is dropped
+  const requestIdRef = useRef(0);
+
   const fetchCanonicalJournal = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     try {
       setLoading(true);
       setError(null);
       const data = await getJournal();
+      if (requestId !== requestIdRef.current) return;
       setJournal(data);
     } catch (err: any) {
+      if (requestId !== requestIdRef.current) return;
       setError(err?.message || 'Không thể tải cuốn nhật ký');
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, []);
 

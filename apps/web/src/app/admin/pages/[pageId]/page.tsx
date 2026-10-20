@@ -1,29 +1,25 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import EditorWorkspace from '@/components/admin/EditorWorkspace';
 import { useCanvasViewport } from '@/hooks/useCanvasViewport';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import {
   getAdminPage,
-  getJournal,
   getAdminPages,
   applyAdminLayout,
-  batchUpdateElements,
   createAdminElement,
   deleteAdminElement,
   duplicateAdminElement,
-  updateAdminPage,
   getAdminAudioTracks,
   getAdminMedia,
-  publishJournal,
   validateJournalForPublish,
   ValidationReport,
 } from '@/services/adminApi';
 import { useJournal } from '@/context/JournalContext';
-import { Page, PageElement, PageElementType, Book } from '@/types/book';
+import { Page, PageElement, PageElementType } from '@/types/book';
 import LayoutPresetPicker from '@/components/admin/LayoutPresetPicker';
 import SaveAsLayoutModal from '@/components/admin/SaveAsLayoutModal';
 import BackgroundEditor from '@/components/admin/BackgroundEditor';
@@ -32,6 +28,8 @@ import AdvancedImageEditor from '@/components/admin/AdvancedImageEditor';
 import AdvancedVideoEditor from '@/components/admin/AdvancedVideoEditor';
 import AdvancedShapeEditor from '@/components/admin/AdvancedShapeEditor';
 import InteractionEditor from '@/components/admin/InteractionEditor';
+import DialogPortal from '@/components/admin/DialogPortal';
+import { useAdminDialog } from '@/hooks/useAdminDialog';
 import {
   applyLayoutTemplate,
   extractContentFromPage,
@@ -40,30 +38,23 @@ import {
 import {
   ArrowLeft,
   Save,
-  Trash2,
-  Copy,
-  Layers,
   Type,
   Image as ImageIcon,
   Video,
   Square,
   Sparkles,
   Sliders,
-  MousePointer,
-  Lock,
-  Unlock,
   Eye,
-  EyeOff,
   ZoomIn,
   ZoomOut,
   Maximize2,
   CheckCircle2,
+  AlertTriangle,
   FileText,
   Palette,
   LayoutGrid,
   BookmarkPlus,
   Send,
-  ExternalLink,
   History,
   Undo2,
   Redo2,
@@ -72,9 +63,11 @@ import {
 } from 'lucide-react';
 import VersionHistoryModal from '@/components/admin/VersionHistoryModal';
 import PublishValidationModal from '@/components/admin/PublishValidationModal';
-import { useAutosavePage } from '@/hooks/useAutosavePage';
+import { useAutosavePage, readPageDraft, clearPageDraft, PageDraft } from '@/hooks/useAutosavePage';
 import AutosaveIndicator from '@/components/admin/AutosaveIndicator';
 import { usePageHistory } from '@/hooks/usePageHistory';
+import { useUndoRedoShortcuts } from '@/hooks/useUndoRedoShortcuts';
+import { usePageTabPresence } from '@/hooks/usePageTabPresence';
 import LayersPanel from '@/components/admin/LayersPanel';
 
 // Dynamic import KonvaPageCanvas with ssr: false because Konva requires DOM window & canvas
@@ -88,9 +81,88 @@ const KonvaPageCanvas = dynamic(() => import('@/components/admin/KonvaPageCanvas
   ),
 });
 
+type Toast = { message: string; tone: 'success' | 'warning' };
+
 export default function VisualPageEditorDirectPage() {
   const params = useParams();
   const pageId = params.pageId as string;
+  // Remount per page: no state, history, autosave baseline or in-flight save can leak across pages
+  return <PageEditor key={pageId} pageId={pageId} />;
+}
+
+function ConflictDialog({
+  open,
+  busy,
+  onReload,
+  onOverwrite,
+  onClose,
+}: {
+  open: boolean;
+  busy: boolean;
+  onReload: () => void;
+  onOverwrite: () => void;
+  onClose: () => void;
+}) {
+  const dialogRef = useAdminDialog(open, onClose);
+  if (!open) return null;
+  return (
+    <DialogPortal>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Xung đột chỉnh sửa"
+        className="cms-dialog fixed inset-0 z-[200] flex items-end sm:items-center justify-center sm:p-4 bg-black/80 backdrop-blur-md select-none"
+      >
+        <div className="cms-dialog-panel relative w-full sm:max-w-md bg-[#180E14] border border-amber-700/60 rounded-t-2xl sm:rounded-2xl shadow-2xl text-parchment-100 p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-1.5 text-sm">
+              <h2 className="font-serif font-bold text-champagne-300">Trang đã được thay đổi ở nơi khác</h2>
+              <p className="text-stone-300 text-xs leading-relaxed">
+                Trang này vừa được lưu từ một tab hoặc thiết bị khác. Tự động lưu đã tạm dừng để không ghi đè
+                lên thay đổi đó.
+              </p>
+              <p className="text-stone-400 text-xs leading-relaxed">
+                Chọn <strong>Tải bản mới nhất</strong> để bỏ các chỉnh sửa chưa lưu ở đây, hoặc <strong>Ghi đè</strong>{' '}
+                để thay bản trên máy chủ bằng nội dung bạn đang thấy.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={busy}
+              className="h-10 px-3 rounded-lg text-xs text-stone-400 hover:text-stone-200 disabled:opacity-50"
+            >
+              Để sau
+            </button>
+            <button
+              type="button"
+              onClick={onReload}
+              disabled={busy}
+              className="h-10 px-3 rounded-lg bg-[#25151F] hover:bg-[#331C2A] border border-rosewood-800/60 text-xs font-medium text-parchment-100 disabled:opacity-50"
+            >
+              Tải bản mới nhất
+            </button>
+            <button
+              type="button"
+              onClick={onOverwrite}
+              disabled={busy}
+              className="h-10 px-3 rounded-lg bg-amber-700 hover:bg-amber-600 text-xs font-semibold text-white disabled:opacity-50"
+            >
+              Ghi đè
+            </button>
+          </div>
+        </div>
+      </div>
+    </DialogPortal>
+  );
+}
+
+function PageEditor({ pageId }: { pageId: string }) {
+  const router = useRouter();
   const { journal, refreshJournal } = useJournal();
 
   const [allPages, setAllPages] = useState<any[]>([]);
@@ -102,13 +174,18 @@ export default function VisualPageEditorDirectPage() {
   } | null>(null);
   const [audioTracks, setAudioTracks] = useState<any[]>([]);
   const [videoMedia, setVideoMedia] = useState<any[]>([]);
-  const [page, setPage] = useState<Page | null>(null);
+  const [page, setPageState] = useState<Page | null>(null);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { viewportRef: canvasViewportRef, scale: canvasScale, zoom: setCanvasScale, fitViewport } = useCanvasViewport(!loading);
   const [mobilePanel, setMobilePanel] = useState<'canvas' | 'layers' | 'properties'>('canvas');
+  const [navigating, setNavigating] = useState(false);
+  const [draftOffer, setDraftOffer] = useState<{ draft: PageDraft; serverIds: string[] } | null>(null);
+  const [conflictDismissed, setConflictDismissed] = useState(false);
+  const [resolvingConflict, setResolvingConflict] = useState(false);
 
   // Layout Picker Modal state
   const [showLayoutPicker, setShowLayoutPicker] = useState(false);
@@ -122,6 +199,25 @@ export default function VisualPageEditorDirectPage() {
   // Snapping Toggle
   const [snappingEnabled, setSnappingEnabled] = useState(true);
 
+  // True while a drag / transform gesture is in progress on the canvas
+  const gestureRef = useRef(false);
+
+  // Synchronous mirror of `page`: edits are computed from it so history is recorded outside setState updaters
+  const pageRef = useRef<Page | null>(null);
+  const setPage = useCallback((next: Page | null) => {
+    pageRef.current = next;
+    setPageState(next);
+  }, []);
+
+  const showToast = useCallback((message: string, tone: Toast['tone'] = 'success', ms = 3000) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message, tone });
+    toastTimerRef.current = setTimeout(() => setToast(null), ms);
+  }, []);
+  useEffect(() => () => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+  }, []);
+
   // Undo / Redo History Hook
   const {
     canUndo,
@@ -134,10 +230,12 @@ export default function VisualPageEditorDirectPage() {
     maxHistory: 40,
     onHistoryChange: (restoredPage) => {
       setPage(restoredPage);
-      if (restoredPage.elements?.length > 0 && selectedElementId) {
-        const stillExists = restoredPage.elements.some((el) => el.id === selectedElementId);
-        if (!stillExists) setSelectedElementId(restoredPage.elements[0].id);
-      }
+      setSelectedElementId((current) => {
+        if (!current) return current;
+        const elements = restoredPage.elements || [];
+        if (elements.some((el) => el.id === current)) return current;
+        return elements[0]?.id ?? null;
+      });
     },
   });
 
@@ -146,17 +244,57 @@ export default function VisualPageEditorDirectPage() {
     status: autosaveStatus,
     lastSavedTime,
     errorMessage: autosaveError,
+    conflict,
+    skippedElementIds,
     retrySave,
     forceSave,
     flush: flushAutosave,
+    overwriteConflict,
+    resetBaseline,
+    runServerMutation,
+    markElementOnServer,
+    markElementDeleted,
+    writeDraft,
+    limitKnownServerIds,
   } = useAutosavePage(page, {
     pageId,
     isViewer: false,
     debounceMs: 800,
   });
 
+  const otherTabOpen = usePageTabPresence(pageId);
+
+  /** Applies `update` to the latest page and records one undo step when `description` is given. */
+  const updatePage = useCallback(
+    (update: (prev: Page) => Page, description?: string) => {
+      const prev = pageRef.current;
+      if (!prev) return;
+      const next = update(prev);
+      if (next === prev) return;
+      setPage(next);
+      if (description) recordHistory(next, description);
+    },
+    [setPage, recordHistory]
+  );
+
+  /** Server state replaces the local state: fresh autosave baseline and fresh undo history. */
+  const adoptServerPage = useCallback(
+    (fresh: Page) => {
+      setPage(fresh);
+      resetBaseline(fresh);
+      initHistory(fresh);
+      setSelectedElementId((current) =>
+        current && (fresh.elements || []).some((el) => el.id === current)
+          ? current
+          : fresh.elements?.[0]?.id ?? null
+      );
+    },
+    [setPage, resetBaseline, initHistory]
+  );
+
   // Load page and related journal data
   useEffect(() => {
+    let cancelled = false;
     async function loadData() {
       setLoading(true);
       try {
@@ -165,6 +303,9 @@ export default function VisualPageEditorDirectPage() {
           getAdminAudioTracks(),
           getAdminMedia({ type: 'VIDEO', limit: 100 }),
         ]);
+        if (cancelled) return;
+        // Baseline before the first render with this page, so the load itself is never "a change"
+        resetBaseline(pageData);
         setPage(pageData);
         initHistory(pageData);
         setAudioTracks(tracks);
@@ -173,75 +314,83 @@ export default function VisualPageEditorDirectPage() {
           setSelectedElementId(pageData.elements[0].id);
         }
 
+        const draft = readPageDraft(pageId);
+        if (draft) {
+          const serverUpdatedAt = Date.parse(pageData.updatedAt ?? '');
+          if (Number.isNaN(serverUpdatedAt) || draft.savedAt > serverUpdatedAt) {
+            setDraftOffer({ draft, serverIds: (pageData.elements || []).map((el: PageElement) => el.id) });
+          } else {
+            // The server already holds something newer than the draft
+            clearPageDraft(pageId);
+          }
+        }
+
         // Fetch pages list of this journal
         const pagesList = await getAdminPages(pageData.bookId);
-        setAllPages(pagesList);
+        if (!cancelled) setAllPages(pagesList);
       } catch (err: any) {
-        alert(err?.message || 'Không thể nạp dữ liệu trang');
+        if (!cancelled) alert(err?.message || 'Không thể nạp dữ liệu trang');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     loadData();
-  }, [pageId, initHistory]);
+    return () => {
+      cancelled = true;
+    };
+  }, [pageId, initHistory, resetBaseline, setPage]);
+
+  useEffect(() => {
+    if (skippedElementIds.length === 0) return;
+    showToast(
+      `Máy chủ không khôi phục được ${skippedElementIds.length} phần tử. Hãy tải lại trang để kiểm tra.`,
+      'warning',
+      6000
+    );
+  }, [skippedElementIds, showToast]);
+
+  useEffect(() => {
+    if (conflict) setConflictDismissed(false);
+  }, [conflict]);
 
   const selectedElement = (page?.elements || []).find((el) => el.id === selectedElementId);
 
   // Update selected element property locally
   const updateSelectedElement = useCallback((updater: (el: any) => any) => {
     if (!selectedElementId) return;
-    setPage((prevPage) => {
-      if (!prevPage) return prevPage;
-      const updatedElements = (prevPage.elements || []).map((el) => {
-        if (el.id === selectedElementId) {
-          return updater(el) as PageElement;
-        }
-        return el;
-      });
-      const nextPage = {
+    updatePage(
+      (prevPage) => ({
         ...prevPage,
         isCustomized: true,
-        elements: updatedElements,
-      };
-      recordHistory(nextPage, 'Chỉnh sửa thuộc tính phần tử');
-      return nextPage;
-    });
-  }, [selectedElementId, recordHistory]);
+        elements: (prevPage.elements || []).map((el) =>
+          el.id === selectedElementId ? (updater(el) as PageElement) : el
+        ),
+      }),
+      'Chỉnh sửa thuộc tính phần tử'
+    );
+  }, [selectedElementId, updatePage]);
 
   // Update normalized transform when dragged or resized on Konva Canvas
   const handleUpdateElementTransform = useCallback(
     (id: string, normalizedTransform: { x: number; y: number; width: number; height: number; rotation: number }) => {
-      setPage((prevPage) => {
-        if (!prevPage) return prevPage;
-        const updatedElements = (prevPage.elements || []).map((el) => {
-          if (el.id === id) {
-            return {
-              ...el,
-              transform: {
-                ...el.transform,
-                ...normalizedTransform,
-              },
-            };
-          }
-          return el;
-        });
-        const nextPage = {
+      updatePage(
+        (prevPage) => ({
           ...prevPage,
           isCustomized: true,
-          elements: updatedElements,
-        };
-        recordHistory(nextPage, 'Thay đổi vị trí / kích thước phần tử');
-        return nextPage;
-      });
+          elements: (prevPage.elements || []).map((el) =>
+            el.id === id ? { ...el, transform: { ...el.transform, ...normalizedTransform } } : el
+          ),
+        }),
+        'Thay đổi vị trí / kích thước phần tử'
+      );
     },
-    [recordHistory]
+    [updatePage]
   );
 
   const handleUpdateActiveArea = useCallback(
     (id: string, activeArea: { left: number; top: number; width: number; height: number }) => {
-      setPage((prevPage) => {
-        if (!prevPage) return prevPage;
-        const nextPage = {
+      updatePage(
+        (prevPage) => ({
           ...prevPage,
           isCustomized: true,
           elements: prevPage.elements.map((el) =>
@@ -255,27 +404,53 @@ export default function VisualPageEditorDirectPage() {
                 }
               : el
           ),
-        };
-        recordHistory(nextPage, 'Cập nhật vùng bấm tương tác');
-        return nextPage;
-      });
+        }),
+        'Cập nhật vùng bấm tương tác'
+      );
     },
-    [recordHistory]
+    [updatePage]
   );
+
+  /** Metadata fields: every keystroke updates the page, one undo step is recorded when the field loses focus. */
+  const updateMetadata = useCallback(
+    (fields: Partial<Page>) => {
+      updatePage((prev) => ({ ...prev, isCustomized: true, ...fields }));
+    },
+    [updatePage]
+  );
+  const commitMetadataHistory = useCallback(() => {
+    if (pageRef.current) recordHistory(pageRef.current, 'Cập nhật thông tin trang');
+  }, [recordHistory]);
+
+  const handleGestureChange = useCallback((active: boolean) => {
+    gestureRef.current = active;
+  }, []);
+
+  useUndoRedoShortcuts({
+    canUndo,
+    canRedo,
+    undo: performUndo,
+    redo: performRedo,
+    isBlocked: () => gestureRef.current,
+  });
+
+  const mutationErrorMessage = (err: any, fallback: string) =>
+    err?.name === 'PageConflictPendingError' ? err.message : err?.message || fallback;
 
   // Apply Layout Template
   const handleApplyLayoutTemplate = async (templateDef: LayoutPresetDefinition) => {
-    if (!page) return;
+    const current = pageRef.current;
+    if (!current) return;
     setSaving(true);
     setToast(null);
 
     try {
-      const extractedContent = extractContentFromPage(page);
+      const extractedContent = extractContentFromPage(current);
       const newlyArrangedPage = applyLayoutTemplate(
         {
-          ...page,
-          pageNumber: page.pageNumber,
-          side: page.side,
+          ...current,
+          pageNumber: current.pageNumber,
+          side: current.side,
         },
         templateDef,
         extractedContent
@@ -295,19 +470,24 @@ export default function VisualPageEditorDirectPage() {
         interaction: el.interaction,
       }));
 
-      // Atomic Apply Layout (single transaction replaces elements & sets isCustomized=false)
-      const refreshedPage = await applyAdminLayout(pageId, templateDef.id, elementsToSave);
+      // Atomic Apply Layout (single transaction replaces elements & sets isCustomized=false).
+      // All element ids change, so the undo stack would point at elements that no longer exist.
+      await runServerMutation(() => applyAdminLayout(pageId, templateDef.id, elementsToSave), {
+        updatedAtFrom: (refreshed: any) => refreshed?.updatedAt,
+        apply: (refreshed: Page) => {
+          adoptServerPage(refreshed);
+          setSelectedElementId(refreshed.elements?.[0]?.id ?? null);
+          return refreshed;
+        },
+      });
 
-      setPage(refreshedPage);
-      recordHistory(refreshedPage, `Áp dụng bố cục ${templateDef.name}`);
-      if (refreshedPage.elements?.length > 0) {
-        setSelectedElementId(refreshedPage.elements[0].id);
-      }
-
-      setToast(`Đã áp dụng bố cục "${templateDef.name}" thành công!`);
-      setTimeout(() => setToast(null), 3000);
+      showToast(
+        `Đã áp dụng bố cục "${templateDef.name}". Lịch sử hoàn tác đã được đặt lại.`,
+        'success',
+        4000
+      );
     } catch (err: any) {
-      alert(err?.message || 'Lỗi áp dụng bố cục mới');
+      alert(mutationErrorMessage(err, 'Lỗi áp dụng bố cục mới'));
     } finally {
       setSaving(false);
     }
@@ -335,8 +515,9 @@ export default function VisualPageEditorDirectPage() {
 
   // Add new element to page
   const handleAddElement = async (type: PageElementType) => {
-    if (!page) return;
-    const maxZ = (page.elements || []).reduce((max, el) => Math.max(max, el.zIndex ?? 1), 0);
+    const current = pageRef.current;
+    if (!current) return;
+    const maxZ = (current.elements || []).reduce((max, el) => Math.max(max, el.zIndex ?? 1), 0);
     const newZ = maxZ + 1;
 
     let defaultData: any = {};
@@ -387,35 +568,47 @@ export default function VisualPageEditorDirectPage() {
     };
 
     try {
-      const created = await createAdminElement(newElementPayload);
-      setPage((prev) => {
-        if (!prev) return prev;
-        const nextPage = { ...prev, isCustomized: true, elements: [...prev.elements, created] };
-        recordHistory(nextPage, `Thêm phần tử ${type}`);
-        return nextPage;
+      await runServerMutation(() => createAdminElement(newElementPayload), {
+        apply: (created: PageElement) => {
+          // Known on the server: undoing the add deletes it there on the next save
+          markElementOnServer(created.id);
+          updatePage(
+            (prev) => ({ ...prev, isCustomized: true, elements: [...prev.elements, created] }),
+            `Thêm phần tử ${type}`
+          );
+          setSelectedElementId(created.id);
+          return pageRef.current;
+        },
       });
-      setSelectedElementId(created.id);
     } catch (err: any) {
-      alert(err?.message || 'Lỗi thêm phần tử mới');
+      alert(mutationErrorMessage(err, 'Lỗi thêm phần tử mới'));
     }
   };
 
   // Duplicate selected element
   const handleDuplicateSelected = async () => {
     if (!selectedElementId) return;
+    const sourceId = selectedElementId;
+    // A local-only element (e.g. restored by undo, not saved yet) cannot be duplicated server-side
+    if (!(await flushAutosave())) {
+      alert('Chưa lưu được trang hiện tại. Vui lòng thử lại trước khi nhân bản.');
+      return;
+    }
     try {
-      const dup = await duplicateAdminElement(selectedElementId, 0.03, 0.03);
-      setPage((prev) => {
-        if (!prev) return prev;
-        const nextPage = { ...prev, isCustomized: true, elements: [...prev.elements, dup] };
-        recordHistory(nextPage, 'Nhân bản phần tử');
-        return nextPage;
+      await runServerMutation(() => duplicateAdminElement(sourceId, 0.03, 0.03), {
+        apply: (dup: PageElement) => {
+          markElementOnServer(dup.id);
+          updatePage(
+            (prev) => ({ ...prev, isCustomized: true, elements: [...prev.elements, dup] }),
+            'Nhân bản phần tử'
+          );
+          setSelectedElementId(dup.id);
+          return pageRef.current;
+        },
       });
-      setSelectedElementId(dup.id);
-      setToast('Đã nhân bản phần tử!');
-      setTimeout(() => setToast(null), 2500);
+      showToast('Đã nhân bản phần tử!', 'success', 2500);
     } catch (err: any) {
-      alert(err?.message || 'Lỗi nhân bản phần tử');
+      alert(mutationErrorMessage(err, 'Lỗi nhân bản phần tử'));
     }
   };
 
@@ -423,50 +616,108 @@ export default function VisualPageEditorDirectPage() {
   const handleDeleteElement = async (elementId: string) => {
     if (!confirm('Bạn có chắc chắn muốn xóa phần tử này khỏi trang?')) return;
     try {
-      await deleteAdminElement(elementId);
-      setPage((prev) => {
-        if (!prev) return prev;
-        const remaining = prev.elements.filter((el) => el.id !== elementId);
-        const nextPage = { ...prev, isCustomized: true, elements: remaining };
-        recordHistory(nextPage, 'Xóa phần tử');
-        return nextPage;
-      });
+      await runServerMutation(
+        async () => {
+          try {
+            return await deleteAdminElement(elementId);
+          } catch (err: any) {
+            // Never reached the server (e.g. added then undone/redone before saving): local removal is enough
+            if (err?.status === 404) return null;
+            throw err;
+          }
+        },
+        {
+          apply: () => {
+            // Gone on the server: undoing the delete re-creates it through the save endpoint (type + slot)
+            markElementDeleted(elementId);
+            updatePage(
+              (prev) => ({
+                ...prev,
+                isCustomized: true,
+                elements: prev.elements.filter((el) => el.id !== elementId),
+              }),
+              'Xóa phần tử'
+            );
+            return pageRef.current;
+          },
+        }
+      );
       setSelectedElementId(null);
     } catch (err: any) {
-      alert(err?.message || 'Lỗi xóa phần tử');
+      alert(mutationErrorMessage(err, 'Lỗi xóa phần tử'));
     }
   };
 
-  // Keyboard Shortcuts: Ctrl/Cmd + Z (Undo), Ctrl/Cmd + Shift + Z (Redo)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
-      ) {
-        return;
-      }
-
-      const isMac = typeof window !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
-
-      if (isCmdOrCtrl && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        if (e.shiftKey) {
-          if (canRedo) performRedo();
-        } else {
-          if (canUndo) performUndo();
+  /** In-app navigation away from this page: persist first so nothing is lost or written elsewhere. */
+  const navigateAway = useCallback(
+    async (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      if (navigating) return;
+      setNavigating(true);
+      try {
+        const saved = await flushAutosave();
+        if (!saved) {
+          const leave = confirm(
+            'Chưa lưu được thay đổi của trang hiện tại lên máy chủ. Bản nháp sẽ được giữ trên trình duyệt này và được đề nghị khôi phục khi bạn mở lại trang.\n\nVẫn rời khỏi trang?'
+          );
+          if (!leave) return;
+          writeDraft();
         }
+        router.push(href);
+      } finally {
+        setNavigating(false);
       }
-    };
+    },
+    [navigating, flushAutosave, writeDraft, router]
+  );
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [canUndo, canRedo, performUndo, performRedo]);
+  const handleReloadLatest = async () => {
+    setResolvingConflict(true);
+    try {
+      const fresh = await getAdminPage(pageId);
+      adoptServerPage(fresh);
+      clearPageDraft(pageId);
+      showToast('Đã tải bản mới nhất từ máy chủ. Lịch sử hoàn tác đã được đặt lại.', 'success', 4000);
+    } catch (err: any) {
+      alert(err?.message || 'Không thể tải bản mới nhất');
+    } finally {
+      setResolvingConflict(false);
+    }
+  };
+
+  const handleOverwrite = async () => {
+    setResolvingConflict(true);
+    try {
+      if (await overwriteConflict()) {
+        showToast('Đã ghi đè bản trên máy chủ bằng nội dung hiện tại.');
+      } else {
+        alert('Không thể ghi đè. Vui lòng thử lại.');
+      }
+    } finally {
+      setResolvingConflict(false);
+    }
+  };
+
+  const handleRestoreDraft = () => {
+    if (!draftOffer) return;
+    const { draft, serverIds } = draftOffer;
+    const draftIds = new Set((draft.page.elements || []).map((el) => el.id));
+    // Elements added on the server after the draft was written are left alone
+    limitKnownServerIds(serverIds.filter((id) => draftIds.has(id)));
+    const current = pageRef.current;
+    const restored: Page = { ...draft.page, ...(current ? { updatedAt: (current as any).updatedAt } : {}) } as Page;
+    setPage(restored);
+    recordHistory(restored, 'Khôi phục bản nháp');
+    setSelectedElementId(restored.elements?.[0]?.id ?? null);
+    setDraftOffer(null);
+    showToast('Đã khôi phục bản nháp. Nội dung sẽ được lưu lên máy chủ.');
+  };
+
+  const handleDiscardDraft = () => {
+    clearPageDraft(pageId);
+    setDraftOffer(null);
+  };
 
   if (loading || !page) {
     return (
@@ -483,6 +734,7 @@ export default function VisualPageEditorDirectPage() {
       <div className="editor-header bg-[#160D12] border-b border-rosewood-900/50 px-2 py-1.5 lg:px-4 flex items-center gap-2 shrink-0 z-30">
         <Link
           href="/admin/pages"
+          onClick={(e) => navigateAway(e, '/admin/pages')}
           className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-[#25151F] hover:bg-[#331C2A] text-stone-300 border border-rosewood-900/40 transition-colors"
           title="Quay lại danh sách trang"
           aria-label="Quay lại danh sách trang"
@@ -567,9 +819,13 @@ export default function VisualPageEditorDirectPage() {
               setSaving(true);
               try {
                 await forceSave();
-                setToast('Đã lưu trang thành công!');
-                setTimeout(() => setToast(null), 2500);
+                showToast('Đã lưu trang thành công!', 'success', 2500);
               } catch (err: any) {
+                // A conflict opens its own prompt
+                if (err?.status === 409 || err?.name === 'PageConflictPendingError') {
+                  setConflictDismissed(false);
+                  return;
+                }
                 alert(`Lỗi khi lưu trang: ${err?.message || 'Vui lòng kiểm tra lại'}`);
               } finally {
                 setSaving(false);
@@ -584,13 +840,81 @@ export default function VisualPageEditorDirectPage() {
         </div>
       </div>
 
+      {(otherTabOpen || draftOffer || (conflict && conflictDismissed)) && (
+        <div className="shrink-0 z-20 flex flex-col">
+          {otherTabOpen && (
+            <div
+              role="alert"
+              className="px-3 py-2 bg-amber-950/80 border-b border-amber-700/50 text-amber-200 text-xs flex items-center gap-2"
+            >
+              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+              <span>
+                Trang này đang được mở ở một tab khác. Chỉnh sửa ở hai nơi cùng lúc có thể ghi đè lên nhau — hãy đóng
+                bớt một tab.
+              </span>
+            </div>
+          )}
+          {draftOffer && (
+            <div
+              role="alert"
+              aria-label="Bản nháp chưa lưu"
+              className="px-3 py-2 bg-sky-950/80 border-b border-sky-700/50 text-sky-200 text-xs flex flex-wrap items-center gap-2"
+            >
+              <AlertTriangle className="w-4 h-4 shrink-0 text-sky-400" />
+              <span className="flex-1 min-w-0">
+                Có bản nháp chưa lưu trên trình duyệt này (
+                {new Date(draftOffer.draft.savedAt).toLocaleString('vi-VN')}), mới hơn bản trên máy chủ.
+              </span>
+              <button
+                type="button"
+                onClick={handleRestoreDraft}
+                className="h-8 px-3 rounded-lg bg-sky-700 hover:bg-sky-600 text-white font-medium"
+              >
+                Khôi phục bản nháp
+              </button>
+              <button
+                type="button"
+                onClick={handleDiscardDraft}
+                className="h-8 px-3 rounded-lg text-sky-300 hover:text-white"
+              >
+                Bỏ bản nháp
+              </button>
+            </div>
+          )}
+          {conflict && conflictDismissed && (
+            <div
+              role="alert"
+              className="px-3 py-2 bg-amber-950/80 border-b border-amber-700/50 text-amber-200 text-xs flex flex-wrap items-center gap-2"
+            >
+              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+              <span className="flex-1 min-w-0">Tự động lưu đang tạm dừng vì trang đã được thay đổi ở nơi khác.</span>
+              <button
+                type="button"
+                onClick={() => setConflictDismissed(false)}
+                className="h-8 px-3 rounded-lg bg-amber-700 hover:bg-amber-600 text-white font-medium"
+              >
+                Giải quyết xung đột
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {toast && (
         <div
           role="status"
-          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] max-w-[calc(100vw-2rem)] px-4 py-2 rounded-xl bg-emerald-950/95 border border-emerald-600/50 text-emerald-300 text-xs flex items-center gap-2 shadow-lg"
+          className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] max-w-[calc(100vw-2rem)] px-4 py-2 rounded-xl border text-xs flex items-center gap-2 shadow-lg ${
+            toast.tone === 'warning'
+              ? 'bg-amber-950/95 border-amber-600/50 text-amber-200'
+              : 'bg-emerald-950/95 border-emerald-600/50 text-emerald-300'
+          }`}
         >
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>{toast}</span>
+          {toast.tone === 'warning' ? (
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+          )}
+          <span>{toast.message}</span>
         </div>
       )}
 
@@ -723,31 +1047,20 @@ export default function VisualPageEditorDirectPage() {
             selectedElementId={selectedElementId}
             onSelectElement={setSelectedElementId}
             onUpdateElement={(elId, updater) => {
-              setPage((prevPage) => {
-                if (!prevPage) return prevPage;
-                const updatedElements = (prevPage.elements || []).map((el) =>
-                  el.id === elId ? updater(el) : el
-                );
-                const nextPage = {
+              updatePage(
+                (prevPage) => ({
                   ...prevPage,
                   isCustomized: true,
-                  elements: updatedElements,
-                };
-                recordHistory(nextPage, 'Cập nhật layer');
-                return nextPage;
-              });
+                  elements: (prevPage.elements || []).map((el) => (el.id === elId ? updater(el) : el)),
+                }),
+                'Cập nhật layer'
+              );
             }}
             onReorderElements={(newElements) => {
-              setPage((prevPage) => {
-                if (!prevPage) return prevPage;
-                const nextPage = {
-                  ...prevPage,
-                  isCustomized: true,
-                  elements: newElements,
-                };
-                recordHistory(nextPage, 'Sắp xếp lại thứ tự z-index layers');
-                return nextPage;
-              });
+              updatePage(
+                (prevPage) => ({ ...prevPage, isCustomized: true, elements: newElements }),
+                'Sắp xếp lại thứ tự z-index layers'
+              );
             }}
             onDuplicateElement={handleDuplicateSelected}
             onDeleteElement={handleDeleteElement}
@@ -769,6 +1082,15 @@ export default function VisualPageEditorDirectPage() {
                 <Link
                   key={p.id}
                   href={`/admin/pages/${p.id}`}
+                  onClick={(e) => {
+                    if (p.id === pageId) {
+                      e.preventDefault();
+                      return;
+                    }
+                    navigateAway(e, `/admin/pages/${p.id}`);
+                  }}
+                  aria-current={p.id === pageId ? 'page' : undefined}
+                  aria-disabled={navigating || undefined}
                   className={`block px-2.5 py-1.5 rounded-lg text-xs font-mono truncate transition-all ${
                     p.id === pageId
                       ? 'bg-rosewood-900/60 text-champagne-300 font-bold border border-rosewood-700/50'
@@ -795,6 +1117,7 @@ export default function VisualPageEditorDirectPage() {
               onUpdateActiveArea={handleUpdateActiveArea}
               scale={canvasScale}
               snappingEnabled={snappingEnabled}
+              onGestureChange={handleGestureChange}
             />
           </div>
           {selectedElement?.type === 'TEXT' && mobilePanel !== 'properties' && (
@@ -890,10 +1213,8 @@ export default function VisualPageEditorDirectPage() {
                     <input
                       type="text"
                       value={page.title || ''}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setPage((prev) => (prev ? { ...prev, isCustomized: true, title: val } : prev));
-                      }}
+                      onChange={(e) => updateMetadata({ title: e.target.value })}
+                      onBlur={commitMetadataHistory}
                       placeholder="Nhập tiêu đề trang..."
                       className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-white text-xs focus:outline-none focus:border-rosewood-500"
                     />
@@ -905,10 +1226,8 @@ export default function VisualPageEditorDirectPage() {
                     <input
                       type="text"
                       value={page.chapter || ''}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setPage((prev) => (prev ? { ...prev, isCustomized: true, chapter: val } : prev));
-                      }}
+                      onChange={(e) => updateMetadata({ chapter: e.target.value })}
+                      onBlur={commitMetadataHistory}
                       placeholder="Ví dụ: Chapter IV, Ngày Chung Đôi..."
                       className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-white text-xs focus:outline-none focus:border-rosewood-500"
                     />
@@ -920,10 +1239,8 @@ export default function VisualPageEditorDirectPage() {
                     <textarea
                       rows={2}
                       value={page.quote || ''}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setPage((prev) => (prev ? { ...prev, isCustomized: true, quote: val } : prev));
-                      }}
+                      onChange={(e) => updateMetadata({ quote: e.target.value })}
+                      onBlur={commitMetadataHistory}
                       placeholder="Câu danh ngôn hoặc tâm tình..."
                       className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-white text-xs focus:outline-none focus:border-rosewood-500"
                     />
@@ -935,10 +1252,8 @@ export default function VisualPageEditorDirectPage() {
                     <input
                       type="text"
                       value={page.handwriting || ''}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setPage((prev) => (prev ? { ...prev, isCustomized: true, handwriting: val } : prev));
-                      }}
+                      onChange={(e) => updateMetadata({ handwriting: e.target.value })}
+                      onBlur={commitMetadataHistory}
                       placeholder="Chữ ký hoặc lời đề từ..."
                       className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-white text-xs focus:outline-none focus:border-rosewood-500 font-serif italic"
                     />
@@ -954,7 +1269,10 @@ export default function VisualPageEditorDirectPage() {
                       value={(page as any).audioTrackId || ''}
                       onChange={(e) => {
                         const val = e.target.value || null;
-                        setPage((prev) => (prev ? { ...prev, isCustomized: true, audioTrackId: val } as any : prev));
+                        updatePage(
+                          (prev) => ({ ...prev, isCustomized: true, audioTrackId: val } as Page),
+                          'Đổi nhạc nền trang'
+                        );
                       }}
                       className="w-full px-3 py-2 bg-[#25151F] border border-rosewood-900/60 rounded-xl text-xs text-white focus:outline-none"
                     >
@@ -976,16 +1294,10 @@ export default function VisualPageEditorDirectPage() {
                 <BackgroundEditor
                   background={page.background || { type: 'color', color: '#F9F5EC' }}
                   onChange={(newBg) => {
-                    setPage((prevPage) => {
-                      if (!prevPage) return prevPage;
-                      const nextPage = {
-                        ...prevPage,
-                        isCustomized: true,
-                        background: newBg,
-                      };
-                      recordHistory(nextPage, 'Cập nhật nền trang');
-                      return nextPage;
-                    });
+                    updatePage(
+                      (prevPage) => ({ ...prevPage, isCustomized: true, background: newBg }),
+                      'Cập nhật nền trang'
+                    );
                   }}
                   disabled={false}
                 />
@@ -1084,8 +1396,7 @@ export default function VisualPageEditorDirectPage() {
           onClose={() => setShowSaveAsLayout(false)}
           page={page}
           onSaved={() => {
-            setToast('Đã lưu bố cục thành Layout Template mới!');
-            setTimeout(() => setToast(null), 3000);
+            showToast('Đã lưu bố cục thành Layout Template mới!');
           }}
         />
       )}
@@ -1100,10 +1411,10 @@ export default function VisualPageEditorDirectPage() {
           onRollbackSuccess={async () => {
             try {
               const refreshed = await getAdminPage(pageId);
-              setPage(refreshed);
-              // Undo stack holds pre-rollback element IDs; start a fresh history
-              initHistory(refreshed);
+              // Undo stack and autosave baseline hold pre-rollback element IDs; start fresh
+              adoptServerPage(refreshed);
               setSelectedElementId(refreshed.elements?.[0]?.id ?? null);
+              clearPageDraft(pageId);
               refreshJournal();
             } catch {
               // This page did not exist in the restored version
@@ -1112,6 +1423,14 @@ export default function VisualPageEditorDirectPage() {
           }}
         />
       )}
+
+      <ConflictDialog
+        open={Boolean(conflict) && !conflictDismissed}
+        busy={resolvingConflict}
+        onReload={handleReloadLatest}
+        onOverwrite={handleOverwrite}
+        onClose={() => setConflictDismissed(true)}
+      />
 
       {/* Publish Validation & Confirmation Modal */}
       {validationModal && (
@@ -1122,8 +1441,7 @@ export default function VisualPageEditorDirectPage() {
           report={validationModal.report}
           onPublishSuccess={() => {
             refreshJournal();
-            setToast('Đã xuất bản thành công bản phát hành mới!');
-            setTimeout(() => setToast(null), 3000);
+            showToast('Đã xuất bản thành công bản phát hành mới!');
           }}
         />
       )}
