@@ -62,3 +62,71 @@ jobs:
           NEXT_PUBLIC_API_URL: http://localhost:4000/api
           BACKEND_INTERNAL_URL: http://localhost:4000/api
           NEXT_PUBLIC_ENABLE_LOCAL_BOOK_FALLBACK: 'false'
+
+  migrations:
+    name: Migrations apply cleanly and match schema
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:ci@localhost:5432/ci
+      DIRECT_URL: postgresql://postgres:ci@localhost:5432/ci
+      DATABASE_URL_UNPOOLED: postgresql://postgres:ci@localhost:5432/ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - name: Apply all migrations to an empty database
+        working-directory: apps/api
+        run: npx prisma migrate deploy --config prisma7.config.ts
+      - name: Fail if schema.prisma drifted from migrations
+        working-directory: apps/api
+        run: npx prisma migrate diff --config prisma7.config.ts --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+
+  e2e:
+    name: E2E (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    env:
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api
+      BACKEND_INTERNAL_URL: http://localhost:4000/api
+      NEXT_PUBLIC_ENABLE_LOCAL_BOOK_FALLBACK: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run build:shared
+      - name: Install Playwright browser
+        working-directory: apps/web
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Run Playwright
+        working-directory: apps/web
+        run: npx playwright test --project=${{ matrix.browser }} --timeout=180000
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-${{ matrix.browser }}
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          retention-days: 7
