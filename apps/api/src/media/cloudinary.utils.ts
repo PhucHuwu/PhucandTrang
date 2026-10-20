@@ -92,3 +92,89 @@ export function getAllowedFormatsForType(type?: MediaType): string {
       return IMAGE_FORMATS;
   }
 }
+
+export interface CloudinaryCredentials {
+  cloudName: string;
+  apiKey: string;
+  apiSecret: string;
+}
+
+export interface CloudinaryDestroyResult {
+  ok: boolean;
+  skipped?: boolean;
+  result?: string;
+  error?: string;
+}
+
+/** Cloudinary resource_type a stored media row lives under (audio is stored as "video"). */
+export function getResourceTypeForMedia(media: { type?: MediaType | string; metadata?: any }): string {
+  const fromUpload = media.metadata?.resourceType;
+  if (fromUpload === 'image' || fromUpload === 'video' || fromUpload === 'raw') return fromUpload;
+  return getResourceTypeForType(media.type as MediaType);
+}
+
+/**
+ * Deletes an asset from Cloudinary through the signed Admin upload API. Never throws:
+ * failures come back as `{ ok: false, error }` so callers can still finish their own work.
+ */
+export async function destroyCloudinaryAsset(
+  credentials: CloudinaryCredentials,
+  publicId: string,
+  resourceType: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<CloudinaryDestroyResult> {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const params: Record<string, any> = { public_id: publicId, timestamp, invalidate: true };
+  const signature = generateCloudinarySignature(params, credentials.apiSecret);
+
+  const body = new URLSearchParams({
+    public_id: publicId,
+    timestamp: String(timestamp),
+    invalidate: 'true',
+    api_key: credentials.apiKey,
+    signature,
+  });
+
+  try {
+    const res = await fetchImpl(
+      `https://api.cloudinary.com/v1_1/${encodeURIComponent(credentials.cloudName)}/${resourceType}/destroy`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
+    const data: any = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, error: data?.error?.message || `HTTP ${res.status}` };
+    }
+    // "not found" means the asset is already gone, which is the outcome we wanted
+    if (data?.result === 'ok' || data?.result === 'not found') {
+      return { ok: true, result: data.result };
+    }
+    return { ok: false, result: data?.result, error: `Unexpected result: ${data?.result}` };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || String(err) };
+  }
+}
+
+/** Only secure URLs served from Cloudinary's delivery host may be registered as media. */
+export function isCloudinaryDeliveryUrl(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.hostname === 'res.cloudinary.com';
+  } catch {
+    return false;
+  }
+}
+
+export function isHttpsUrl(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}

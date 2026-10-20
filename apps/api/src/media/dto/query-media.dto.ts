@@ -1,4 +1,4 @@
-import { IsOptional, IsEnum, IsString, IsInt, Min } from 'class-validator';
+import { IsOptional, IsEnum, IsString, IsInt, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 import { MediaType } from '@prisma/client';
 
@@ -25,5 +25,6 @@ export class QueryMediaDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(200)
   limit?: number = 50;
 }

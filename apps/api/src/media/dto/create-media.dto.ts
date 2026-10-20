@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsNumber, IsObject, IsUrl } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsNumber, IsObject, IsUrl, MaxLength } from 'class-validator';
 import { MediaType } from '@prisma/client';
 
 export class CreateMediaDto {
@@ -10,7 +10,11 @@ export class CreateMediaDto {
   provider?: string;
 
   @IsNotEmpty()
-  @IsUrl({ protocols: ['https'], require_protocol: true })
+  @MaxLength(2048)
+  @IsUrl(
+    { protocols: ['https'], require_protocol: true, host_whitelist: ['res.cloudinary.com'] },
+    { message: 'url phải là đường dẫn https trên res.cloudinary.com' },
+  )
   url: string;
 
   @IsOptional()

@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { passwordFingerprint } from './jwt-secret';
 
 describe('AuthService Security Hardening (Prompt 35 & Single Password Login)', () => {
   let service: AuthService;
@@ -121,5 +122,93 @@ describe('AuthService Security Hardening (Prompt 35 & Single Password Login)', (
     expect(res.accessToken).toBe('mock-jwt-token');
     expect(res.user.email).toBe('admin@phucandtrang.love');
     expect(res.user.role).toBe('ADMIN');
+  });
+
+  it('embeds a password fingerprint (pwf) in the issued token', async () => {
+    const previousSecret = process.env.JWT_SECRET;
+    process.env.JWT_SECRET = 'unit-test-secret-unit-test-secret-1234';
+    const passwordHash = await bcrypt.hash('test-only-password', 4);
+    const admin = { id: 'admin-1', email: 'a@b.c', passwordHash, name: 'Admin', role: 'ADMIN' };
+    prisma.user.findUnique.mockResolvedValue(admin);
+
+    const res = await service.login({ pass: 'test-only-password' });
+    const payload = jwtService.sign.mock.calls[0][0];
+    expect(payload.pwf).toBe(passwordFingerprint(passwordHash, process.env.JWT_SECRET));
+    expect(payload.pwf).toMatch(/^[0-9a-f]{16}$/);
+    expect((res.user as any).passwordHash).toBeUndefined();
+    process.env.JWT_SECRET = previousSecret;
+  });
+
+  it('does not hard-block the shared BFF source after 30 failures from different clients', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.findFirst.mockResolvedValue(null);
+    const nowSpy = jest.spyOn(Date, 'now');
+    try {
+      let now = 5_000_000;
+      nowSpy.mockImplementation(() => now);
+      for (let i = 0; i < 40; i++) {
+        now += 61_000; // stay clear of the per-account backoff
+        await expect(service.login({ pass: 'wrong' }, `client-${i}`, 'bff')).rejects.toThrow(
+          UnauthorizedException,
+        );
+      }
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('blocks the shared source only until its 5-minute window ends once 100 failures are reached', async () => {
+    const internals = service as any;
+    const nowSpy = jest.spyOn(Date, 'now');
+    try {
+      let now = 9_000_000;
+      nowSpy.mockImplementation(() => now);
+      for (let i = 0; i < 100; i++) internals.recordFailedAttempt('source:bff');
+      expect(() => internals.checkRateLimit('source:bff')).toThrow(HttpException);
+
+      now += 5 * 60 * 1000 + 1;
+      expect(() => internals.checkRateLimit('source:bff')).not.toThrow();
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('applies a capped, growing per-account delay after repeated failures and lets the admin back in', async () => {
+    const passwordHash = await bcrypt.hash('right-password', 4);
+    const admin = { id: 'admin-1', email: 'a@b.c', passwordHash, name: 'Admin', role: 'ADMIN' };
+    prisma.user.findUnique.mockResolvedValue(admin);
+    const nowSpy = jest.spyOn(Date, 'now');
+    try {
+      let now = 20_000_000;
+      nowSpy.mockImplementation(() => now);
+
+      // 10 free failures from distinct clients
+      for (let i = 0; i < 10; i++) {
+        await expect(service.login({ pass: 'wrong' }, `c-${i}`, `s-${i}`)).rejects.toThrow(
+          UnauthorizedException,
+        );
+      }
+      // Now even the right password must wait the backoff delay
+      await expect(service.login({ pass: 'right-password' }, 'admin-ip', 'admin-src')).rejects.toMatchObject({
+        status: HttpStatus.TOO_MANY_REQUESTS,
+      });
+
+      // Many more failures, each after waiting: delay never exceeds 60s
+      for (let i = 0; i < 20; i++) {
+        now += 60_001;
+        await expect(service.login({ pass: 'wrong' }, `d-${i}`, `t-${i}`)).rejects.toThrow(
+          UnauthorizedException,
+        );
+      }
+      expect((service as any).accountDelayMs(now)).toBe(60_000);
+
+      // After the capped delay the real admin can log in
+      now += 60_001;
+      const res = await service.login({ pass: 'right-password' }, 'admin-ip', 'admin-src');
+      expect(res.accessToken).toBe('mock-jwt-token');
+      expect((service as any).accountDelayMs(now)).toBe(0);
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 });

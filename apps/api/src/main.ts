@@ -1,47 +1,32 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { requireJwtSecret } from './auth/jwt-secret';
+import { buildCorsOrigin, securityHeaders } from './http-security';
+import { PrismaExceptionFilter } from './common/prisma-exception.filter';
 
 async function bootstrap() {
   const isProduction = process.env.NODE_ENV === 'production';
 
-  // Every environment needs its own JWT_SECRET; there is no built-in fallback
-  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.includes('super_secret_romantic_jwt_key')) {
+  // Every environment needs its own JWT_SECRET; there is no built-in fallback.
+  // A short secret in production only logs a warning so the API keeps booting.
+  try {
+    requireJwtSecret(process.env.JWT_SECRET);
+  } catch {
     console.error('FATAL: JWT_SECRET environment variable must be properly configured!');
     process.exit(1);
   }
 
   const app = await NestFactory.create(AppModule);
 
+  app.getHttpAdapter().getInstance().disable('x-powered-by');
+  app.use(securityHeaders);
+
   // Enable shutdown hooks for graceful termination (SIGTERM / SIGINT)
   app.enableShutdownHooks();
 
-  // Secure CORS Configuration
-  let corsOrigin: any = true;
-  if (isProduction) {
-    if (process.env.CORS_ORIGINS) {
-      corsOrigin = process.env.CORS_ORIGINS.split(',').map((s) => s.trim());
-    } else {
-      corsOrigin = [
-        'https://love.phuchuwu.io.vn',
-        'https://phucandtrang.love',
-        'https://phuc-and-trang.vercel.app',
-        /\.vercel\.app$/,
-      ];
-    }
-  } else {
-    corsOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-      // Allow localhost or server-to-server calls in development
-      if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1')) {
-        callback(null, true);
-      } else {
-        callback(null, true);
-      }
-    };
-  }
-
   app.enableCors({
-    origin: corsOrigin,
+    origin: buildCorsOrigin(isProduction, process.env.CORS_ORIGINS),
     credentials: true,
   });
 
@@ -56,6 +41,8 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+
+  app.useGlobalFilters(new PrismaExceptionFilter());
 
   const port = process.env.PORT || 4000;
   await app.listen(port);

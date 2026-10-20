@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { isSameOriginRequest } from '../../sameOrigin';
+import { tokenCookieMaxAge } from '../../tokenMaxAge';
 
 const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -25,12 +26,16 @@ export async function POST(request: Request) {
       request.headers.get('x-real-ip') ||
       '';
 
+    // The backend only trusts x-client-ip when it comes with the shared BFF secret
+    const bffSecret = process.env.BFF_SHARED_SECRET;
+
     // Call backend login endpoint (password-only)
     const backendRes = await fetch(`${BACKEND_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(clientIp ? { 'x-client-ip': clientIp } : {}),
+        ...(bffSecret ? { 'x-bff-secret': bffSecret } : {}),
       },
       body: JSON.stringify({ pass }),
     });
@@ -55,7 +60,7 @@ export async function POST(request: Request) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 7 * 24 * 60 * 60, // 7 days
+      maxAge: tokenCookieMaxAge(accessToken),
     });
 
     return NextResponse.json({

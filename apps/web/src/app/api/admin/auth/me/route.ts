@@ -38,6 +38,7 @@ export async function GET() {
       user: data.user,
     });
   } catch (error: any) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+    console.error('[admin me] Failed:', error?.message || error);
+    return NextResponse.json({ message: 'Lỗi kết nối máy chủ xác thực' }, { status: 500 });
   }
 }
