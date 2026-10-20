@@ -7,7 +7,10 @@ import {
   CompiledElement,
   CompiledMediaReferences,
 } from './compiled-book.interface';
-import { PublicCacheService, PUBLIC_JOURNAL_CACHE_KEY } from './public-cache.service';
+import {
+  PublicCacheService,
+  PUBLIC_JOURNAL_CACHE_KEY,
+} from './public-cache.service';
 import { derivePageSide } from '../utils/page-utils';
 
 @Injectable()
@@ -23,8 +26,13 @@ export class PublicService {
    * Public API MUST serve the frozen publishedSnapshot if present.
    * Any ongoing edits/drafts in the Admin relational tables do NOT leak into live public site.
    */
-  async getPublishedBook(): Promise<{ document: CompiledBookDocument; etag: string }> {
-    const cached = this.cacheService.get<CompiledBookDocument>(PUBLIC_JOURNAL_CACHE_KEY);
+  async getPublishedBook(): Promise<{
+    document: CompiledBookDocument;
+    etag: string;
+  }> {
+    const cached = this.cacheService.get<CompiledBookDocument>(
+      PUBLIC_JOURNAL_CACHE_KEY,
+    );
     if (cached) {
       return { document: cached.document, etag: cached.etag };
     }
@@ -47,11 +55,14 @@ export class PublicService {
       );
     }
 
-    const document: CompiledBookDocument = book.publishedSnapshot as unknown as CompiledBookDocument;
+    const document: CompiledBookDocument =
+      book.publishedSnapshot as unknown as CompiledBookDocument;
 
     // The ETag only depends on what identifies the frozen snapshot: draft edits (contentRevision)
     // or manual version snapshots must not invalidate client caches of an unchanged publication.
-    const publishedAtMs = book.publishedAt ? new Date(book.publishedAt).getTime() : 0;
+    const publishedAtMs = book.publishedAt
+      ? new Date(book.publishedAt).getTime()
+      : 0;
     const etag = `"${book.id}-rev${book.publishedRevision || 0}-${publishedAtMs}"`;
 
     this.cacheService.set(PUBLIC_JOURNAL_CACHE_KEY, document, etag);
@@ -205,10 +216,17 @@ export class PublicService {
    * Compiles raw database entities into a pristine, lean client document.
    * Resolves canonical URLs, strips sensitive fields, and computes deterministic page side sequencing.
    */
-  compileBookDocument(book: any, mediaMap: Map<string, any>): CompiledBookDocument {
+  compileBookDocument(
+    book: any,
+    mediaMap: Map<string, any>,
+  ): CompiledBookDocument {
     const allUrls = new Set<string>();
     const images = new Set<string>();
-    const videos: Array<{ url: string; thumbnailUrl?: string; caption?: string }> = [];
+    const videos: Array<{
+      url: string;
+      thumbnailUrl?: string;
+      caption?: string;
+    }> = [];
     const audio: string[] = [];
     const backgrounds = new Set<string>();
 
@@ -216,7 +234,8 @@ export class PublicService {
     let compiledAudio: CompiledBookDocument['audio'] = null;
     if (book.backgroundMusic) {
       const resolvedSrc =
-        (book.backgroundMusic.mediaId && mediaMap.get(book.backgroundMusic.mediaId)?.url) ||
+        (book.backgroundMusic.mediaId &&
+          mediaMap.get(book.backgroundMusic.mediaId)?.url) ||
         book.backgroundMusic.src;
 
       compiledAudio = {
@@ -242,7 +261,10 @@ export class PublicService {
     // 1b. Compiled Global Playlist
     const settings = (book.settings as any) || {};
     let compiledPlaylist: CompiledBookDocument['playlist'] = undefined;
-    if (Array.isArray(settings.playlistTracks) && settings.playlistTracks.length > 0) {
+    if (
+      Array.isArray(settings.playlistTracks) &&
+      settings.playlistTracks.length > 0
+    ) {
       compiledPlaylist = settings.playlistTracks
         .map((track: any) => {
           const trackSrc =
@@ -278,11 +300,13 @@ export class PublicService {
       cover.front?.backgroundUrl ||
       '';
     const backInsideBg =
-      (cover.back?.insideMediaId && mediaMap.get(cover.back.insideMediaId)?.url) ||
+      (cover.back?.insideMediaId &&
+        mediaMap.get(cover.back.insideMediaId)?.url) ||
       cover.back?.insideBackgroundUrl ||
       '';
     const backOutsideBg =
-      (cover.back?.outsideMediaId && mediaMap.get(cover.back.outsideMediaId)?.url) ||
+      (cover.back?.outsideMediaId &&
+        mediaMap.get(cover.back.outsideMediaId)?.url) ||
       cover.back?.outsideBackgroundUrl ||
       '';
 
@@ -302,88 +326,104 @@ export class PublicService {
     // Compile cover elements (if any)
     const frontCoverElements = (cover.front?.elements || [])
       .filter((el: any) => el.visible !== false)
-      .map((el: any) => this.compileElement(el, mediaMap, images, allUrls, videos));
-
-    const backCoverElements = (cover.back?.elements || [])
-      .filter((el: any) => el.visible !== false)
-      .map((el: any) => this.compileElement(el, mediaMap, images, allUrls, videos));
-
-    const backInsideCoverElements = (cover.back?.insideElements || [])
-      .filter((el: any) => el.visible !== false)
-      .map((el: any) => this.compileElement(el, mediaMap, images, allUrls, videos));
-
-    // 3. Pages & Elements: sort strictly by order ASC
-    const rawPages = [...(book.pages || [])].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
-
-    const compiledPages: CompiledPage[] = rawPages.map((page: any, physicalIndex: number) => {
-      const bg = (page.background as any) || { type: 'color', color: '#F9F5EC' };
-      const resolvedBgImage =
-        (bg.mediaId && mediaMap.get(bg.mediaId)?.url) || bg.imageUrl;
-
-      if (resolvedBgImage) {
-        backgrounds.add(resolvedBgImage);
-        allUrls.add(resolvedBgImage);
-      }
-
-      // Page-level audio track
-      let pageAudio: CompiledPage['audio'] = null;
-      if (page.audioTrack) {
-        const trackSrc =
-          (page.audioTrack.mediaId && mediaMap.get(page.audioTrack.mediaId)?.url) ||
-          page.audioTrack.src;
-
-        pageAudio = {
-          id: page.audioTrack.id,
-          title: page.audioTrack.title,
-          artist: page.audioTrack.artist,
-          src: trackSrc,
-          mediaId: page.audioTrack.mediaId,
-          volume: page.audioTrack.volume ?? 0.8,
-          loop: page.audioTrack.loop ?? true,
-          startAt: page.audioTrack.startAt ?? 0.0,
-          fadeIn: page.audioTrack.fadeIn ?? 0.0,
-          fadeOut: page.audioTrack.fadeOut ?? 0.0,
-          durationSeconds: page.audioTrack.durationSeconds,
-          autoPlay: page.audioTrack.autoPlay ?? true,
-        };
-        if (trackSrc) {
-          audio.push(trackSrc);
-          allUrls.add(trackSrc);
-        }
-      }
-
-      // Elements: filter visible, sort by zIndex ASC
-      const rawElements = (page.elements || [])
-        .filter((el: any) => el.visible !== false)
-        .sort((a: any, b: any) => (a.zIndex ?? 1) - (b.zIndex ?? 1));
-
-      const compiledElements: CompiledElement[] = rawElements.map((el: any) =>
+      .map((el: any) =>
         this.compileElement(el, mediaMap, images, allUrls, videos),
       );
 
-      // Side is deterministically derived from physical order index
-      const derivedSide = derivePageSide(physicalIndex);
+    const backCoverElements = (cover.back?.elements || [])
+      .filter((el: any) => el.visible !== false)
+      .map((el: any) =>
+        this.compileElement(el, mediaMap, images, allUrls, videos),
+      );
 
-      return {
-        id: page.id,
-        order: page.order ?? physicalIndex,
-        displayPageNumber: page.pageNumber ?? physicalIndex,
-        pageNumber: page.pageNumber ?? physicalIndex,
-        side: derivedSide,
-        chapter: page.chapter || null,
-        title: page.title || null,
-        quote: page.quote || null,
-        handwriting: page.handwriting || null,
-        layout: page.layoutTemplateId || (page.sourceTemplateId ? page.sourceTemplateId : 'auto'),
-        layoutMode: page.layoutMode || 'PRESET',
-        background: {
-          ...bg,
-          imageUrl: resolvedBgImage,
-        },
-        audio: pageAudio,
-        elements: compiledElements,
-      };
-    });
+    const backInsideCoverElements = (cover.back?.insideElements || [])
+      .filter((el: any) => el.visible !== false)
+      .map((el: any) =>
+        this.compileElement(el, mediaMap, images, allUrls, videos),
+      );
+
+    // 3. Pages & Elements: sort strictly by order ASC
+    const rawPages = [...(book.pages || [])].sort(
+      (a: any, b: any) => (a.order ?? 0) - (b.order ?? 0),
+    );
+
+    const compiledPages: CompiledPage[] = rawPages.map(
+      (page: any, physicalIndex: number) => {
+        const bg = (page.background as any) || {
+          type: 'color',
+          color: '#F9F5EC',
+        };
+        const resolvedBgImage =
+          (bg.mediaId && mediaMap.get(bg.mediaId)?.url) || bg.imageUrl;
+
+        if (resolvedBgImage) {
+          backgrounds.add(resolvedBgImage);
+          allUrls.add(resolvedBgImage);
+        }
+
+        // Page-level audio track
+        let pageAudio: CompiledPage['audio'] = null;
+        if (page.audioTrack) {
+          const trackSrc =
+            (page.audioTrack.mediaId &&
+              mediaMap.get(page.audioTrack.mediaId)?.url) ||
+            page.audioTrack.src;
+
+          pageAudio = {
+            id: page.audioTrack.id,
+            title: page.audioTrack.title,
+            artist: page.audioTrack.artist,
+            src: trackSrc,
+            mediaId: page.audioTrack.mediaId,
+            volume: page.audioTrack.volume ?? 0.8,
+            loop: page.audioTrack.loop ?? true,
+            startAt: page.audioTrack.startAt ?? 0.0,
+            fadeIn: page.audioTrack.fadeIn ?? 0.0,
+            fadeOut: page.audioTrack.fadeOut ?? 0.0,
+            durationSeconds: page.audioTrack.durationSeconds,
+            autoPlay: page.audioTrack.autoPlay ?? true,
+          };
+          if (trackSrc) {
+            audio.push(trackSrc);
+            allUrls.add(trackSrc);
+          }
+        }
+
+        // Elements: filter visible, sort by zIndex ASC
+        const rawElements = (page.elements || [])
+          .filter((el: any) => el.visible !== false)
+          .sort((a: any, b: any) => (a.zIndex ?? 1) - (b.zIndex ?? 1));
+
+        const compiledElements: CompiledElement[] = rawElements.map((el: any) =>
+          this.compileElement(el, mediaMap, images, allUrls, videos),
+        );
+
+        // Side is deterministically derived from physical order index
+        const derivedSide = derivePageSide(physicalIndex);
+
+        return {
+          id: page.id,
+          order: page.order ?? physicalIndex,
+          displayPageNumber: page.pageNumber ?? physicalIndex,
+          pageNumber: page.pageNumber ?? physicalIndex,
+          side: derivedSide,
+          chapter: page.chapter || null,
+          title: page.title || null,
+          quote: page.quote || null,
+          handwriting: page.handwriting || null,
+          layout:
+            page.layoutTemplateId ||
+            (page.sourceTemplateId ? page.sourceTemplateId : 'auto'),
+          layoutMode: page.layoutMode || 'PRESET',
+          background: {
+            ...bg,
+            imageUrl: resolvedBgImage,
+          },
+          audio: pageAudio,
+          elements: compiledElements,
+        };
+      },
+    );
 
     const mediaReferences: CompiledMediaReferences = {
       allUrls: Array.from(allUrls),
@@ -428,7 +468,11 @@ export class PublicService {
       settings: (book.settings as any) || {},
       pages: compiledPages,
       media: mediaReferences,
-      publishedAt: book.publishedAt ? new Date(book.publishedAt).toISOString() : book.updatedAt instanceof Date ? book.updatedAt.toISOString() : book.updatedAt,
+      publishedAt: book.publishedAt
+        ? new Date(book.publishedAt).toISOString()
+        : book.updatedAt instanceof Date
+          ? book.updatedAt.toISOString()
+          : book.updatedAt,
       version: latestVersion,
     };
   }

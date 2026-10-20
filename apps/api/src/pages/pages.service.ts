@@ -29,7 +29,9 @@ export class PagesService {
     private cacheService: PublicCacheService,
   ) {}
 
-  private async resolveElementMediaUrls<T extends { elements?: any[] }>(page: T): Promise<T> {
+  private async resolveElementMediaUrls<T extends { elements?: any[] }>(
+    page: T,
+  ): Promise<T> {
     const ids = new Set<string>();
     for (const el of page.elements || []) {
       const data = (el.data as any) || {};
@@ -50,7 +52,9 @@ export class PagesService {
       elements: (page.elements || []).map((el) => {
         const data = { ...((el.data as any) || {}) };
         const source = data.mediaId ? mediaMap.get(data.mediaId) : undefined;
-        const poster = data.posterMediaId ? mediaMap.get(data.posterMediaId) : undefined;
+        const poster = data.posterMediaId
+          ? mediaMap.get(data.posterMediaId)
+          : undefined;
 
         if (source) {
           data.src = source.url;
@@ -69,7 +73,10 @@ export class PagesService {
    * Rejects unknown layout template ids with a 400 instead of letting the FK constraint
    * surface as a 500. `undefined`/`null` (no template) is always accepted.
    */
-  private async assertLayoutTemplateExists(client: any, layoutTemplateId?: string | null) {
+  private async assertLayoutTemplateExists(
+    client: any,
+    layoutTemplateId?: string | null,
+  ) {
     if (layoutTemplateId === undefined || layoutTemplateId === null) return;
     const preset = LAYOUT_PRESETS[layoutTemplateId];
     if (preset) {
@@ -93,7 +100,9 @@ export class PagesService {
       select: { id: true },
     });
     if (!tpl) {
-      throw new BadRequestException(`Layout template không tồn tại: ${layoutTemplateId}`);
+      throw new BadRequestException(
+        `Layout template không tồn tại: ${layoutTemplateId}`,
+      );
     }
   }
 
@@ -102,11 +111,18 @@ export class PagesService {
    * Normalizes contiguous physical sequence: order = 0..N-1, side = derivePageSideEnum(order).
    * Strictly preserves existing display metadata: pageNumber is NEVER overwritten.
    */
-  async normalizeBookPageSequence(bookId: string, customTx?: any): Promise<void> {
+  async normalizeBookPageSequence(
+    bookId: string,
+    customTx?: any,
+  ): Promise<void> {
     const execute = async (tx: any) => {
       const pages = await tx.page.findMany({
         where: { bookId },
-        orderBy: [{ order: 'asc' }, { pageNumber: 'asc' }, { createdAt: 'asc' }],
+        orderBy: [
+          { order: 'asc' },
+          { pageNumber: 'asc' },
+          { createdAt: 'asc' },
+        ],
         select: { id: true, order: true, side: true, pageNumber: true },
       });
 
@@ -157,7 +173,8 @@ export class PagesService {
         audioTrack: true,
       },
     });
-    if (!page) throw new NotFoundException(`Không tìm thấy trang với ID: ${id}`);
+    if (!page)
+      throw new NotFoundException(`Không tìm thấy trang với ID: ${id}`);
     return this.resolveElementMediaUrls(page);
   }
 
@@ -294,14 +311,20 @@ export class PagesService {
       }
     }
 
-    if (dto.layoutTemplateId !== undefined && dto.layoutTemplateId !== page.layoutTemplateId) {
+    if (
+      dto.layoutTemplateId !== undefined &&
+      dto.layoutTemplateId !== page.layoutTemplateId
+    ) {
       await this.assertLayoutTemplateExists(this.prisma, dto.layoutTemplateId);
     }
 
     // Safe merge for partial JSON objects if PATCH (cleanly accept updated background without stale field resurrection)
-    const background = isPatch && dto.background
-      ? (dto.background.type || dto.background.imageUrl || dto.background.color ? dto.background : safeDeepMerge(page.background as any, dto.background))
-      : dto.background;
+    const background =
+      isPatch && dto.background
+        ? dto.background.type || dto.background.imageUrl || dto.background.color
+          ? dto.background
+          : safeDeepMerge(page.background as any, dto.background)
+        : dto.background;
 
     const updated = await this.prisma.page.update({
       where: { id },
@@ -310,13 +333,23 @@ export class PagesService {
         ...(dto.chapter !== undefined ? { chapter: dto.chapter } : {}),
         ...(dto.title !== undefined ? { title: dto.title } : {}),
         ...(dto.quote !== undefined ? { quote: dto.quote } : {}),
-        ...(dto.handwriting !== undefined ? { handwriting: dto.handwriting } : {}),
-        ...(dto.layoutTemplateId !== undefined ? { layoutTemplateId: dto.layoutTemplateId } : {}),
+        ...(dto.handwriting !== undefined
+          ? { handwriting: dto.handwriting }
+          : {}),
+        ...(dto.layoutTemplateId !== undefined
+          ? { layoutTemplateId: dto.layoutTemplateId }
+          : {}),
         ...(dto.layoutMode !== undefined ? { layoutMode: dto.layoutMode } : {}),
-        ...(dto.sourceTemplateId !== undefined ? { sourceTemplateId: dto.sourceTemplateId } : {}),
-        ...(dto.isCustomized !== undefined ? { isCustomized: dto.isCustomized } : {}),
+        ...(dto.sourceTemplateId !== undefined
+          ? { sourceTemplateId: dto.sourceTemplateId }
+          : {}),
+        ...(dto.isCustomized !== undefined
+          ? { isCustomized: dto.isCustomized }
+          : {}),
         ...(background !== undefined ? { background: background as any } : {}),
-        ...(dto.audioTrackId !== undefined ? { audioTrackId: dto.audioTrackId } : {}),
+        ...(dto.audioTrackId !== undefined
+          ? { audioTrackId: dto.audioTrackId }
+          : {}),
       },
       include: {
         elements: { orderBy: { zIndex: 'asc' } },
@@ -365,7 +398,8 @@ export class PagesService {
           where: { id },
           select: { order: true },
         });
-        if (!source) throw new NotFoundException(`Không tìm thấy trang với ID: ${id}`);
+        if (!source)
+          throw new NotFoundException(`Không tìm thấy trang với ID: ${id}`);
 
         let targetOrder: number;
         if (insertAfter) {
@@ -397,7 +431,9 @@ export class PagesService {
             pageNumber: targetPageNum,
             side: derivedSide,
             order: targetOrder,
-            chapter: original.chapter ? `${original.chapter} (Bản sao)` : undefined,
+            chapter: original.chapter
+              ? `${original.chapter} (Bản sao)`
+              : undefined,
             title: original.title ? `${original.title} (Copy)` : undefined,
             quote: original.quote,
             handwriting: original.handwriting,
@@ -419,7 +455,9 @@ export class PagesService {
                 transform: requiredJson(el.transform),
                 style: nullableJson(el.style),
                 // findOne resolves media URLs at runtime; never persist them back
-                data: requiredJson(canonicalizeMediaData(el.type, el.data as any)),
+                data: requiredJson(
+                  canonicalizeMediaData(el.type, el.data as any),
+                ),
                 interaction: nullableJson(el.interaction),
               })),
             },
@@ -452,7 +490,10 @@ export class PagesService {
       await this.normalizeBookPageSequence(page.bookId, tx);
     });
     await this.cacheService.touchBook(page.bookId);
-    return { success: true, message: `Đã xóa trang ${id} cùng tất cả element liên quan` };
+    return {
+      success: true,
+      message: `Đã xóa trang ${id} cùng tất cả element liên quan`,
+    };
   }
 
   async reorder(bookId: string, dto: ReorderPagesDto) {
@@ -472,7 +513,9 @@ export class PagesService {
 
       // 1. Check duplicate IDs
       if (requestedIdSet.size !== requestedIds.length) {
-        throw new BadRequestException('Danh sách reorder chứa ID trang bị trùng lặp.');
+        throw new BadRequestException(
+          'Danh sách reorder chứa ID trang bị trùng lặp.',
+        );
       }
 
       // 2. Check complete page set length
@@ -505,7 +548,13 @@ export class PagesService {
       return tx.page.findMany({
         where: { bookId },
         orderBy: { order: 'asc' },
-        select: { id: true, pageNumber: true, order: true, side: true, title: true },
+        select: {
+          id: true,
+          pageNumber: true,
+          order: true,
+          side: true,
+          title: true,
+        },
       });
     });
 
@@ -595,7 +644,8 @@ export class PagesService {
           where: { id: pageId },
           select: { id: true, bookId: true, updatedAt: true },
         });
-        if (!current) throw new NotFoundException(`Không tìm thấy trang với ID: ${pageId}`);
+        if (!current)
+          throw new NotFoundException(`Không tìm thấy trang với ID: ${pageId}`);
 
         const throwConflict = (currentUpdatedAt: Date) => {
           throw new ConflictException({
@@ -605,8 +655,13 @@ export class PagesService {
           });
         };
 
-        const baseUpdatedAt = dto.baseUpdatedAt ? new Date(dto.baseUpdatedAt) : undefined;
-        if (baseUpdatedAt && current.updatedAt.toISOString() !== baseUpdatedAt.toISOString()) {
+        const baseUpdatedAt = dto.baseUpdatedAt
+          ? new Date(dto.baseUpdatedAt)
+          : undefined;
+        if (
+          baseUpdatedAt &&
+          current.updatedAt.toISOString() !== baseUpdatedAt.toISOString()
+        ) {
           throwConflict(current.updatedAt);
         }
 
@@ -619,13 +674,27 @@ export class PagesService {
           ...(fields.title !== undefined ? { title: fields.title } : {}),
           ...(fields.chapter !== undefined ? { chapter: fields.chapter } : {}),
           ...(fields.quote !== undefined ? { quote: fields.quote } : {}),
-          ...(fields.handwriting !== undefined ? { handwriting: fields.handwriting } : {}),
-          ...(fields.background !== undefined ? { background: requiredJson(fields.background) } : {}),
-          ...(fields.audioTrackId !== undefined ? { audioTrackId: fields.audioTrackId } : {}),
-          ...(fields.layoutTemplateId !== undefined ? { layoutTemplateId: fields.layoutTemplateId } : {}),
-          ...(fields.sourceTemplateId !== undefined ? { sourceTemplateId: fields.sourceTemplateId } : {}),
-          ...(fields.layoutMode !== undefined ? { layoutMode: fields.layoutMode } : {}),
-          ...(fields.isCustomized !== undefined ? { isCustomized: fields.isCustomized } : {}),
+          ...(fields.handwriting !== undefined
+            ? { handwriting: fields.handwriting }
+            : {}),
+          ...(fields.background !== undefined
+            ? { background: requiredJson(fields.background) }
+            : {}),
+          ...(fields.audioTrackId !== undefined
+            ? { audioTrackId: fields.audioTrackId }
+            : {}),
+          ...(fields.layoutTemplateId !== undefined
+            ? { layoutTemplateId: fields.layoutTemplateId }
+            : {}),
+          ...(fields.sourceTemplateId !== undefined
+            ? { sourceTemplateId: fields.sourceTemplateId }
+            : {}),
+          ...(fields.layoutMode !== undefined
+            ? { layoutMode: fields.layoutMode }
+            : {}),
+          ...(fields.isCustomized !== undefined
+            ? { isCustomized: fields.isCustomized }
+            : {}),
           // Always bump so every save yields a fresh baseUpdatedAt for the client
           updatedAt: new Date(),
         };
@@ -643,7 +712,10 @@ export class PagesService {
             where: { id: pageId },
             select: { updatedAt: true },
           });
-          if (!latest) throw new NotFoundException(`Không tìm thấy trang với ID: ${pageId}`);
+          if (!latest)
+            throw new NotFoundException(
+              `Không tìm thấy trang với ID: ${pageId}`,
+            );
           throwConflict(latest.updatedAt);
         }
 
@@ -653,12 +725,14 @@ export class PagesService {
             where: { id: { in: ids } },
             select: { id: true, pageId: true, type: true, transform: true },
           });
-          const existingMap = new Map<string, { id: string; pageId: string; type: string; transform: any }>(
-            existing.map((el: any) => [el.id, el]),
-          );
+          const existingMap = new Map<
+            string,
+            { id: string; pageId: string; type: string; transform: any }
+          >(existing.map((el: any) => [el.id, el]));
 
           for (const item of items) {
-            const { zIndex: _ignore, ...cleanTransform } = (item.transform as any) || {};
+            const { zIndex: _ignore, ...cleanTransform } =
+              (item.transform as any) || {};
             const found = existingMap.get(item.id);
 
             if (found) {
@@ -672,16 +746,31 @@ export class PagesService {
                   ...(item.slot !== undefined ? { slot: item.slot } : {}),
                   ...(item.zIndex !== undefined ? { zIndex: item.zIndex } : {}),
                   ...(item.order !== undefined ? { order: item.order } : {}),
-                  ...(item.visible !== undefined ? { visible: item.visible } : {}),
+                  ...(item.visible !== undefined
+                    ? { visible: item.visible }
+                    : {}),
                   ...(item.locked !== undefined ? { locked: item.locked } : {}),
-                  ...(item.opacity !== undefined ? { opacity: item.opacity } : {}),
+                  ...(item.opacity !== undefined
+                    ? { opacity: item.opacity }
+                    : {}),
                   // Transforms may be partial (validated leniently), so they are merged.
                   ...(item.transform !== undefined
-                    ? { transform: safeDeepMerge((found.transform as any) || {}, cleanTransform) }
+                    ? {
+                        transform: safeDeepMerge(
+                          (found.transform as any) || {},
+                          cleanTransform,
+                        ),
+                      }
                     : {}),
-                  ...(item.style !== undefined ? { style: nullableJson(item.style) } : {}),
+                  ...(item.style !== undefined
+                    ? { style: nullableJson(item.style) }
+                    : {}),
                   ...(item.data !== undefined
-                    ? { data: requiredJson(canonicalizeMediaData(found.type, item.data)) }
+                    ? {
+                        data: requiredJson(
+                          canonicalizeMediaData(found.type, item.data),
+                        ),
+                      }
                     : {}),
                   ...(item.interaction !== undefined
                     ? { interaction: nullableJson(item.interaction) }
@@ -729,7 +818,11 @@ export class PagesService {
           include: PAGE_DETAIL_INCLUDE,
         });
 
-        return { page: saved, skippedElementIds: skipped, bookId: current.bookId };
+        return {
+          page: saved,
+          skippedElementIds: skipped,
+          bookId: current.bookId,
+        };
       },
       { timeout: 15000 },
     );

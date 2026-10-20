@@ -4,7 +4,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PublicCacheService } from '../public/public-cache.service';
 import { PublicService } from '../public/public.service';
 import { PublishValidationService } from './publish-validation.service';
-import { BookStatus } from '@prisma/client';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 
 describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Validation)', () => {
@@ -23,9 +22,13 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       audioTrack: {
-        findUnique: jest.fn().mockImplementation(({ where }) =>
-          Promise.resolve(where.id.startsWith('track-') ? { id: where.id } : null),
-        ),
+        findUnique: jest
+          .fn()
+          .mockImplementation(({ where }) =>
+            Promise.resolve(
+              where.id.startsWith('track-') ? { id: where.id } : null,
+            ),
+          ),
       },
       bookVersion: {
         create: jest.fn(),
@@ -46,7 +49,7 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
 
     publicService = {
       collectAndResolveMedia: jest.fn().mockResolvedValue(new Map()),
-      compileBookDocument: jest.fn().mockImplementation((book, mediaMap) => ({
+      compileBookDocument: jest.fn().mockImplementation((book) => ({
         id: book.id,
         title: book.title,
         contentRevision: 1,
@@ -69,7 +72,10 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
         { provide: PrismaService, useValue: prisma },
         { provide: PublicCacheService, useValue: cacheService },
         { provide: PublicService, useValue: publicService },
-        { provide: PublishValidationService, useValue: publishValidationService },
+        {
+          provide: PublishValidationService,
+          useValue: publishValidationService,
+        },
       ],
     }).compile();
 
@@ -88,7 +94,10 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
 
   it('Case A: PATCH backgroundMusicId = null should set backgroundMusicId to null (disable music)', async () => {
     prisma.book.findUnique.mockResolvedValue(mockExistingBook);
-    prisma.book.update.mockResolvedValue({ ...mockExistingBook, backgroundMusicId: null });
+    prisma.book.update.mockResolvedValue({
+      ...mockExistingBook,
+      backgroundMusicId: null,
+    });
 
     const patchDto = { backgroundMusicId: null };
     await service.update('book-1', patchDto, true);
@@ -106,7 +115,10 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
 
   it('Case B: PATCH backgroundMusicId = "track-2" should switch backgroundMusicId to "track-2"', async () => {
     prisma.book.findUnique.mockResolvedValue(mockExistingBook);
-    prisma.book.update.mockResolvedValue({ ...mockExistingBook, backgroundMusicId: 'track-2' });
+    prisma.book.update.mockResolvedValue({
+      ...mockExistingBook,
+      backgroundMusicId: 'track-2',
+    });
 
     const patchDto = { backgroundMusicId: 'track-2' };
     await service.update('book-1', patchDto, true);
@@ -124,7 +136,10 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
 
   it('Case C: PATCH { title: "Updated" } without audio fields must NOT touch backgroundMusicId in Prisma update', async () => {
     prisma.book.findUnique.mockResolvedValue(mockExistingBook);
-    prisma.book.update.mockResolvedValue({ ...mockExistingBook, title: 'Updated' });
+    prisma.book.update.mockResolvedValue({
+      ...mockExistingBook,
+      title: 'Updated',
+    });
 
     const patchDto = { title: 'Updated' };
     await service.update('book-1', patchDto, true);
@@ -141,7 +156,9 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
 
     expect(preview.isDraftPreview).toBe(true);
     expect(preview.document.id).toBe('book-1');
-    expect(publicService.collectAndResolveMedia).toHaveBeenCalledWith(mockExistingBook);
+    expect(publicService.collectAndResolveMedia).toHaveBeenCalledWith(
+      mockExistingBook,
+    );
     expect(publicService.compileBookDocument).toHaveBeenCalled();
   });
 
@@ -151,7 +168,12 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
       errorCount: 2,
       warningCount: 0,
       issues: [
-        { id: 'err-1', severity: 'ERROR', code: 'MISSING_COVER', message: 'Thiếu bìa sách' },
+        {
+          id: 'err-1',
+          severity: 'ERROR',
+          code: 'MISSING_COVER',
+          message: 'Thiếu bìa sách',
+        },
       ],
     });
 
@@ -209,7 +231,9 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
     prisma.book.findUnique.mockResolvedValue(mockExistingBook);
     prisma.book.updateMany.mockResolvedValue({ count: 0 });
 
-    await expect(service.publishBook('book-1')).rejects.toThrow(ConflictException);
+    await expect(service.publishBook('book-1')).rejects.toThrow(
+      ConflictException,
+    );
     expect(prisma.book.updateMany).toHaveBeenCalledTimes(2);
     expect(prisma.bookVersion.create).not.toHaveBeenCalled();
     expect(cacheService.invalidateBookCache).not.toHaveBeenCalled();
@@ -230,7 +254,14 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
     await expect(
       service.update(
         'book-1',
-        { settings: { playlistTracks: [{ id: 't1', src: 'https://cdn.example.com/a.mp3' }, { id: 't2', src: 'http://evil.example.com/b.mp3' }] } },
+        {
+          settings: {
+            playlistTracks: [
+              { id: 't1', src: 'https://cdn.example.com/a.mp3' },
+              { id: 't2', src: 'http://evil.example.com/b.mp3' },
+            ],
+          },
+        },
         true,
       ),
     ).rejects.toThrow(/playlistTracks\[1\]\.src/);
@@ -243,7 +274,15 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
 
     await service.update(
       'book-1',
-      { settings: { playlistTracks: [{ src: 'https://cdn.example.com/a.mp3' }, { src: '/music/b.mp3' }, { id: 'no-src' }] } },
+      {
+        settings: {
+          playlistTracks: [
+            { src: 'https://cdn.example.com/a.mp3' },
+            { src: '/music/b.mp3' },
+            { id: 'no-src' },
+          ],
+        },
+      },
       true,
     );
     expect(prisma.book.update).toHaveBeenCalled();
@@ -259,7 +298,13 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
           cover: {
             back: {
               insideElements: [
-                { id: 'e1', interaction: { action: 'open-link', target: 'javascript:alert(1)' } },
+                {
+                  id: 'e1',
+                  interaction: {
+                    action: 'open-link',
+                    target: 'javascript:alert(1)',
+                  },
+                },
               ],
             },
           },
@@ -271,12 +316,17 @@ describe('BooksService (Prompt 13.9 & Prompt 23 Draft/Publish & Prompt 34 Valida
   });
 
   it('update reads, merges and writes settings inside one interactive transaction', async () => {
-    prisma.book.findUnique.mockResolvedValue({ ...mockExistingBook, settings: { theme: { a: 1 } } });
+    prisma.book.findUnique.mockResolvedValue({
+      ...mockExistingBook,
+      settings: { theme: { a: 1 } },
+    });
     prisma.book.update.mockResolvedValue(mockExistingBook);
 
     await service.update('book-1', { settings: { theme: { b: 2 } } }, true);
 
     expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
-    expect(prisma.book.update.mock.calls[0][0].data.settings).toEqual({ theme: { a: 1, b: 2 } });
+    expect(prisma.book.update.mock.calls[0][0].data.settings).toEqual({
+      theme: { a: 1, b: 2 },
+    });
   });
 });

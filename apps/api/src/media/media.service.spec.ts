@@ -3,7 +3,11 @@ import { MediaService } from './media.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { MediaType } from '@prisma/client';
-import { BadRequestException, ConflictException, InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { validateSync } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { CreateMediaDto } from './dto/create-media.dto';
@@ -155,7 +159,11 @@ describe('MediaService', () => {
             front: {
               backgroundUrl: 'other.jpg',
               elements: [
-                { id: 'cover-el-1', type: 'IMAGE', data: { mediaId: 'media-1' } },
+                {
+                  id: 'cover-el-1',
+                  type: 'IMAGE',
+                  data: { mediaId: 'media-1' },
+                },
               ],
             },
             back: {},
@@ -185,7 +193,10 @@ describe('MediaService', () => {
                 {
                   id: 'cover-video-1',
                   type: 'VIDEO',
-                  data: { mediaId: 'video-source-id', posterMediaId: 'media-1' },
+                  data: {
+                    mediaId: 'video-source-id',
+                    posterMediaId: 'media-1',
+                  },
                 },
               ],
             },
@@ -197,7 +208,9 @@ describe('MediaService', () => {
       const result = await service.checkReferences('media-1');
       expect(result.isInUse).toBe(true);
       expect(result.references[0].targetType).toBe('BOOK_COVER');
-      expect(result.references[0].description).toContain('Poster video trên bìa trước');
+      expect(result.references[0].description).toContain(
+        'Poster video trên bìa trước',
+      );
     });
 
     it('should detect when media is referenced by audio track', async () => {
@@ -206,7 +219,12 @@ describe('MediaService', () => {
       prisma.page.findMany.mockResolvedValue([]);
       prisma.pageElement.findMany.mockResolvedValue([]);
       prisma.audioTrack.findMany.mockResolvedValue([
-        { id: 'track-1', title: 'Vạn vật', src: mockMedia.url, mediaId: mockMedia.id },
+        {
+          id: 'track-1',
+          title: 'Vạn vật',
+          src: mockMedia.url,
+          mediaId: mockMedia.id,
+        },
       ]);
 
       const result = await service.checkReferences('media-1');
@@ -318,14 +336,18 @@ describe('MediaService', () => {
       expect((result as any).warning).toBeUndefined();
       expect(fetchMock).toHaveBeenCalledTimes(1);
       const [url, init] = fetchMock.mock.calls[0];
-      expect(url).toBe('https://api.cloudinary.com/v1_1/dlvpiesfj/image/destroy');
+      expect(url).toBe(
+        'https://api.cloudinary.com/v1_1/dlvpiesfj/image/destroy',
+      );
       const body = new URLSearchParams(init.body);
       expect(body.get('public_id')).toBe('phuc_trang_memories/pic1');
       expect(body.get('invalidate')).toBe('true');
       expect(body.get('api_key')).toBe('935512575175661');
       const expected = require('crypto')
         .createHash('sha1')
-        .update(`invalidate=true&public_id=phuc_trang_memories/pic1&timestamp=${body.get('timestamp')}test_secret`)
+        .update(
+          `invalidate=true&public_id=phuc_trang_memories/pic1&timestamp=${body.get('timestamp')}test_secret`,
+        )
         .digest('hex');
       expect(body.get('signature')).toBe(expected);
     });
@@ -333,7 +355,9 @@ describe('MediaService', () => {
     it('uses the video resource type for audio and video media', async () => {
       mockUnused({ ...baseMedia, type: MediaType.AUDIO });
       await service.remove('media-1', false);
-      expect(fetchMock.mock.calls[0][0]).toBe('https://api.cloudinary.com/v1_1/dlvpiesfj/video/destroy');
+      expect(fetchMock.mock.calls[0][0]).toBe(
+        'https://api.cloudinary.com/v1_1/dlvpiesfj/video/destroy',
+      );
     });
 
     it('still deletes the DB row and returns a warning when Cloudinary fails', async () => {
@@ -342,13 +366,19 @@ describe('MediaService', () => {
 
       const result = await service.remove('media-1', true);
       expect(result.success).toBe(true);
-      expect(prisma.media.delete).toHaveBeenCalledWith({ where: { id: 'media-1' } });
+      expect(prisma.media.delete).toHaveBeenCalledWith({
+        where: { id: 'media-1' },
+      });
       expect((result as any).warning).toContain('Cloudinary');
     });
 
     it('returns a warning when Cloudinary answers with an error status', async () => {
       mockUnused(baseMedia);
-      fetchMock.mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: { message: 'Invalid Signature' } }) });
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: { message: 'Invalid Signature' } }),
+      });
 
       const result = await service.remove('media-1', false);
       expect(result.success).toBe(true);
@@ -378,19 +408,22 @@ describe('MediaService', () => {
         providers: [
           MediaService,
           { provide: PrismaService, useValue: prisma },
-          { provide: ConfigService, useValue: { get: jest.fn(() => undefined) } },
+          {
+            provide: ConfigService,
+            useValue: { get: jest.fn(() => undefined) },
+          },
         ],
       }).compile();
       unconfigured = module.get<MediaService>(MediaService);
     });
 
     it('refuses to sign uploads without falling back to hard-coded credentials', () => {
-      expect(() => unconfigured.getSignedUploadConfig({ type: MediaType.IMAGE })).toThrow(
-        InternalServerErrorException,
-      );
-      expect(() => unconfigured.getSignedUploadConfig({ type: MediaType.IMAGE })).toThrow(
-        'Cloudinary chưa được cấu hình',
-      );
+      expect(() =>
+        unconfigured.getSignedUploadConfig({ type: MediaType.IMAGE }),
+      ).toThrow(InternalServerErrorException);
+      expect(() =>
+        unconfigured.getSignedUploadConfig({ type: MediaType.IMAGE }),
+      ).toThrow('Cloudinary chưa được cấu hình');
     });
 
     it('still deletes the DB row and warns instead of calling Cloudinary', async () => {
@@ -435,7 +468,14 @@ describe('MediaService', () => {
         {
           id: 'book-1',
           title: 'Chúng Mình',
-          cover: { front: {}, back: { insideElements: [{ id: 'in-1', type: 'IMAGE', data: { mediaId: 'media-1' } }] } },
+          cover: {
+            front: {},
+            back: {
+              insideElements: [
+                { id: 'in-1', type: 'IMAGE', data: { mediaId: 'media-1' } },
+              ],
+            },
+          },
           settings: {},
         },
       ]);
@@ -450,7 +490,11 @@ describe('MediaService', () => {
           id: 'book-1',
           title: 'Chúng Mình',
           cover: {},
-          settings: { playlistTracks: [{ id: 't1', title: 'Vạn vật', src: mockMedia.url }] },
+          settings: {
+            playlistTracks: [
+              { id: 't1', title: 'Vạn vật', src: mockMedia.url },
+            ],
+          },
         },
       ]);
       const result = await service.checkReferences('media-1');
@@ -481,23 +525,37 @@ describe('MediaService', () => {
     });
 
     it('rejects a non-object body', async () => {
-      await expect(service.syncLegacyMedia(['x'] as any)).rejects.toThrow(BadRequestException);
+      await expect(service.syncLegacyMedia(['x'] as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
   describe('DTO validation', () => {
     it('only accepts https URLs on res.cloudinary.com for new media', () => {
       const errorsFor = (url: string) =>
-        validateSync(plainToInstance(CreateMediaDto, { type: MediaType.IMAGE, url }));
-      expect(errorsFor('https://res.cloudinary.com/x/image/upload/a.jpg')).toHaveLength(0);
-      expect(errorsFor('http://res.cloudinary.com/x/image/upload/a.jpg').length).toBeGreaterThan(0);
+        validateSync(
+          plainToInstance(CreateMediaDto, { type: MediaType.IMAGE, url }),
+        );
+      expect(
+        errorsFor('https://res.cloudinary.com/x/image/upload/a.jpg'),
+      ).toHaveLength(0);
+      expect(
+        errorsFor('http://res.cloudinary.com/x/image/upload/a.jpg').length,
+      ).toBeGreaterThan(0);
       expect(errorsFor('https://evil.example/a.jpg').length).toBeGreaterThan(0);
-      expect(errorsFor('https://res.cloudinary.com.evil.example/a.jpg').length).toBeGreaterThan(0);
+      expect(
+        errorsFor('https://res.cloudinary.com.evil.example/a.jpg').length,
+      ).toBeGreaterThan(0);
     });
 
     it('caps the page size at 200', () => {
-      expect(validateSync(plainToInstance(QueryMediaDto, { limit: '200' }))).toHaveLength(0);
-      expect(validateSync(plainToInstance(QueryMediaDto, { limit: '201' })).length).toBeGreaterThan(0);
+      expect(
+        validateSync(plainToInstance(QueryMediaDto, { limit: '200' })),
+      ).toHaveLength(0);
+      expect(
+        validateSync(plainToInstance(QueryMediaDto, { limit: '201' })).length,
+      ).toBeGreaterThan(0);
     });
   });
 });

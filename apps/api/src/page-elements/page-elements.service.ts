@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePageElementDto } from './dto/create-page-element.dto';
 import { UpdatePageElementDto } from './dto/update-page-element.dto';
@@ -29,7 +33,8 @@ export class PageElementsService {
 
   async findOne(id: string) {
     const el = await this.prisma.pageElement.findUnique({ where: { id } });
-    if (!el) throw new NotFoundException(`Không tìm thấy phần tử với ID: ${id}`);
+    if (!el)
+      throw new NotFoundException(`Không tìm thấy phần tử với ID: ${id}`);
     return el;
   }
 
@@ -50,7 +55,8 @@ export class PageElementsService {
       }
 
       // Clean transform: strip any accidental duplicate zIndex in transform object
-      const { zIndex: _ignore, ...cleanTransform } = (dto.transform as any) || {};
+      const { zIndex: _ignore, ...cleanTransform } =
+        (dto.transform as any) || {};
 
       const created = await tx.pageElement.create({
         data: {
@@ -82,36 +88,53 @@ export class PageElementsService {
     return element;
   }
 
-  async update(id: string, dto: UpdatePageElementDto, isPatch: boolean = false) {
+  async update(
+    id: string,
+    dto: UpdatePageElementDto,
+    isPatch: boolean = false,
+  ) {
     const updated = await this.prisma.$transaction(async (tx) => {
       const el = await tx.pageElement.findUnique({ where: { id } });
-      if (!el) throw new NotFoundException(`Không tìm thấy phần tử với ID: ${id}`);
+      if (!el)
+        throw new NotFoundException(`Không tìm thấy phần tử với ID: ${id}`);
 
       // PATCH deep-merges partial JSON objects; an explicit null inside the patch deletes that key.
       const mergeOptions = { nullDeletes: true };
 
       let transform: any = undefined;
       if (dto.transform) {
-        const { zIndex: _ignore, ...cleanDtoTransform } = (dto.transform as any) || {};
+        const { zIndex: _ignore, ...cleanDtoTransform } =
+          (dto.transform as any) || {};
         transform = isPatch
-          ? safeDeepMerge((el.transform as any) || {}, cleanDtoTransform, mergeOptions)
+          ? safeDeepMerge(
+              (el.transform as any) || {},
+              cleanDtoTransform,
+              mergeOptions,
+            )
           : cleanDtoTransform;
       }
 
-      const style = isPatch && dto.style
-        ? safeDeepMerge((el.style as any) || {}, dto.style, mergeOptions)
-        : dto.style;
+      const style =
+        isPatch && dto.style
+          ? safeDeepMerge((el.style as any) || {}, dto.style, mergeOptions)
+          : dto.style;
 
-      const mergedData = isPatch && dto.data
-        ? safeDeepMerge((el.data as any) || {}, dto.data, mergeOptions)
-        : dto.data;
+      const mergedData =
+        isPatch && dto.data
+          ? safeDeepMerge((el.data as any) || {}, dto.data, mergeOptions)
+          : dto.data;
       const data = mergedData
         ? canonicalizeMediaData(dto.type || el.type, mergedData)
         : undefined;
 
-      const interaction = isPatch && dto.interaction
-        ? safeDeepMerge((el.interaction as any) || {}, dto.interaction, mergeOptions)
-        : dto.interaction;
+      const interaction =
+        isPatch && dto.interaction
+          ? safeDeepMerge(
+              (el.interaction as any) || {},
+              dto.interaction,
+              mergeOptions,
+            )
+          : dto.interaction;
 
       const result = await tx.pageElement.update({
         where: { id },
@@ -123,10 +146,14 @@ export class PageElementsService {
           ...(dto.visible !== undefined ? { visible: dto.visible } : {}),
           ...(dto.locked !== undefined ? { locked: dto.locked } : {}),
           ...(dto.opacity !== undefined ? { opacity: dto.opacity } : {}),
-          ...(transform !== undefined ? { transform: requiredJson(transform) } : {}),
+          ...(transform !== undefined
+            ? { transform: requiredJson(transform) }
+            : {}),
           ...(style !== undefined ? { style: nullableJson(style) } : {}),
           ...(data !== undefined ? { data: requiredJson(data) } : {}),
-          ...(interaction !== undefined ? { interaction: nullableJson(interaction) } : {}),
+          ...(interaction !== undefined
+            ? { interaction: nullableJson(interaction) }
+            : {}),
         },
       });
 
@@ -146,7 +173,8 @@ export class PageElementsService {
   async duplicate(id: string, dto?: DuplicateElementDto) {
     const duplicate = await this.prisma.$transaction(async (tx) => {
       const original = await tx.pageElement.findUnique({ where: { id } });
-      if (!original) throw new NotFoundException(`Không tìm thấy phần tử với ID: ${id}`);
+      if (!original)
+        throw new NotFoundException(`Không tìm thấy phần tử với ID: ${id}`);
 
       // Get max zIndex on page
       const maxEl = await tx.pageElement.findFirst({
@@ -171,8 +199,14 @@ export class PageElementsService {
       const { zIndex: _ignore, ...restTransform } = originalTransform;
       const duplicatedTransform = {
         ...restTransform,
-        x: Math.min(0.95 - (originalTransform.width || 0.1), Math.max(0, (originalTransform.x || 0) + offsetX)),
-        y: Math.min(0.95 - (originalTransform.height || 0.1), Math.max(0, (originalTransform.y || 0) + offsetY)),
+        x: Math.min(
+          0.95 - (originalTransform.width || 0.1),
+          Math.max(0, (originalTransform.x || 0) + offsetX),
+        ),
+        y: Math.min(
+          0.95 - (originalTransform.height || 0.1),
+          Math.max(0, (originalTransform.y || 0) + offsetY),
+        ),
       };
 
       const created = await tx.pageElement.create({
@@ -208,7 +242,8 @@ export class PageElementsService {
   async remove(id: string) {
     const result = await this.prisma.$transaction(async (tx) => {
       const el = await tx.pageElement.findUnique({ where: { id } });
-      if (!el) throw new NotFoundException(`Không tìm thấy phần tử với ID: ${id}`);
+      if (!el)
+        throw new NotFoundException(`Không tìm thấy phần tử với ID: ${id}`);
 
       const deleted = await tx.pageElement.delete({ where: { id } });
       await tx.page.update({
@@ -231,7 +266,9 @@ export class PageElementsService {
 
     const ids = dto.items.map((item) => item.id);
     if (new Set(ids).size !== ids.length) {
-      throw new BadRequestException('Danh sách sắp xếp chứa ID phần tử bị trùng lặp.');
+      throw new BadRequestException(
+        'Danh sách sắp xếp chứa ID phần tử bị trùng lặp.',
+      );
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -281,61 +318,78 @@ export class PageElementsService {
    * Use `batchUpdate` for the legacy array-only result.
    */
   async batchUpdateWithReport(pageId: string, dto: BatchUpdateElementsDto) {
-    const { elements, skippedElementIds } = await this.prisma.$transaction(async (tx) => {
-      const page = await tx.page.findUnique({ where: { id: pageId } });
-      if (!page) throw new NotFoundException(`Page not found: ${pageId}`);
+    const { elements, skippedElementIds } = await this.prisma.$transaction(
+      async (tx) => {
+        const page = await tx.page.findUnique({ where: { id: pageId } });
+        if (!page) throw new NotFoundException(`Page not found: ${pageId}`);
 
-      const ids = dto.elements.map((item) => item.id);
-      const existingList = ids.length
-        ? await tx.pageElement.findMany({
-            where: { id: { in: ids }, pageId },
-            select: { id: true, type: true, transform: true },
-          })
-        : [];
-      const existingMap = new Map<string, { id: string; type: string; transform: any }>(
-        existingList.map((el: any) => [el.id, el]),
-      );
+        const ids = dto.elements.map((item) => item.id);
+        const existingList = ids.length
+          ? await tx.pageElement.findMany({
+              where: { id: { in: ids }, pageId },
+              select: { id: true, type: true, transform: true },
+            })
+          : [];
+        const existingMap = new Map<
+          string,
+          { id: string; type: string; transform: any }
+        >(existingList.map((el: any) => [el.id, el]));
 
-      const results = [];
-      const skipped: string[] = [];
-      for (const item of dto.elements) {
-        const existing = existingMap.get(item.id);
-        if (!existing) {
-          skipped.push(item.id);
-          continue;
+        const results = [];
+        const skipped: string[] = [];
+        for (const item of dto.elements) {
+          const existing = existingMap.get(item.id);
+          if (!existing) {
+            skipped.push(item.id);
+            continue;
+          }
+
+          const { zIndex: _ignore, ...cleanTransform } =
+            (item.transform as any) || {};
+
+          const updated = await tx.pageElement.update({
+            where: { id: item.id },
+            data: {
+              ...(item.zIndex !== undefined ? { zIndex: item.zIndex } : {}),
+              ...(item.order !== undefined ? { order: item.order } : {}),
+              ...(item.visible !== undefined ? { visible: item.visible } : {}),
+              ...(item.locked !== undefined ? { locked: item.locked } : {}),
+              ...(item.opacity !== undefined ? { opacity: item.opacity } : {}),
+              // Transforms may be partial (validated leniently), so they are still merged.
+              ...(item.transform !== undefined
+                ? {
+                    transform: safeDeepMerge(
+                      (existing.transform as any) || {},
+                      cleanTransform,
+                    ),
+                  }
+                : {}),
+              ...(item.style !== undefined
+                ? { style: nullableJson(item.style) }
+                : {}),
+              ...(item.data !== undefined
+                ? {
+                    data: requiredJson(
+                      canonicalizeMediaData(existing.type, item.data),
+                    ),
+                  }
+                : {}),
+              ...(item.interaction !== undefined
+                ? { interaction: nullableJson(item.interaction) }
+                : {}),
+            },
+          });
+          results.push(updated);
         }
 
-        const { zIndex: _ignore, ...cleanTransform } = (item.transform as any) || {};
-
-        const updated = await tx.pageElement.update({
-          where: { id: item.id },
-          data: {
-            ...(item.zIndex !== undefined ? { zIndex: item.zIndex } : {}),
-            ...(item.order !== undefined ? { order: item.order } : {}),
-            ...(item.visible !== undefined ? { visible: item.visible } : {}),
-            ...(item.locked !== undefined ? { locked: item.locked } : {}),
-            ...(item.opacity !== undefined ? { opacity: item.opacity } : {}),
-            // Transforms may be partial (validated leniently), so they are still merged.
-            ...(item.transform !== undefined
-              ? { transform: safeDeepMerge((existing.transform as any) || {}, cleanTransform) }
-              : {}),
-            ...(item.style !== undefined ? { style: nullableJson(item.style) } : {}),
-            ...(item.data !== undefined
-              ? { data: requiredJson(canonicalizeMediaData(existing.type, item.data)) }
-              : {}),
-            ...(item.interaction !== undefined ? { interaction: nullableJson(item.interaction) } : {}),
-          },
+        await tx.page.update({
+          where: { id: pageId },
+          data: { isCustomized: true },
         });
-        results.push(updated);
-      }
 
-      await tx.page.update({
-        where: { id: pageId },
-        data: { isCustomized: true },
-      });
-
-      return { elements: results, skippedElementIds: skipped };
-    });
+        return { elements: results, skippedElementIds: skipped };
+      },
+    );
 
     await this.cacheService.touchByPageId(pageId);
     return { elements, skippedElementIds };

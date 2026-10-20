@@ -75,7 +75,11 @@ export class MediaService {
     if (!credentials) {
       throw new InternalServerErrorException('Cloudinary chưa được cấu hình');
     }
-    const { cloudName: effectiveCloudName, apiKey: effectiveApiKey, apiSecret: effectiveSecret } = credentials;
+    const {
+      cloudName: effectiveCloudName,
+      apiKey: effectiveApiKey,
+      apiSecret: effectiveSecret,
+    } = credentials;
 
     const requestedFolder = dto.folder;
     if (requestedFolder && !ALLOWED_CLOUDINARY_FOLDERS.has(requestedFolder)) {
@@ -98,7 +102,10 @@ export class MediaService {
       allowed_formats: getAllowedFormatsForType(dto.type),
     };
 
-    const signature = generateCloudinarySignature(paramsToSign, effectiveSecret);
+    const signature = generateCloudinarySignature(
+      paramsToSign,
+      effectiveSecret,
+    );
     const uploadUrl = `https://api.cloudinary.com/v1_1/${effectiveCloudName}/${resourceType}/upload`;
 
     return {
@@ -187,7 +194,9 @@ export class MediaService {
       throw new BadRequestException('Query filenameOrUrl is required');
     }
 
-    let media = await this.prisma.media.findUnique({ where: { url: filenameOrUrl } });
+    let media = await this.prisma.media.findUnique({
+      where: { url: filenameOrUrl },
+    });
     if (media) return this.formatMedia(media);
 
     media = await this.prisma.media.findFirst({
@@ -209,7 +218,9 @@ export class MediaService {
    * Saves metadata after client uploads directly to Cloudinary.
    */
   async create(dto: CreateMediaDto) {
-    const existing = await this.prisma.media.findUnique({ where: { url: dto.url } });
+    const existing = await this.prisma.media.findUnique({
+      where: { url: dto.url },
+    });
     if (existing) {
       const updated = await this.prisma.media.update({
         where: { id: existing.id },
@@ -281,7 +292,10 @@ export class MediaService {
     const mediaUrl = media.url;
     const mediaPublicId = media.publicId;
 
-    const matchesMedia = (testUrl?: string | null, testMediaId?: string | null): boolean => {
+    const matchesMedia = (
+      testUrl?: string | null,
+      testMediaId?: string | null,
+    ): boolean => {
       if (testMediaId && testMediaId === mediaId) return true;
       if (!testUrl) return false;
       if (testUrl === mediaUrl) return true;
@@ -313,7 +327,9 @@ export class MediaService {
         });
       }
 
-      if (matchesMedia(cover.back?.insideBackgroundUrl, cover.back?.insideMediaId)) {
+      if (
+        matchesMedia(cover.back?.insideBackgroundUrl, cover.back?.insideMediaId)
+      ) {
         references.push({
           targetType: 'BOOK_COVER',
           bookId: book.id,
@@ -323,7 +339,12 @@ export class MediaService {
         });
       }
 
-      if (matchesMedia(cover.back?.outsideBackgroundUrl, cover.back?.outsideMediaId)) {
+      if (
+        matchesMedia(
+          cover.back?.outsideBackgroundUrl,
+          cover.back?.outsideMediaId,
+        )
+      ) {
         references.push({
           targetType: 'BOOK_COVER',
           bookId: book.id,
@@ -334,17 +355,33 @@ export class MediaService {
       }
 
       // Scan cover elements (front, back, inside back) for both source media and video poster media
-      const coverElementGroups: { list: any; field: string; label: string }[] = [
-        { list: cover.front?.elements, field: 'cover.front.elements', label: 'bìa trước' },
-        { list: cover.back?.elements, field: 'cover.back.elements', label: 'bìa sau' },
-        { list: cover.back?.insideElements, field: 'cover.back.insideElements', label: 'mặt trong bìa sau' },
-      ];
+      const coverElementGroups: { list: any; field: string; label: string }[] =
+        [
+          {
+            list: cover.front?.elements,
+            field: 'cover.front.elements',
+            label: 'bìa trước',
+          },
+          {
+            list: cover.back?.elements,
+            field: 'cover.back.elements',
+            label: 'bìa sau',
+          },
+          {
+            list: cover.back?.insideElements,
+            field: 'cover.back.insideElements',
+            label: 'mặt trong bìa sau',
+          },
+        ];
       for (const group of coverElementGroups) {
         if (!Array.isArray(group.list)) continue;
         for (const el of group.list) {
           const d = el?.data || {};
           const sourceMatched = matchesMedia(d.src || d.url, d.mediaId);
-          const posterMatched = matchesMedia(d.thumbnailUrl || d.posterUrl, d.posterMediaId);
+          const posterMatched = matchesMedia(
+            d.thumbnailUrl || d.posterUrl,
+            d.posterMediaId,
+          );
 
           if (sourceMatched) {
             references.push({
@@ -372,7 +409,9 @@ export class MediaService {
         }
       }
 
-      if (matchesMedia(book.backgroundMusic?.src, book.backgroundMusic?.mediaId)) {
+      if (
+        matchesMedia(book.backgroundMusic?.src, book.backgroundMusic?.mediaId)
+      ) {
         references.push({
           targetType: 'AUDIO_TRACK',
           bookId: book.id,
@@ -462,7 +501,10 @@ export class MediaService {
       const data = (elem.data as any) || {};
 
       const srcMatched = matchesMedia(data.src || data.url, data.mediaId);
-      const posterMatched = matchesMedia(data.thumbnailUrl || data.posterUrl, data.posterMediaId);
+      const posterMatched = matchesMedia(
+        data.thumbnailUrl || data.posterUrl,
+        data.posterMediaId,
+      );
 
       if (srcMatched) {
         references.push({
@@ -561,24 +603,37 @@ export class MediaService {
   /** Removes the file from Cloudinary. Returns a warning message instead of throwing on failure. */
   private async destroyRemoteAsset(media: any): Promise<string | undefined> {
     const publicId: string | undefined = media.publicId;
-    if (!publicId || (media.provider && media.provider !== 'CLOUDINARY')) return undefined;
+    if (!publicId || (media.provider && media.provider !== 'CLOUDINARY'))
+      return undefined;
 
     const credentials = this.getCloudinaryCredentials();
     if (!credentials) {
-      this.logger.warn(`Skipped Cloudinary delete for ${publicId}: Cloudinary is not configured`);
+      this.logger.warn(
+        `Skipped Cloudinary delete for ${publicId}: Cloudinary is not configured`,
+      );
       return 'Cloudinary chưa được cấu hình nên tệp trên Cloudinary chưa được xóa.';
     }
 
     // Another record may still point at the same Cloudinary file (e.g. a re-registered URL)
-    const sharedBy = await this.prisma.media.count({ where: { publicId, id: { not: media.id } } });
+    const sharedBy = await this.prisma.media.count({
+      where: { publicId, id: { not: media.id } },
+    });
     if (sharedBy > 0) {
-      this.logger.warn(`Skipped Cloudinary delete for ${publicId}: still used by ${sharedBy} other media record(s)`);
+      this.logger.warn(
+        `Skipped Cloudinary delete for ${publicId}: still used by ${sharedBy} other media record(s)`,
+      );
       return undefined;
     }
 
-    const result = await destroyCloudinaryAsset(credentials, publicId, getResourceTypeForMedia(media));
+    const result = await destroyCloudinaryAsset(
+      credentials,
+      publicId,
+      getResourceTypeForMedia(media),
+    );
     if (!result.ok) {
-      this.logger.error(`Cloudinary delete failed for ${publicId}: ${result.error}`);
+      this.logger.error(
+        `Cloudinary delete failed for ${publicId}: ${result.error}`,
+      );
       return 'Đã xóa media khỏi hệ thống nhưng không xóa được tệp trên Cloudinary.';
     }
     return undefined;
@@ -588,8 +643,14 @@ export class MediaService {
    * Bulk import or sync existing legacy cloudinaryUrls.json map into the PostgreSQL Media table.
    */
   async syncLegacyMedia(legacyMap: Record<string, string>) {
-    if (!legacyMap || typeof legacyMap !== 'object' || Array.isArray(legacyMap)) {
-      throw new BadRequestException('Dữ liệu đồng bộ phải là một object { key: url }');
+    if (
+      !legacyMap ||
+      typeof legacyMap !== 'object' ||
+      Array.isArray(legacyMap)
+    ) {
+      throw new BadRequestException(
+        'Dữ liệu đồng bộ phải là một object { key: url }',
+      );
     }
 
     let createdCount = 0;
@@ -610,7 +671,11 @@ export class MediaService {
         folder = 'phuc_trang_backgrounds';
       } else if (key.endsWith('.mp4')) {
         type = MediaType.VIDEO;
-      } else if (key.endsWith('.mp3') || key.endsWith('.wav') || key.endsWith('.m4a')) {
+      } else if (
+        key.endsWith('.mp3') ||
+        key.endsWith('.wav') ||
+        key.endsWith('.m4a')
+      ) {
         type = MediaType.AUDIO;
         folder = 'phuc_trang_audio';
       }
@@ -629,7 +694,7 @@ export class MediaService {
             publicId: existing.publicId || publicId,
             alt: existing.alt || key,
             metadata: {
-              ...(existing.metadata as any || {}),
+              ...((existing.metadata as any) || {}),
               originalKey: key,
               syncedFromLegacy: true,
             },
@@ -670,14 +735,21 @@ export class MediaService {
     let sizeValue: number | string | null = null;
     if (media.size !== null && media.size !== undefined) {
       const big = BigInt(media.size);
-      sizeValue = big <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(big) : big.toString();
+      sizeValue =
+        big <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(big) : big.toString();
     }
 
     return {
       ...media,
       size: sizeValue,
-      createdAt: media.createdAt instanceof Date ? media.createdAt.toISOString() : media.createdAt,
-      updatedAt: media.updatedAt instanceof Date ? media.updatedAt.toISOString() : media.updatedAt,
+      createdAt:
+        media.createdAt instanceof Date
+          ? media.createdAt.toISOString()
+          : media.createdAt,
+      updatedAt:
+        media.updatedAt instanceof Date
+          ? media.updatedAt.toISOString()
+          : media.updatedAt,
     };
   }
 }

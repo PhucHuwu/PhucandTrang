@@ -135,7 +135,9 @@ describe('PagesService Option B Contract & Sequencing (Req 1, 2, 3, 4, 5, 6)', (
       items: [{ id: 'p1' }, { id: 'foreign-page-b' }],
     };
 
-    await expect(service.reorder('book-1', reorderDto)).rejects.toThrow(BadRequestException);
+    await expect(service.reorder('book-1', reorderDto)).rejects.toThrow(
+      BadRequestException,
+    );
     expect(prisma.page.update).not.toHaveBeenCalled();
   });
 
@@ -154,7 +156,9 @@ describe('PagesService Option B Contract & Sequencing (Req 1, 2, 3, 4, 5, 6)', (
       items: [{ id: 'p1' }, { id: 'p2' }],
     };
 
-    await expect(service.reorder('book-1', incompleteDto)).rejects.toThrow(BadRequestException);
+    await expect(service.reorder('book-1', incompleteDto)).rejects.toThrow(
+      BadRequestException,
+    );
     expect(prisma.page.update).not.toHaveBeenCalled();
   });
 
@@ -170,29 +174,43 @@ describe('PagesService Option B Contract & Sequencing (Req 1, 2, 3, 4, 5, 6)', (
       items: [{ id: 'p1' }, { id: 'p1' }],
     };
 
-    await expect(service.reorder('book-1', duplicateDto)).rejects.toThrow(BadRequestException);
+    await expect(service.reorder('book-1', duplicateDto)).rejects.toThrow(
+      BadRequestException,
+    );
     expect(prisma.page.update).not.toHaveBeenCalled();
   });
 
   it('Update Page: should reject if client attempts to pass order directly in update', async () => {
-    prisma.page.findUnique.mockResolvedValue({ id: 'p1', bookId: 'book-1', pageNumber: 1 });
+    prisma.page.findUnique.mockResolvedValue({
+      id: 'p1',
+      bookId: 'book-1',
+      pageNumber: 1,
+    });
 
     const updateWithOrderDto = {
       order: 3,
     } as any;
 
-    await expect(service.update('p1', updateWithOrderDto)).rejects.toThrow(BadRequestException);
+    await expect(service.update('p1', updateWithOrderDto)).rejects.toThrow(
+      BadRequestException,
+    );
     expect(prisma.page.update).not.toHaveBeenCalled();
   });
 
   it('Update Page: should reject if client attempts to pass side directly in update', async () => {
-    prisma.page.findUnique.mockResolvedValue({ id: 'p1', bookId: 'book-1', pageNumber: 1 });
+    prisma.page.findUnique.mockResolvedValue({
+      id: 'p1',
+      bookId: 'book-1',
+      pageNumber: 1,
+    });
 
     const updateWithSideDto = {
       side: 'LEFT',
     } as any;
 
-    await expect(service.update('p1', updateWithSideDto)).rejects.toThrow(BadRequestException);
+    await expect(service.update('p1', updateWithSideDto)).rejects.toThrow(
+      BadRequestException,
+    );
     expect(prisma.page.update).not.toHaveBeenCalled();
   });
 
@@ -203,7 +221,11 @@ describe('PagesService Option B Contract & Sequencing (Req 1, 2, 3, 4, 5, 6)', (
       pageNumber: 1,
       audioTrackId: 'track-1',
     });
-    prisma.page.update.mockResolvedValue({ id: 'p1', bookId: 'book-1', audioTrackId: null });
+    prisma.page.update.mockResolvedValue({
+      id: 'p1',
+      bookId: 'book-1',
+      audioTrackId: null,
+    });
 
     const patchDto = { audioTrackId: null };
     await service.update('p1', patchDto, true);
@@ -220,7 +242,12 @@ describe('PagesService Option B Contract & Sequencing (Req 1, 2, 3, 4, 5, 6)', (
   });
 
   it('Delete (Option B): should compact order but preserve remaining pageNumbers', async () => {
-    const pageToDelete = { id: 'p2', bookId: 'book-1', pageNumber: 20, order: 1 };
+    const pageToDelete = {
+      id: 'p2',
+      bookId: 'book-1',
+      pageNumber: 20,
+      order: 1,
+    };
     prisma.page.findUnique.mockResolvedValue(pageToDelete);
 
     // Remaining pages after deletion: p1 (pageNumber 10), p3 (pageNumber 30)
@@ -310,8 +337,16 @@ describe('PagesService Option B Contract & Sequencing (Req 1, 2, 3, 4, 5, 6)', (
       ],
     });
     prisma.media.findMany.mockResolvedValue([
-      { id: 'video-media', url: 'https://cdn.example.com/memory.mp4', alt: 'Video memory' },
-      { id: 'poster-media', url: 'https://cdn.example.com/poster.jpg', alt: 'Poster' },
+      {
+        id: 'video-media',
+        url: 'https://cdn.example.com/memory.mp4',
+        alt: 'Video memory',
+      },
+      {
+        id: 'poster-media',
+        url: 'https://cdn.example.com/poster.jpg',
+        alt: 'Poster',
+      },
     ]);
 
     const page = await service.findOne('page-video');

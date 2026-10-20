@@ -65,9 +65,9 @@ describe('VersionsService Rollback Protection (Req 2, 3, 4, 14, 15, 16 & Prompt 
     prisma.bookVersion.findUnique.mockResolvedValue(foreignVersion);
 
     // Attempting to rollback Book A using Book B version must be rejected
-    await expect(service.rollbackToSnapshot('book-A', 'ver-foreign')).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(
+      service.rollbackToSnapshot('book-A', 'ver-foreign'),
+    ).rejects.toThrow(BadRequestException);
 
     expect(prisma.page.deleteMany).not.toHaveBeenCalled();
     expect(cacheService.touchBook).not.toHaveBeenCalled();
@@ -124,7 +124,9 @@ describe('VersionsService Rollback Protection (Req 2, 3, 4, 14, 15, 16 & Prompt 
     expect(updateCallData.status).toBeUndefined();
 
     // Draft pages deleted and re-created
-    expect(prisma.page.deleteMany).toHaveBeenCalledWith({ where: { bookId: 'book-1' } });
+    expect(prisma.page.deleteMany).toHaveBeenCalledWith({
+      where: { bookId: 'book-1' },
+    });
     expect(prisma.page.create).toHaveBeenCalled();
 
     // Invalidate book cache without double bumping contentRevision
@@ -152,7 +154,14 @@ describe('VersionsService Rollback Protection (Req 2, 3, 4, 14, 15, 16 & Prompt 
               { id: 'el-hidden', type: 'IMAGE', visible: false },
             ],
           },
-          { id: 'page-2', pageNumber: 2, side: 'LEFT', order: 1, layoutTemplateId: 'tpl-deleted', elements: [] },
+          {
+            id: 'page-2',
+            pageNumber: 2,
+            side: 'LEFT',
+            order: 1,
+            layoutTemplateId: 'tpl-deleted',
+            elements: [],
+          },
         ],
       },
     });
@@ -162,18 +171,24 @@ describe('VersionsService Rollback Protection (Req 2, 3, 4, 14, 15, 16 & Prompt 
 
     await service.rollbackToSnapshot('book-1', 'ver-ids');
 
-    expect(prisma.book.update.mock.calls[0][0].data.backgroundMusicId).toBeNull();
+    expect(
+      prisma.book.update.mock.calls[0][0].data.backgroundMusicId,
+    ).toBeNull();
 
     const firstPage = prisma.page.create.mock.calls[0][0].data;
     expect(firstPage.id).toBe('page-keep');
     expect(firstPage.layoutTemplateId).toBe('tpl-exists');
     expect(firstPage.audioTrackId).toBeNull();
-    expect(firstPage.elements.create.map((e: any) => [e.id, e.visible])).toEqual([
+    expect(
+      firstPage.elements.create.map((e: any) => [e.id, e.visible]),
+    ).toEqual([
       ['el-visible', true],
       ['el-hidden', false],
     ]);
 
-    expect(prisma.page.create.mock.calls[1][0].data.layoutTemplateId).toBeNull();
+    expect(
+      prisma.page.create.mock.calls[1][0].data.layoutTemplateId,
+    ).toBeNull();
   });
 
   it('should reject rollback if snapshot does not have valid pages array, without deleting current pages', async () => {
@@ -214,7 +229,14 @@ describe('VersionsService Rollback Protection (Req 2, 3, 4, 14, 15, 16 & Prompt 
             order: 0,
             background: null,
             elements: [
-              { id: 'el-null', type: 'TEXT', transform: null, style: null, data: null, interaction: null },
+              {
+                id: 'el-null',
+                type: 'TEXT',
+                transform: null,
+                style: null,
+                data: null,
+                interaction: null,
+              },
               { id: 'el-missing', type: 'TEXT' },
               {
                 id: 'el-full',

@@ -3,7 +3,7 @@
  * =====================================
  * Thorough pre-publish inspection system that audits all book entities, pages,
  * elements, media references, audio, and covers before compiling a live snapshot.
- * 
+ *
  * Errors (BLOCKING - CANNOT PUBLISH):
  * - missing required media
  * - broken mediaId (referenced mediaId does not exist in Media table)
@@ -14,7 +14,7 @@
  * - missing cover (front cover backgroundUrl/mediaId missing)
  * - malformed element transform (NaN, negative width/height, out-of-bounds)
  * - deleted audio references (audioTrackId does not exist)
- * 
+ *
  * Warnings (NON-BLOCKING - INFORMATIVE):
  * - empty page (page with 0 elements)
  * - no alt text (IMAGE element without alt text)

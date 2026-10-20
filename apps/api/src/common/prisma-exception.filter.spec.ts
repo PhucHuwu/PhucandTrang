@@ -1,5 +1,8 @@
 import { Prisma } from '@prisma/client';
-import { PrismaExceptionFilter, mapPrismaError } from './prisma-exception.filter';
+import {
+  PrismaExceptionFilter,
+  mapPrismaError,
+} from './prisma-exception.filter';
 
 function prismaError(code: string) {
   return new Prisma.PrismaClientKnownRequestError(
@@ -25,8 +28,12 @@ describe('PrismaExceptionFilter', () => {
   const filter = new PrismaExceptionFilter();
 
   beforeAll(() => {
-    jest.spyOn((filter as any).logger, 'warn').mockImplementation(() => undefined);
-    jest.spyOn((filter as any).logger, 'error').mockImplementation(() => undefined);
+    jest
+      .spyOn((filter as any).logger, 'warn')
+      .mockImplementation(() => undefined);
+    jest
+      .spyOn((filter as any).logger, 'error')
+      .mockImplementation(() => undefined);
   });
 
   it.each([

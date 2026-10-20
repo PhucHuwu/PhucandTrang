@@ -31,7 +31,9 @@ export interface MigrationPlan {
   changes: MigrationChange[];
 }
 
-export function buildExactUrlLookup(media: Array<{ id: string; url?: string | null }>) {
+export function buildExactUrlLookup(
+  media: Array<{ id: string; url?: string | null }>,
+) {
   const map = new Map<string, string>();
   for (const m of media) {
     if (m.url) map.set(m.url.trim(), m.id);
@@ -44,25 +46,52 @@ export function buildExactUrlLookup(media: Array<{ id: string; url?: string | nu
 
 /** Pure planning step: computes the writes without touching the database. */
 export function planLegacyMigration(
-  book: { id: string; cover: any; pages: Array<{ id: string; background: any; elements: Array<{ id: string; data: any }> }> },
+  book: {
+    id: string;
+    cover: any;
+    pages: Array<{
+      id: string;
+      background: any;
+      elements: Array<{ id: string; data: any }>;
+    }>;
+  },
   findMediaIdForUrl: (url?: unknown) => string | null,
 ): MigrationPlan {
-  const plan: MigrationPlan = { cover: null, pageBackgrounds: [], elements: [], changes: [] };
+  const plan: MigrationPlan = {
+    cover: null,
+    pageBackgrounds: [],
+    elements: [],
+    changes: [],
+  };
 
   const cover = JSON.parse(JSON.stringify(book.cover || {}));
   let coverModified = false;
-  const assignCover = (side: any, urlKey: string, idKey: string, label: string) => {
+  const assignCover = (
+    side: any,
+    urlKey: string,
+    idKey: string,
+    label: string,
+  ) => {
     if (!side) return;
     const id = findMediaIdForUrl(side[urlKey]);
     if (id && side[idKey] !== id) {
       side[idKey] = id;
       coverModified = true;
-      plan.changes.push({ kind: 'cover', id: book.id, description: `${label}.${idKey} = ${id}` });
+      plan.changes.push({
+        kind: 'cover',
+        id: book.id,
+        description: `${label}.${idKey} = ${id}`,
+      });
     }
   };
   assignCover(cover.front, 'backgroundUrl', 'mediaId', 'cover.front');
   assignCover(cover.back, 'insideBackgroundUrl', 'insideMediaId', 'cover.back');
-  assignCover(cover.back, 'outsideBackgroundUrl', 'outsideMediaId', 'cover.back');
+  assignCover(
+    cover.back,
+    'outsideBackgroundUrl',
+    'outsideMediaId',
+    'cover.back',
+  );
   if (coverModified) plan.cover = cover;
 
   for (const page of book.pages) {
@@ -72,7 +101,11 @@ export function planLegacyMigration(
       if (bgMediaId) {
         bg.mediaId = bgMediaId;
         plan.pageBackgrounds.push({ pageId: page.id, background: bg });
-        plan.changes.push({ kind: 'page-background', id: page.id, description: `background.mediaId = ${bgMediaId}` });
+        plan.changes.push({
+          kind: 'page-background',
+          id: page.id,
+          description: `background.mediaId = ${bgMediaId}`,
+        });
       }
     }
 
@@ -97,7 +130,11 @@ export function planLegacyMigration(
 
       if (notes.length > 0) {
         plan.elements.push({ elementId: el.id, data });
-        plan.changes.push({ kind: 'element', id: el.id, description: notes.join(', ') });
+        plan.changes.push({
+          kind: 'element',
+          id: el.id,
+          description: notes.join(', '),
+        });
       }
     }
   }
@@ -107,8 +144,14 @@ export function planLegacyMigration(
 
 async function main() {
   const apply = process.argv.includes('--apply');
-  console.log('🚀 Running Prompt 25 Legacy Content Migration & Canonical Media Mapping...');
-  console.log(apply ? '✍️  Mode: APPLY (changes will be written)' : '🔍 Mode: DRY RUN (no writes; pass --apply to write)');
+  console.log(
+    '🚀 Running Prompt 25 Legacy Content Migration & Canonical Media Mapping...',
+  );
+  console.log(
+    apply
+      ? '✍️  Mode: APPLY (changes will be written)'
+      : '🔍 Mode: DRY RUN (no writes; pass --apply to write)',
+  );
 
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
@@ -123,8 +166,12 @@ async function main() {
   const prisma = new PrismaClient({ adapter });
 
   try {
-    const allMedia = await prisma.media.findMany({ select: { id: true, url: true } });
-    console.log(`📦 Loaded ${allMedia.length} Media records from PostgreSQL library.`);
+    const allMedia = await prisma.media.findMany({
+      select: { id: true, url: true },
+    });
+    console.log(
+      `📦 Loaded ${allMedia.length} Media records from PostgreSQL library.`,
+    );
     const findMediaIdForUrl = buildExactUrlLookup(allMedia);
 
     const book = await prisma.book.findFirst({
@@ -142,11 +189,15 @@ async function main() {
       return;
     }
 
-    console.log(`📖 Auditing book "${book.title}" (${book.pages.length} pages)...`);
+    console.log(
+      `📖 Auditing book "${book.title}" (${book.pages.length} pages)...`,
+    );
     const plan = planLegacyMigration(book as any, findMediaIdForUrl);
 
     if (plan.changes.length === 0) {
-      console.log('✅ Nothing to migrate: all references already canonical (or no exact URL match).');
+      console.log(
+        '✅ Nothing to migrate: all references already canonical (or no exact URL match).',
+      );
       return;
     }
 
@@ -158,20 +209,31 @@ async function main() {
     );
 
     if (!apply) {
-      console.log('🔍 Dry run complete. Re-run with --apply to write these changes.');
+      console.log(
+        '🔍 Dry run complete. Re-run with --apply to write these changes.',
+      );
       return;
     }
 
     await prisma.$transaction(
       async (tx) => {
         if (plan.cover) {
-          await tx.book.update({ where: { id: book.id }, data: { cover: plan.cover } });
+          await tx.book.update({
+            where: { id: book.id },
+            data: { cover: plan.cover },
+          });
         }
         for (const bg of plan.pageBackgrounds) {
-          await tx.page.update({ where: { id: bg.pageId }, data: { background: bg.background } });
+          await tx.page.update({
+            where: { id: bg.pageId },
+            data: { background: bg.background },
+          });
         }
         for (const el of plan.elements) {
-          await tx.pageElement.update({ where: { id: el.elementId }, data: { data: el.data } });
+          await tx.pageElement.update({
+            where: { id: el.elementId },
+            data: { data: el.data },
+          });
         }
         await tx.book.update({
           where: { id: book.id },
@@ -181,7 +243,9 @@ async function main() {
       { timeout: 120_000, maxWait: 15_000 },
     );
 
-    console.log(`✅ Applied ${plan.changes.length} canonical mediaId changes to the draft.`);
+    console.log(
+      `✅ Applied ${plan.changes.length} canonical mediaId changes to the draft.`,
+    );
     console.log(
       'ℹ️ publishedSnapshot was NOT modified. Review the draft in the Admin preview, then Publish from the Admin UI to go live.',
     );

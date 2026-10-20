@@ -20,7 +20,7 @@ import {
 } from '@phucandtrang/shared';
 
 export function IsStringOrNumber(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'isStringOrNumber',
       target: object.constructor,
@@ -39,8 +39,10 @@ export function IsStringOrNumber(validationOptions?: ValidationOptions) {
   };
 }
 
-export function IsValidInteractionTarget(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+export function IsValidInteractionTarget(
+  validationOptions?: ValidationOptions,
+) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'isValidInteractionTarget',
       target: object.constructor,
@@ -53,7 +55,10 @@ export function IsValidInteractionTarget(validationOptions?: ValidationOptions) 
         },
         defaultMessage(args: ValidationArguments) {
           const action = (args.object as ElementInteractionDto).action;
-          return validateInteractionTarget(action, args.value) || 'Interaction target không hợp lệ.';
+          return (
+            validateInteractionTarget(action, args.value) ||
+            'Interaction target không hợp lệ.'
+          );
         },
       },
     });
@@ -65,7 +70,11 @@ export function isSafeInteractionValue(value: any): boolean {
   if (value === undefined || value === null) return true;
   if (typeof value !== 'object' || Array.isArray(value)) return false;
   if (value.action !== 'open-link') return true;
-  return value.target === undefined || value.target === '' || isValidHttpUrl(value.target);
+  return (
+    value.target === undefined ||
+    value.target === '' ||
+    isValidHttpUrl(value.target)
+  );
 }
 
 /**
@@ -73,7 +82,7 @@ export function isSafeInteractionValue(value: any): boolean {
  * that are not http/https, so stored data can never become a javascript: link on the public site.
  */
 export function IsSafeInteraction(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'isSafeInteraction',
       target: object.constructor,

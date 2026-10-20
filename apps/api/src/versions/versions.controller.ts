@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Body,
-  Request,
-} from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Request } from '@nestjs/common';
 import { VersionsService } from './versions.service';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '@prisma/client';

@@ -51,12 +51,17 @@ export class PublishValidationService {
 
     // 2. Fetch all registered Media IDs & AudioTrack IDs for fast in-memory validation
     const [allMedia, allAudioTracks, allLayoutTemplates] = await Promise.all([
-      this.prisma.media.findMany({ select: { id: true, size: true, url: true } }),
+      this.prisma.media.findMany({
+        select: { id: true, size: true, url: true },
+      }),
       this.prisma.audioTrack.findMany({ select: { id: true } }),
       this.prisma.layoutTemplate.findMany({ select: { id: true } }),
     ]);
 
-    const mediaMap = new Map<string, { size?: number | bigint | null; url: string }>();
+    const mediaMap = new Map<
+      string,
+      { size?: number | bigint | null; url: string }
+    >();
     allMedia.forEach((m) => mediaMap.set(m.id, { size: m.size, url: m.url }));
 
     const audioTrackIdSet = new Set(allAudioTracks.map((a) => a.id));
@@ -80,7 +85,7 @@ export class PublishValidationService {
       mediaId?: string | null,
       rawUrl?: string | null,
       location?: ValidationIssue['location'],
-      fieldLabel?: string
+      fieldLabel?: string,
     ) => {
       if (mediaId) {
         if (!mediaMap.has(mediaId)) {
@@ -121,15 +126,26 @@ export class PublishValidationService {
         id: 'err-missing-cover',
         severity: 'ERROR',
         code: 'MISSING_COVER',
-        message: 'Bìa trước cuốn sách (Front Cover) chưa có ảnh nền hoặc mediaId.',
+        message:
+          'Bìa trước cuốn sách (Front Cover) chưa có ảnh nền hoặc mediaId.',
         location: { type: 'COVER' },
         fixLink: `/admin/books/${book.id}/cover`,
       });
     }
 
     checkMedia(frontMediaId, frontBg, { type: 'COVER' }, 'Bìa trước');
-    checkMedia(cover.back?.insideMediaId, cover.back?.insideBackgroundUrl, { type: 'COVER' }, 'Mặt trong bìa sau');
-    checkMedia(cover.back?.outsideMediaId, cover.back?.outsideBackgroundUrl, { type: 'COVER' }, 'Mặt ngoài bìa sau');
+    checkMedia(
+      cover.back?.insideMediaId,
+      cover.back?.insideBackgroundUrl,
+      { type: 'COVER' },
+      'Mặt trong bìa sau',
+    );
+    checkMedia(
+      cover.back?.outsideMediaId,
+      cover.back?.outsideBackgroundUrl,
+      { type: 'COVER' },
+      'Mặt ngoài bìa sau',
+    );
 
     // ==========================================
     // B. BACKGROUND MUSIC VALIDATION
@@ -157,7 +173,8 @@ export class PublishValidationService {
         id: 'err-empty-book',
         severity: 'ERROR',
         code: 'NO_PAGES',
-        message: 'Cuốn sách chưa có bất kỳ trang nội dung nào. Không thể xuất bản.',
+        message:
+          'Cuốn sách chưa có bất kỳ trang nội dung nào. Không thể xuất bản.',
         location: { type: 'BOOK' },
         fixLink: `/admin/books/${book.id}/pages`,
       });
@@ -165,7 +182,7 @@ export class PublishValidationService {
 
     // Check sequence of physical order (0, 1, 2, ..., N-1)
     const seenOrders = new Set<number>();
-    pages.forEach((p, idx) => {
+    pages.forEach((p) => {
       const order = p.order;
       if (order < 0) {
         issues.push({
@@ -173,7 +190,12 @@ export class PublishValidationService {
           severity: 'ERROR',
           code: 'INVALID_PAGE_ORDER',
           message: `Trang ${p.pageNumber} có thứ tự order âm (${order}).`,
-          location: { type: 'PAGE', pageId: p.id, pageNumber: p.pageNumber, pageOrder: order },
+          location: {
+            type: 'PAGE',
+            pageId: p.id,
+            pageNumber: p.pageNumber,
+            pageOrder: order,
+          },
           fixLink: `/admin/books/${book.id}/pages`,
         });
       }
@@ -184,7 +206,12 @@ export class PublishValidationService {
           severity: 'ERROR',
           code: 'INVALID_PAGE_ORDER',
           message: `Trùng lặp thứ tự order #${order} tại trang ${p.pageNumber}.`,
-          location: { type: 'PAGE', pageId: p.id, pageNumber: p.pageNumber, pageOrder: order },
+          location: {
+            type: 'PAGE',
+            pageId: p.id,
+            pageNumber: p.pageNumber,
+            pageOrder: order,
+          },
           fixLink: `/admin/books/${book.id}/pages`,
         });
       }
@@ -192,13 +219,21 @@ export class PublishValidationService {
 
       // Check Layout Template validity
       if (p.layoutTemplateId) {
-        if (!builtInLayouts.has(p.layoutTemplateId) && !layoutTemplateIdSet.has(p.layoutTemplateId)) {
+        if (
+          !builtInLayouts.has(p.layoutTemplateId) &&
+          !layoutTemplateIdSet.has(p.layoutTemplateId)
+        ) {
           issues.push({
             id: `err-invalid-layout-${p.id}`,
             severity: 'ERROR',
             code: 'INVALID_LAYOUT',
             message: `Trang ${p.pageNumber} sử dụng Layout Template ID không tồn tại ("${p.layoutTemplateId}").`,
-            location: { type: 'PAGE', pageId: p.id, pageNumber: p.pageNumber, pageOrder: p.order },
+            location: {
+              type: 'PAGE',
+              pageId: p.id,
+              pageNumber: p.pageNumber,
+              pageOrder: p.order,
+            },
             fixLink: `/admin/pages/${p.id}`,
           });
         }
@@ -212,7 +247,12 @@ export class PublishValidationService {
             severity: 'ERROR',
             code: 'DELETED_AUDIO_REFERENCE',
             message: `Nhạc nền riêng của Trang ${p.pageNumber} (ID "${p.audioTrackId}") đã bị xóa.`,
-            location: { type: 'PAGE', pageId: p.id, pageNumber: p.pageNumber, pageOrder: p.order },
+            location: {
+              type: 'PAGE',
+              pageId: p.id,
+              pageNumber: p.pageNumber,
+              pageOrder: p.order,
+            },
             fixLink: `/admin/pages/${p.id}`,
           });
         }
@@ -223,8 +263,13 @@ export class PublishValidationService {
       checkMedia(
         bg.mediaId,
         bg.imageUrl,
-        { type: 'PAGE', pageId: p.id, pageNumber: p.pageNumber, pageOrder: p.order },
-        `Hình nền Trang ${p.pageNumber}`
+        {
+          type: 'PAGE',
+          pageId: p.id,
+          pageNumber: p.pageNumber,
+          pageOrder: p.order,
+        },
+        `Hình nền Trang ${p.pageNumber}`,
       );
 
       // Warning: Empty Page
@@ -234,7 +279,12 @@ export class PublishValidationService {
           severity: 'WARNING',
           code: 'EMPTY_PAGE',
           message: `Trang ${p.pageNumber} hiện đang để trống (0 phần tử nội dung).`,
-          location: { type: 'PAGE', pageId: p.id, pageNumber: p.pageNumber, pageOrder: p.order },
+          location: {
+            type: 'PAGE',
+            pageId: p.id,
+            pageNumber: p.pageNumber,
+            pageOrder: p.order,
+          },
           fixLink: `/admin/pages/${p.id}`,
         });
       }
@@ -256,7 +306,8 @@ export class PublishValidationService {
         };
 
         // 1. Malformed Transform check
-        const isInvalidNumber = (val: any) => typeof val !== 'number' || isNaN(val);
+        const isInvalidNumber = (val: any) =>
+          typeof val !== 'number' || isNaN(val);
         if (
           isInvalidNumber(trans.x) ||
           isInvalidNumber(trans.y) ||
@@ -288,7 +339,12 @@ export class PublishValidationService {
             });
           }
 
-          checkMedia(d.mediaId, d.src, elementLocation, `Ảnh trên Trang ${p.pageNumber}`);
+          checkMedia(
+            d.mediaId,
+            d.src,
+            elementLocation,
+            `Ảnh trên Trang ${p.pageNumber}`,
+          );
 
           // Warning: Missing Alt Text
           if (!d.alt && !d.altText) {
@@ -316,8 +372,18 @@ export class PublishValidationService {
             });
           }
 
-          checkMedia(d.mediaId, d.src, elementLocation, `Video trên Trang ${p.pageNumber}`);
-          checkMedia(d.posterMediaId, d.thumbnailUrl, elementLocation, `Poster video trên Trang ${p.pageNumber}`);
+          checkMedia(
+            d.mediaId,
+            d.src,
+            elementLocation,
+            `Video trên Trang ${p.pageNumber}`,
+          );
+          checkMedia(
+            d.posterMediaId,
+            d.thumbnailUrl,
+            elementLocation,
+            `Poster video trên Trang ${p.pageNumber}`,
+          );
 
           // Error: Invalid/missing video poster
           if (!d.thumbnailUrl && !d.posterMediaId) {
@@ -334,8 +400,16 @@ export class PublishValidationService {
 
         // 4. Element Interaction Target Validation
         const interaction = el.interaction as any;
-        if (interaction && interaction.enabled && interaction.action && interaction.action !== 'none') {
-          const targetError = validateInteractionTarget(interaction.action, interaction.target);
+        if (
+          interaction &&
+          interaction.enabled &&
+          interaction.action &&
+          interaction.action !== 'none'
+        ) {
+          const targetError = validateInteractionTarget(
+            interaction.action,
+            interaction.target,
+          );
           if (targetError) {
             issues.push({
               id: `err-invalid-target-${el.id}`,

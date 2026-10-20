@@ -91,10 +91,7 @@ export class MediaController {
    */
   @Roles(Role.ADMIN)
   @Delete(':id')
-  remove(
-    @Param('id') id: string,
-    @Query('force') force?: string,
-  ) {
+  remove(@Param('id') id: string, @Query('force') force?: string) {
     const isForce = force === 'true' || force === '1';
     return this.mediaService.remove(id, isForce);
   }

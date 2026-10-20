@@ -35,9 +35,13 @@ jobs:
         working-directory: apps/api
         run: npx prisma generate --config prisma7.config.ts
 
+      - name: Lint API
+        working-directory: apps/api
+        run: npx eslint "src/**/*.ts" "prisma/**/*.ts" "test/**/*.ts"
+
       - name: Typecheck API
         working-directory: apps/api
-        run: npx tsc --noEmit -p tsconfig.build.json
+        run: npx tsc --noEmit -p tsconfig.json
 
       - name: Typecheck Web
         working-directory: apps/web

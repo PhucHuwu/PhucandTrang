@@ -63,7 +63,8 @@ export class PageElementsController {
     @Res({ passthrough: true }) res: Response,
   ) {
     // Body stays the updated-elements array (backward compatible); skipped ids go in a header.
-    const { elements, skippedElementIds } = await this.elementsService.batchUpdateWithReport(pageId, dto);
+    const { elements, skippedElementIds } =
+      await this.elementsService.batchUpdateWithReport(pageId, dto);
     res.setHeader('X-Skipped-Element-Ids', skippedElementIds.join(','));
     return elements;
   }

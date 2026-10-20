@@ -13,7 +13,9 @@ async function bootstrap() {
   try {
     requireJwtSecret(process.env.JWT_SECRET);
   } catch {
-    console.error('FATAL: JWT_SECRET environment variable must be properly configured!');
+    console.error(
+      'FATAL: JWT_SECRET environment variable must be properly configured!',
+    );
     process.exit(1);
   }
 
@@ -46,6 +48,8 @@ async function bootstrap() {
 
   const port = process.env.PORT || 4000;
   await app.listen(port);
-  console.log(`🚀 Phuc & Trang Love Journey Backend is running on: http://localhost:${port}/api`);
+  console.log(
+    `🚀 Phuc & Trang Love Journey Backend is running on: http://localhost:${port}/api`,
+  );
 }
 bootstrap();

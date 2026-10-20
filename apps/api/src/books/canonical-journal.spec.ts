@@ -42,7 +42,10 @@ describe('BooksService Canonical Single Love Journal (Prompt 40.2 Architecture)'
         { provide: PrismaService, useValue: prisma },
         { provide: PublicCacheService, useValue: cacheService },
         { provide: PublicService, useValue: publicService },
-        { provide: PublishValidationService, useValue: publishValidationService },
+        {
+          provide: PublishValidationService,
+          useValue: publishValidationService,
+        },
       ],
     }).compile();
 
@@ -71,7 +74,9 @@ describe('BooksService Canonical Single Love Journal (Prompt 40.2 Architecture)'
   it('getCanonicalJournal: throws NotFoundException when no journal exists in database', async () => {
     prisma.book.findFirst.mockResolvedValue(null);
 
-    await expect(service.getCanonicalJournal()).rejects.toThrow(NotFoundException);
+    await expect(service.getCanonicalJournal()).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('getCanonicalJournalId: returns the ID of the single canonical journal', async () => {

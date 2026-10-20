@@ -20,7 +20,8 @@ export class AudioService {
     let sizeVal: number | string | null = null;
     if (media.size !== null && media.size !== undefined) {
       const big = BigInt(media.size);
-      sizeVal = big <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(big) : big.toString();
+      sizeVal =
+        big <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(big) : big.toString();
     }
     return {
       ...media,
@@ -127,7 +128,9 @@ export class AudioService {
     }
 
     if (!src) {
-      throw new BadRequestException('Audio src or valid mediaId must be provided');
+      throw new BadRequestException(
+        'Audio src or valid mediaId must be provided',
+      );
     }
 
     const created = await this.prisma.audioTrack.create({
@@ -208,11 +211,20 @@ export class AudioService {
       if (!track) throw new NotFoundException(`Audio track not found: ${id}`);
 
       const [books, pages] = await Promise.all([
-        tx.book.findMany({ where: { backgroundMusicId: id }, select: { id: true } }),
-        tx.page.findMany({ where: { audioTrackId: id }, select: { bookId: true } }),
+        tx.book.findMany({
+          where: { backgroundMusicId: id },
+          select: { id: true },
+        }),
+        tx.page.findMany({
+          where: { audioTrackId: id },
+          select: { bookId: true },
+        }),
       ]);
       const affected = Array.from(
-        new Set<string>([...books.map((b) => b.id), ...pages.map((p) => p.bookId)]),
+        new Set<string>([
+          ...books.map((b) => b.id),
+          ...pages.map((p) => p.bookId),
+        ]),
       );
 
       const removed = await tx.audioTrack.delete({ where: { id } });

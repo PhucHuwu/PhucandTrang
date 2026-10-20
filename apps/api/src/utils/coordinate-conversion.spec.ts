@@ -20,7 +20,12 @@ describe('Video ActiveArea Coordinate Conversion (Req 5)', () => {
 
   it('should accurately convert relative normalized coordinates inside element to page coordinates', () => {
     const transform = { x: 0.1, y: 0.2, width: 0.5, height: 0.4 };
-    const relativeActiveArea = { left: 0.05, top: 0.1, width: 0.9, height: 0.85 };
+    const relativeActiveArea = {
+      left: 0.05,
+      top: 0.1,
+      width: 0.9,
+      height: 0.85,
+    };
 
     const rect = computeActiveAreaPageRect(transform, relativeActiveArea);
 

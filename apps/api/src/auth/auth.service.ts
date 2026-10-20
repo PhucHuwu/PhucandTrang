@@ -44,7 +44,10 @@ export class AuthService {
 
   // Per account (there is a single admin): after this many failures from anywhere, each further
   // attempt must wait an exponentially growing delay, capped so the admin is never locked out for long.
-  private accountBackoff: AccountBackoffState = { failures: 0, lastFailureAt: 0 };
+  private accountBackoff: AccountBackoffState = {
+    failures: 0,
+    lastFailureAt: 0,
+  };
   private readonly ACCOUNT_FREE_FAILURES = 10;
   private readonly ACCOUNT_BASE_DELAY_MS = 1000;
   private readonly ACCOUNT_MAX_DELAY_MS = 60 * 1000;
@@ -60,13 +63,18 @@ export class AuthService {
   }
 
   /** Returns the live record for a client, dropping it once its block or window has expired. */
-  private getActiveRecord(key: string, now: number): LoginAttemptRecord | undefined {
+  private getActiveRecord(
+    key: string,
+    now: number,
+  ): LoginAttemptRecord | undefined {
     const record = this.loginAttempts.get(key);
     if (!record) return undefined;
 
-    const blockExpired = record.blockedUntil !== undefined && record.blockedUntil <= now;
+    const blockExpired =
+      record.blockedUntil !== undefined && record.blockedUntil <= now;
     const windowExpired =
-      record.blockedUntil === undefined && now - record.windowStartedAt > this.ATTEMPT_WINDOW_MS;
+      record.blockedUntil === undefined &&
+      now - record.windowStartedAt > this.ATTEMPT_WINDOW_MS;
     if (blockExpired || windowExpired) {
       this.loginAttempts.delete(key);
       return undefined;
@@ -88,7 +96,10 @@ export class AuthService {
 
   private recordFailedAttempt(key: string) {
     const now = Date.now();
-    const record = this.getActiveRecord(key, now) || { attempts: 0, windowStartedAt: now };
+    const record = this.getActiveRecord(key, now) || {
+      attempts: 0,
+      windowStartedAt: now,
+    };
 
     record.attempts++;
     if (this.isSourceKey(key)) {
@@ -116,13 +127,19 @@ export class AuthService {
   /** Delay the account currently requires between attempts (0 while under the free-failure budget). */
   private accountDelayMs(now: number): number {
     const state = this.accountBackoff;
-    if (state.failures > 0 && now - state.lastFailureAt > this.ACCOUNT_RESET_AFTER_MS) {
+    if (
+      state.failures > 0 &&
+      now - state.lastFailureAt > this.ACCOUNT_RESET_AFTER_MS
+    ) {
       this.accountBackoff = { failures: 0, lastFailureAt: 0 };
       return 0;
     }
     if (state.failures < this.ACCOUNT_FREE_FAILURES) return 0;
     const exponent = Math.min(state.failures - this.ACCOUNT_FREE_FAILURES, 16);
-    return Math.min(this.ACCOUNT_BASE_DELAY_MS * 2 ** exponent, this.ACCOUNT_MAX_DELAY_MS);
+    return Math.min(
+      this.ACCOUNT_BASE_DELAY_MS * 2 ** exponent,
+      this.ACCOUNT_MAX_DELAY_MS,
+    );
   }
 
   private checkAccountBackoff() {
@@ -176,7 +193,7 @@ export class AuthService {
   async validateUser(pass: string): Promise<any> {
     const user = await this.authenticate(pass);
     if (!user) return null;
-    const { passwordHash, ...result } = user;
+    const { passwordHash: _passwordHash, ...result } = user;
     return result;
   }
 
@@ -221,7 +238,9 @@ export class AuthService {
       );
     }
 
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
     if (existing) {
       throw new ConflictException('Email này đã được sử dụng');
     }

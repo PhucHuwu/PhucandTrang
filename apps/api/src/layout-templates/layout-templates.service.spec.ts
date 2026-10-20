@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { LayoutTemplatesService } from './layout-templates.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { Role } from '@prisma/client';
-import { ForbiddenException, ConflictException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 
 describe('LayoutTemplatesService (Prompt 17 — Custom Layout Templates)', () => {
   let service: LayoutTemplatesService;
@@ -83,7 +83,9 @@ describe('LayoutTemplatesService (Prompt 17 — Custom Layout Templates)', () =>
       isSystem: true, // Not allowed for EDITOR!
     };
 
-    await expect(service.create(dto, Role.EDITOR)).rejects.toThrow(ForbiddenException);
+    await expect(service.create(dto, Role.EDITOR)).rejects.toThrow(
+      ForbiddenException,
+    );
     expect(prisma.layoutTemplate.create).not.toHaveBeenCalled();
   });
 
@@ -94,16 +96,18 @@ describe('LayoutTemplatesService (Prompt 17 — Custom Layout Templates)', () =>
       name: 'Hacked System Template',
     };
 
-    await expect(service.update('single-hero', updateDto, Role.EDITOR)).rejects.toThrow(
-      ForbiddenException,
-    );
+    await expect(
+      service.update('single-hero', updateDto, Role.EDITOR),
+    ).rejects.toThrow(ForbiddenException);
     expect(prisma.layoutTemplate.update).not.toHaveBeenCalled();
   });
 
   it('should strictly prevent deleting isSystem = true template even by ADMIN', async () => {
     prisma.layoutTemplate.findUnique.mockResolvedValue(mockSystemTemplate);
 
-    await expect(service.remove('single-hero', Role.ADMIN)).rejects.toThrow(ForbiddenException);
+    await expect(service.remove('single-hero', Role.ADMIN)).rejects.toThrow(
+      ForbiddenException,
+    );
     expect(prisma.layoutTemplate.delete).not.toHaveBeenCalled();
   });
 
@@ -131,7 +135,10 @@ describe('LayoutTemplatesService (Prompt 17 — Custom Layout Templates)', () =>
       isSystem: false,
     });
 
-    const result = await service.duplicate('single-hero', 'duplicated-layout-1');
+    const result = await service.duplicate(
+      'single-hero',
+      'duplicated-layout-1',
+    );
 
     expect(result.id).toBe('duplicated-layout-1');
     expect(prisma.layoutTemplate.create).toHaveBeenCalledWith({

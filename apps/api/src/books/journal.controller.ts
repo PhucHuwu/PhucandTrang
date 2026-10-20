@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Patch,
-  Post,
-  Body,
-  Request,
-} from '@nestjs/common';
+import { Controller, Get, Patch, Post, Body, Request } from '@nestjs/common';
 import { BooksService } from './books.service';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { PublishBookDto } from './dto/publish-book.dto';
@@ -47,12 +40,13 @@ export class JournalController {
 
   @Roles(Role.ADMIN)
   @Post('publish')
-  async publishJournal(
-    @Body() body: PublishBookDto = {},
-    @Request() req: any,
-  ) {
+  async publishJournal(@Body() body: PublishBookDto = {}, @Request() req: any) {
     const journalId = await this.booksService.getCanonicalJournalId();
-    return this.booksService.publishBook(journalId, body?.changelog, req.user?.id);
+    return this.booksService.publishBook(
+      journalId,
+      body?.changelog,
+      req.user?.id,
+    );
   }
 
   @Roles(Role.ADMIN)

@@ -6,7 +6,6 @@ import {
   Min,
   Max,
   IsIn,
-  IsObject,
   ValidateNested,
   IsArray,
 } from 'class-validator';

@@ -12,11 +12,14 @@ export interface CaptionMergePlan {
   text: string;
 }
 
-const isMedia = (el: CaptionMergeElement) => el.type === 'IMAGE' || el.type === 'VIDEO';
+const isMedia = (el: CaptionMergeElement) =>
+  el.type === 'IMAGE' || el.type === 'VIDEO';
 
 export function isStandaloneCaption(el: CaptionMergeElement) {
   if (el.type !== 'TEXT') return false;
-  return el.data?.variant === 'caption' || Boolean(el.slot?.endsWith('-caption'));
+  return (
+    el.data?.variant === 'caption' || Boolean(el.slot?.endsWith('-caption'))
+  );
 }
 
 function captionText(el: CaptionMergeElement): string {
@@ -31,7 +34,9 @@ function captionText(el: CaptionMergeElement): string {
  * horizontally-overlapping media whose bottom edge is closest to the caption.
  * Media that already has its own caption is never overwritten.
  */
-export function planCaptionMerge(elements: CaptionMergeElement[]): CaptionMergePlan[] {
+export function planCaptionMerge(
+  elements: CaptionMergeElement[],
+): CaptionMergePlan[] {
   const media = elements.filter(isMedia);
   const taken = new Set(media.filter((m) => m.data?.caption).map((m) => m.id));
   const plans: CaptionMergePlan[] = [];
@@ -40,8 +45,12 @@ export function planCaptionMerge(elements: CaptionMergeElement[]): CaptionMergeP
     const text = captionText(caption).trim();
     if (!text) continue;
 
-    const slotTarget = caption.slot?.endsWith('-caption') ? caption.slot.slice(0, -'-caption'.length) : null;
-    let target = media.find((m) => slotTarget && m.slot === slotTarget && !taken.has(m.id));
+    const slotTarget = caption.slot?.endsWith('-caption')
+      ? caption.slot.slice(0, -'-caption'.length)
+      : null;
+    let target = media.find(
+      (m) => slotTarget && m.slot === slotTarget && !taken.has(m.id),
+    );
 
     if (!target) {
       const c = caption.transform || {};
@@ -49,7 +58,8 @@ export function planCaptionMerge(elements: CaptionMergeElement[]): CaptionMergeP
       for (const m of media) {
         if (taken.has(m.id)) continue;
         const t = m.transform || {};
-        const overlap = Math.min(c.x + c.width, t.x + t.width) - Math.max(c.x, t.x);
+        const overlap =
+          Math.min(c.x + c.width, t.x + t.width) - Math.max(c.x, t.x);
         if (overlap <= 0) continue;
         const distance = Math.abs(c.y - (t.y + t.height));
         if (distance < best && distance <= 0.1) {
