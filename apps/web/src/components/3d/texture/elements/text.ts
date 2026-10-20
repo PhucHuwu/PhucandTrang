@@ -71,7 +71,7 @@ export function renderTextElement(
   const totalTextHeight = lines.length * lineHeight;
 
   let startY = -totalTextHeight / 2 + lineHeight / 2;
-  let startX =
+  const startX =
     s.textAlign === 'center'
       ? 0
       : s.textAlign === 'right'

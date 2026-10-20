@@ -99,7 +99,8 @@ export default function AdminAudioPage() {
     try {
       const payload = {
         title,
-        artist: artist || undefined,
+        // Send an empty string (not undefined, which JSON drops) so clearing the field is saved
+        artist: artist.trim(),
         src,
         mediaId,
         volume: Number(volume),

@@ -17,7 +17,7 @@ export class AnimationLoop {
 
 		const animate = (currentTime: number) => {
 			if (isDisposed()) return;
-			let dt = Math.min((currentTime - previousTime) / 1000, 0.05);
+			const dt = Math.min((currentTime - previousTime) / 1000, 0.05);
 			previousTime = currentTime;
 			if (document.hidden) {
 				onHiddenFrame();

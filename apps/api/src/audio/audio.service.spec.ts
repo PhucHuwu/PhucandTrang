@@ -94,6 +94,21 @@ describe('AudioService Business Logic (Prompt 36)', () => {
     );
   });
 
+  it('update with an empty artist clears it; omitting artist leaves it unchanged', async () => {
+    prisma.audioTrack.findUnique.mockResolvedValue(mockTrack);
+    prisma.audioTrack.update.mockResolvedValue({ ...mockTrack, artist: null });
+    prisma.book.findMany.mockResolvedValue([]);
+    prisma.page.findMany.mockResolvedValue([]);
+
+    await service.update('track-1', { artist: '  ' });
+    expect(prisma.audioTrack.update.mock.calls[0][0].data.artist).toBeNull();
+
+    await service.update('track-1', { title: 'Mới' });
+    expect(
+      prisma.audioTrack.update.mock.calls[1][0].data.artist,
+    ).toBeUndefined();
+  });
+
   it('touchAffectedBooks should touch cache for all books using this track as background or page music', async () => {
     prisma.book.findMany.mockResolvedValue([{ id: 'book-1' }]);
     prisma.page.findMany.mockResolvedValue([

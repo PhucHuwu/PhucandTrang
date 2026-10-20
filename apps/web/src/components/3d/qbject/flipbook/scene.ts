@@ -148,7 +148,7 @@ export function placePages(
 	spineWidth: number,
 	spineZ: number,
 ) {
-	let spinePlacementStart = -spineWidth / 2;
+	const spinePlacementStart = -spineWidth / 2;
 	let spinePlacementShift = 0;
 	pages.forEach((page, index) => {
 		group.add(page.pivot);

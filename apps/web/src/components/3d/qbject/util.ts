@@ -55,11 +55,11 @@ export function approach(
 	speed: number,
 	dt: number,
 ): number {
-	let difference = target - val;
+	const difference = target - val;
 	if (Math.abs(difference) < 0.0001) {
 		return target;
 	}
-	let change = difference * (1 - Math.exp(-speed * dt));
+	const change = difference * (1 - Math.exp(-speed * dt));
 	val += change;
 	return val;
 }

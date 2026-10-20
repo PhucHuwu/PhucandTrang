@@ -145,7 +145,7 @@ export default class SlidingNumber extends EventEmitter {
 			this.animationFrame = 0;
 			if (this.destroyed) return;
 			// rAF timestamps can precede the performance.now() taken when the loop was woken
-			let dt = Math.max(0, Math.min((currentTime - previousTime) / 1000, 0.05));
+			const dt = Math.max(0, Math.min((currentTime - previousTime) / 1000, 0.05));
 			previousTime = Math.max(previousTime, currentTime);
 			if (!document.hidden) this.update(dt);
 

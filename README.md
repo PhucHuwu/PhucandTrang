@@ -1,5 +1,11 @@
 # Phuc & Trang: Love Journal
 
+[![CI](https://github.com/PhucHuwu/PhucandTrang/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/PhucHuwu/PhucandTrang/actions/workflows/ci.yml)
+![Next.js](https://img.shields.io/badge/Next.js-15-black)
+![NestJS](https://img.shields.io/badge/NestJS-10-e0234e)
+![Three.js](https://img.shields.io/badge/Three.js-r186-049ef4)
+![License](https://img.shields.io/badge/license-custom-blue)
+
 A digital love journal for two people. Visitors read it as an interactive 3D book that turns page by page in the browser. The owner edits it through a private visual editor.
 
 Live site: [love.phuchuwu.io.vn](https://love.phuchuwu.io.vn)
@@ -106,7 +112,14 @@ npm run prisma:generate
 
 ### Configure environment
 
-Create `apps/api/.env`:
+Copy the example files and fill them in:
+
+```bash
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env.local
+```
+
+`apps/api/.env`:
 
 | Variable | Required | Description |
 | --- | --- | --- |
@@ -121,7 +134,7 @@ Create `apps/api/.env`:
 | `SEED_FORCE_CANONICAL_BOOK` | no | `true` resets all pages to the sample book (destructive) |
 | `SEED_CONFIRM_DESTRUCTIVE` | with the line above | Must be `yes-wipe-pages` |
 
-Create `apps/web/.env.local`:
+`apps/web/.env.local`:
 
 | Variable | Required | Description |
 | --- | --- | --- |
@@ -154,7 +167,7 @@ npm run dev:web   # http://localhost:3000, admin at /admin
 | `npm run build` | Build shared, API, and web |
 | `npm run test:api` | Run the API unit tests |
 | `npx tsc --noEmit -p apps/web` | Typecheck the web app (use `-p apps/api` for the API) |
-| `npm run lint --workspace=@phucandtrang/api` | Lint the API |
+| `npm run lint --workspace=@phucandtrang/api` | Lint the API (use `@phucandtrang/web` for the web app) |
 | `npx playwright test` (in `apps/web`) | Run the web end-to-end tests |
 | `npm run admin:set-password` (in `apps/api`) | Change the admin password; reads `ADMIN_NEW_PASSWORD` and signs out every existing session |
 
@@ -191,11 +204,12 @@ pg_restore -d "$TARGET_DATABASE_URL" backup_YYYYMMDD_HHMMSS.dump
 
 ## License
 
-Copyright (c) 2026 [PhucHuwu](https://github.com/PhucHuwu). All rights reserved, except as stated below.
+Copyright (c) 2026 [PhucHuwu](https://github.com/PhucHuwu). See [`LICENSE`](LICENSE) for the full terms. In short:
 
 - **Permitted:** using and modifying the source code, including building your own personal project from it.
-- **Condition:** keep this copyright notice, and credit the original author with a link to [github.com/PhucHuwu](https://github.com/PhucHuwu) in your `README.md`.
+- **Condition:** keep the copyright notice, and credit the original author with a link to [github.com/PhucHuwu](https://github.com/PhucHuwu) in your `README.md`.
 - **Not permitted:** claiming to be the original author, or removing the original attribution.
+- **Not covered:** the personal photos, videos, audio, names, and text of Phuc and Trang. Do not reuse them.
 
 ## Make it your own
 

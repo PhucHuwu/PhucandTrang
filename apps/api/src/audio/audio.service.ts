@@ -136,7 +136,7 @@ export class AudioService {
     const created = await this.prisma.audioTrack.create({
       data: {
         title: dto.title,
-        artist: dto.artist,
+        artist: dto.artist?.trim() || null,
         src,
         mediaId: dto.mediaId,
         volume: dto.volume ?? 0.8,
@@ -176,7 +176,9 @@ export class AudioService {
       where: { id },
       data: {
         title: dto.title,
-        artist: dto.artist,
+        // undefined = leave unchanged; an empty string clears the artist
+        artist:
+          dto.artist === undefined ? undefined : dto.artist.trim() || null,
         src,
         mediaId: dto.mediaId,
         volume: dto.volume,

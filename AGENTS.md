@@ -31,6 +31,7 @@ Production: web `https://love.phuchuwu.io.vn` (Vercel project `we`), API `https:
 | Typecheck | `npx tsc --noEmit -p apps/web` and `npx tsc --noEmit -p apps/api` |
 | API unit tests (Jest) | `npm run test --workspace=@phucandtrang/api` |
 | API lint | in `apps/api`: `npx eslint "{src,prisma,test}/**/*.ts" --rule "prettier/prettier: off"` |
+| Web lint | `npm run lint --workspace=@phucandtrang/web` (errors fail CI, warnings do not) |
 | Format check | in `apps/api`: `npx prettier --check <files> --end-of-line auto` |
 | Web build | `npm run build:web` |
 | Web E2E (Playwright) | in `apps/web`: `npx playwright test --project=chromium` |
@@ -38,7 +39,7 @@ Production: web `https://love.phuchuwu.io.vn` (Vercel project `we`), API `https:
 
 Before reporting work as done: typecheck both apps, run API tests, and run `npm run build:web` if web code changed. CI (`.github/workflows/ci.yml`) also checks migrations against the schema and runs E2E on chromium and webkit.
 
-Windows note: `core.autocrlf=true`, so full API lint reports thousands of CRLF-only prettier errors. Lint with prettier off and format-check changed files with `--end-of-line auto`.
+Line endings are LF everywhere (`.gitattributes`, `.editorconfig`). On older Windows checkouts with `core.autocrlf=true`, the full API lint can report CRLF-only prettier errors. In that case, lint with prettier off and format-check changed files with `--end-of-line auto`. Env templates are `apps/api/.env.example` and `apps/web/.env.example`; keep them in sync when adding env vars.
 
 ## Architecture rules that must hold
 

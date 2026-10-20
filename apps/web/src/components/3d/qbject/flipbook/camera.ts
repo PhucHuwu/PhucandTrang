@@ -23,8 +23,8 @@ export function computeCameraPos(
 		.multiplyScalar(0.25);
 
 	// Calculate normal using cross product of diagonals
-	let v1 = new THREE.Vector3().subVectors(BL, TR);
-	let v2 = new THREE.Vector3().subVectors(BR, TL);
+	const v1 = new THREE.Vector3().subVectors(BL, TR);
+	const v2 = new THREE.Vector3().subVectors(BR, TL);
 	const normal = new THREE.Vector3().crossVectors(v1, v2).normalize();
 
 	const width = TL.distanceTo(TR);
@@ -183,7 +183,7 @@ export function computeBaseViewRect({
 		overrideSettings?.cameraAngle || settings.cameraAngle;
 	const cameraDistance =
 		overrideSettings?.cameraDistance || settings.cameraDistance;
-	let rotationMatrix = new THREE.Matrix4().makeRotationX(cameraAngle);
+	const rotationMatrix = new THREE.Matrix4().makeRotationX(cameraAngle);
 	corners.forEach(point => point.applyMatrix4(rotationMatrix));
 
 	return scaleRectangle(corners, cameraDistance);
