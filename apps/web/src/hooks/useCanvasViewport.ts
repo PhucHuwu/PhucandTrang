@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { DESIGN_CANVAS_HEIGHT, DESIGN_CANVAS_WIDTH } from '@phucandtrang/shared';
 
 export function useCanvasViewport(ready: boolean) {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -9,7 +10,7 @@ export function useCanvasViewport(ready: boolean) {
   const fit = useCallback(() => {
     const viewport = viewportRef.current;
     if (!viewport || !viewport.clientWidth || !viewport.clientHeight) return;
-    setScale(Math.max(0.05, Math.min(1, (viewport.clientWidth - 32) / 1024, (viewport.clientHeight - 32) / 1360)));
+    setScale(Math.max(0.05, Math.min(1, (viewport.clientWidth - 32) / DESIGN_CANVAS_WIDTH, (viewport.clientHeight - 32) / DESIGN_CANVAS_HEIGHT)));
   }, []);
   useEffect(() => {
     const viewport = viewportRef.current;

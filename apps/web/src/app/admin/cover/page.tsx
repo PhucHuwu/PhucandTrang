@@ -13,32 +13,11 @@ import {
 import { useJournal } from '@/context/JournalContext';
 import { Book, Page, PageElement, PageElementType } from '@/types/book';
 import LayersPanel from '@/components/admin/LayersPanel';
-import BackgroundEditor from '@/components/admin/BackgroundEditor';
-import AdvancedTextEditor from '@/components/admin/AdvancedTextEditor';
-import AdvancedImageEditor from '@/components/admin/AdvancedImageEditor';
-import AdvancedVideoEditor from '@/components/admin/AdvancedVideoEditor';
-import AdvancedShapeEditor from '@/components/admin/AdvancedShapeEditor';
-import InteractionEditor from '@/components/admin/InteractionEditor';
+import CoverEditorToolbar from '@/components/admin/cover-editor/CoverEditorToolbar';
+import CoverPropertiesColumn, { CoverInspectorTab } from '@/components/admin/cover-editor/CoverPropertiesColumn';
 import { usePageHistory } from '@/hooks/usePageHistory';
 import { useUndoRedoShortcuts } from '@/hooks/useUndoRedoShortcuts';
-import {
-  ArrowLeft,
-  Save,
-  Type,
-  Image as ImageIcon,
-  Video,
-  Square,
-  Sparkles,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
-  CheckCircle2,
-  Undo2,
-  Redo2,
-  Magnet,
-  Sliders,
-  Palette,
-} from 'lucide-react';
+import { ArrowLeft, Save, CheckCircle2 } from 'lucide-react';
 
 export type CoverSide = 'front' | 'back-inside' | 'back-outside';
 
@@ -63,7 +42,7 @@ export default function BookCoverEditorPage() {
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
 
   // Inspector Tab
-  const [inspectorTab, setInspectorTab] = useState<'element' | 'interaction' | 'background'>('element');
+  const [inspectorTab, setInspectorTab] = useState<CoverInspectorTab>('element');
   const [editingActiveArea, setEditingActiveArea] = useState(false);
 
   // Viewport zoom & snapping
@@ -508,100 +487,18 @@ export default function BookCoverEditorPage() {
       {/* Main 3-Column Studio Layout */}
       <EditorWorkspace
         toolbar={
-          <>
-            <div className="editor-scroll flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto">
-              <div className="shrink-0 flex items-center gap-0.5 bg-[#20111A] p-0.5 rounded-lg border border-rosewood-900/40 text-xs" role="group" aria-label="Thêm phần tử">
-                {([
-                  ['TEXT', 'Chữ', Type, 'text-champagne-300'],
-                  ['IMAGE', 'Ảnh', ImageIcon, 'text-pink-400'],
-                  ['VIDEO', 'Video', Video, 'text-amber-400'],
-                  ['SHAPE', 'Đường kẻ', Square, 'text-rosewood-400'],
-                ] as const).map(([type, label, Icon, color]) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => handleAddElement(type)}
-                    className="h-9 min-w-9 flex items-center justify-center gap-1 px-2 rounded-md hover:bg-rosewood-800/60 text-parchment-200 transition"
-                    title={`Thêm ${label.toLowerCase()}`}
-                    aria-label={`Thêm ${label.toLowerCase()}`}
-                  >
-                    <Icon className={`w-4 h-4 ${color}`} />
-                    <span className="editor-label">{label}</span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="shrink-0 flex items-center gap-0.5 bg-[#20111A] p-0.5 rounded-lg border border-rosewood-900/40">
-                <button
-                  type="button"
-                  onClick={() => performUndo()}
-                  disabled={!canUndo}
-                  className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-rosewood-800/60 text-parchment-200 transition disabled:opacity-30"
-                  title="Hoàn tác (Ctrl+Z)"
-                  aria-label="Hoàn tác"
-                >
-                  <Undo2 className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => performRedo()}
-                  disabled={!canRedo}
-                  className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-rosewood-800/60 text-parchment-200 transition disabled:opacity-30"
-                  title="Làm lại (Ctrl+Shift+Z)"
-                  aria-label="Làm lại"
-                >
-                  <Redo2 className="w-4 h-4" />
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSnappingEnabled(!snappingEnabled)}
-                aria-pressed={snappingEnabled}
-                className={`h-10 shrink-0 flex items-center gap-1.5 px-2.5 rounded-lg border text-xs transition-all ${
-                  snappingEnabled
-                    ? 'bg-cyan-950/60 border-cyan-500/60 text-cyan-300'
-                    : 'bg-[#20111A] border-rosewood-900/40 text-stone-500 hover:text-stone-300'
-                }`}
-                title="Bật/tắt hít từ tính"
-                aria-label="Hít từ tính"
-              >
-                <Magnet className="w-4 h-4" />
-                <span className="editor-label">Snap</span>
-              </button>
-            </div>
-
-            <div className="shrink-0 flex items-center gap-0.5 bg-[#20111A] p-0.5 rounded-lg border border-rosewood-900/40 text-stone-300">
-              <button
-                type="button"
-                onClick={() => setCanvasScale((s) => Math.max(0.2, parseFloat((s - 0.05).toFixed(2))))}
-                className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-rosewood-800 transition-colors"
-                title="Thu nhỏ canvas"
-                aria-label="Thu nhỏ canvas"
-              >
-                <ZoomOut className="w-4 h-4" />
-              </button>
-              <span className="font-mono w-10 text-center text-[11px]" aria-live="polite">{Math.round(canvasScale * 100)}%</span>
-              <button
-                type="button"
-                onClick={() => setCanvasScale((s) => Math.min(1.2, parseFloat((s + 0.05).toFixed(2))))}
-                className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-rosewood-800 transition-colors"
-                title="Phóng to canvas"
-                aria-label="Phóng to canvas"
-              >
-                <ZoomIn className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={fitViewport}
-                className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-rosewood-800 transition-colors"
-                title="Vừa vùng làm việc"
-                aria-label="Vừa vùng làm việc"
-              >
-                <Maximize2 className="w-4 h-4" />
-              </button>
-            </div>
-          </>
+          <CoverEditorToolbar
+            handleAddElement={handleAddElement}
+            performUndo={performUndo}
+            canUndo={canUndo}
+            performRedo={performRedo}
+            canRedo={canRedo}
+            snappingEnabled={snappingEnabled}
+            setSnappingEnabled={setSnappingEnabled}
+            setCanvasScale={setCanvasScale}
+            canvasScale={canvasScale}
+            fitViewport={fitViewport}
+          />
         }
       >
         {/* LEFT COLUMN: Layers Panel */}
@@ -650,139 +547,18 @@ export default function BookCoverEditorPage() {
           </div>
         </main>
 
-        {/* RIGHT COLUMN: Properties Panel */}
-        <aside className="editor-properties bg-[#140B10] border-l border-rosewood-900/40 flex-col justify-between shrink-0 overflow-y-auto">
-          <div className="flex flex-col h-full">
-            {/* Inspector Tab Switcher */}
-            <div className="p-2 bg-[#1C0F16] border-b border-rosewood-900/40 grid grid-cols-3 gap-1 shrink-0 text-[11px]">
-              <button
-                type="button"
-                onClick={() => setInspectorTab('element')}
-                className={`min-h-11 min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-lg font-medium leading-tight transition-all ${
-                  inspectorTab === 'element'
-                    ? 'bg-rosewood-600 text-white font-semibold shadow'
-                    : 'text-stone-400 hover:text-white hover:bg-[#25151F]'
-                }`}
-              >
-                <Sliders className="w-3.5 h-3.5" />
-                <span>Phần tử</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setInspectorTab('interaction')}
-                className={`min-h-11 min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-lg font-medium leading-tight transition-all ${
-                  inspectorTab === 'interaction'
-                    ? 'bg-rosewood-600 text-white font-semibold shadow'
-                    : 'text-stone-400 hover:text-white hover:bg-[#25151F]'
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Tương tác</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setInspectorTab('background')}
-                className={`min-h-11 min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-lg font-medium leading-tight transition-all ${
-                  inspectorTab === 'background'
-                    ? 'bg-rosewood-600 text-white font-semibold shadow'
-                    : 'text-stone-400 hover:text-white hover:bg-[#25151F]'
-                }`}
-              >
-                <Palette className="w-3.5 h-3.5 text-pink-400" />
-                <span>Nền bìa</span>
-              </button>
-            </div>
-
-            {/* Inspector Tab Content */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-5">
-              {inspectorTab === 'background' && (
-                <BackgroundEditor
-                  background={virtualPage.background || { type: 'color', color: '#1A0E15' }}
-                  onChange={(newBg) => {
-                    updateVirtualPage((prev) => {
-                      const nextPage = { ...prev, background: newBg };
-                      return nextPage;
-                    }, 'Cập nhật nền bìa');
-                  }}
-                  disabled={false}
-                />
-              )}
-
-              {inspectorTab === 'interaction' && selectedElement && (
-                <InteractionEditor
-                  element={selectedElement}
-                  pages={[]}
-                  audioTracks={[]}
-                  videoMedia={videoMedia}
-                  onChange={(newInteraction) => {
-                    updateSelectedElement((target) => ({
-                      ...target,
-                      interaction: newInteraction,
-                    }));
-                  }}
-                  isEditingActiveArea={editingActiveArea}
-                  onEditActiveArea={() => setEditingActiveArea(!editingActiveArea)}
-                  disabled={false}
-                />
-              )}
-
-              {inspectorTab === 'element' && selectedElement && (
-                <>
-                  {selectedElement.type === 'TEXT' && (
-                    <AdvancedTextEditor
-                      element={selectedElement}
-                      onChange={(updated) => {
-                        updateSelectedElement(updated);
-                      }}
-                      book={journal}
-                      page={virtualPage}
-                      disabled={false}
-                    />
-                  )}
-
-                  {selectedElement.type === 'IMAGE' && (
-                    <AdvancedImageEditor
-                      element={selectedElement}
-                      onChange={(updated) => {
-                        updateSelectedElement(updated);
-                      }}
-                      disabled={false}
-                    />
-                  )}
-
-                  {selectedElement.type === 'VIDEO' && (
-                    <AdvancedVideoEditor
-                      element={selectedElement}
-                      onChange={(updated) => {
-                        updateSelectedElement(updated);
-                      }}
-                      disabled={false}
-                    />
-                  )}
-
-                  {selectedElement.type === 'SHAPE' && (
-                    <AdvancedShapeEditor
-                      element={selectedElement as any}
-                      onChange={(updated) => {
-                        updateSelectedElement(updated as any);
-                      }}
-                      disabled={false}
-                    />
-                  )}
-                </>
-              )}
-
-              {inspectorTab !== 'background' && !selectedElement && (
-                <div className="py-20 text-center text-xs text-stone-500">
-                  <Sliders className="w-8 h-8 mx-auto mb-2 text-rosewood-800 opacity-50" />
-                  <p>Chọn một phần tử trên bìa để chỉnh sửa thuộc tính.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </aside>
+        <CoverPropertiesColumn
+          virtualPage={virtualPage}
+          journal={journal}
+          videoMedia={videoMedia}
+          inspectorTab={inspectorTab}
+          setInspectorTab={setInspectorTab}
+          selectedElement={selectedElement}
+          updateSelectedElement={updateSelectedElement}
+          updateVirtualPage={updateVirtualPage}
+          editingActiveArea={editingActiveArea}
+          setEditingActiveArea={setEditingActiveArea}
+        />
       </EditorWorkspace>
     </div>
   );
