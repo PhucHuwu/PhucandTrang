@@ -1,61 +1,53 @@
 import * as THREE from "three";
-import { gsap } from "gsap";
-import {
-	lerpRectangles,
-	rotateY,
-	scaleRectangle,
-	sleep,
-	toggleVisibility,
-} from "./util";
+import { scaleRectangle } from "./util";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import Page from "./page";
 import VideoOverlay from "./video-overlay";
-import SlidingNumber, { ValueChangeEvent } from "./sliding-number";
-import SwipeHandler from "./swipe-handler";
+import SlidingNumber from "./sliding-number";
 import IntroOverlay from "./intro-overlay";
-import PageCurveHelper from "./page-curve-helper";
-import { detectInitialTier, EFFECT_SHARE, FrameRateMonitor, MAX_PIXEL_RATIO, QualityTier } from "./quality";
+import { detectInitialTier, EFFECT_SHARE, FrameRateMonitor, QualityTier } from "./quality";
+import {
+	BookDimensions,
+	createDeskMesh,
+	createLights,
+	createPages,
+	createRenderer,
+	createSpineMesh,
+	createWrapperLink,
+	enableRendererShadows,
+	placePages,
+	resolveDimensions,
+} from "./flipbook/scene";
+import { getTargetPixelRatio, getViewportSize, isVerticalLayout, resizeView, watchPixelRatio } from "./flipbook/viewport";
+import { CameraPreset, computeBaseViewRect, computeCameraPos, tweenCamera } from "./flipbook/camera";
+import { applyCameraSettings, applyLightingSettings, createDefaultSettings, SceneHelpers } from "./flipbook/settings";
+import {
+	applySwipeMove,
+	bindTurnState,
+	findActiveAreaAt,
+	getBookOpenFactor,
+	getFlipTarget,
+	TurnState,
+	updateBookRotation,
+	updatePages,
+} from "./flipbook/page-turning";
+import { applyCursor, resolveCursor } from "./flipbook/input";
+import { InputController } from "./flipbook/input-controller";
+import { IntroHost, IntroPhase, playIntro } from "./flipbook/intro";
+import { disposeGraphics, disposeHelpers, killFlipbookTweens } from "./flipbook/disposal";
+import { applyNextFaceTexture, FaceTextureQueue, isFaceOnVisiblePage, prepareOpeningTextures } from "./flipbook/face-textures";
+import { AnimationLoop } from "./flipbook/animation-loop";
 
 export default class Flipbook {
 	private containerEl: HTMLElement;
 	private wrapperLinkEl: HTMLElement;
-	private pageWidth: number;
-	private pageHeight: number;
-	private pageThickness: number;
-	private pageRootThickness: number;
-	private coverThickness: number;
-	private coverMarginX: number;
-	private coverMarginY: number;
+	private dims: BookDimensions;
 	private textureUrls;
 	private pageActiveAreas: PageActiveArea[] = [];
-	private pageEdgeColor: number;
-	public readonly settings: FlipbookSettings = {
-		cameraAngle: (Math.PI / 2) * 0.28,
-		cameraDistance: 1.02,
-		cameraFov: 14,
-
-		spotLightX: 250,
-		spotLightY: 500,
-		spotLightZ: 1500,
-		spotLightColor: 0xffffff,
-		spotLightIntensity: 60,
-		spotLightAngle: 0.7,
-		spotLightPenumbra: 0.6,
-		spotLightDecay: 0.4,
-		spotLightNearClip: 500,
-		spotLightFarClip: 3500,
-		spotLightMapSize: 2048,
-
-		ambientLightColor: 0xffffff,
-		ambientLightIntensity: 0.35,
-
-		showSpotLightHelper: false,
-		showSpotShadowHelper: false,
-		showPageCurveHelpers: false,
-	};
+	public readonly settings: FlipbookSettings = createDefaultSettings();
 
 	private pages: Page[] = [];
-	private pageHelpers: PageCurveHelper[] = [];
+	private helpers: SceneHelpers = { spotLightHelper: null, spotShadowHelper: null, pageHelpers: [] };
 	private group: THREE.Group;
 	private scene: THREE.Scene;
 	private camera: THREE.PerspectiveCamera;
@@ -71,11 +63,7 @@ export default class Flipbook {
 	private spineZ: number;
 
 	private controls?: OrbitControls;
-	// private stats: any;
-	// private datGui: any;
 
-	private spotLightHelper: THREE.SpotLightHelper | null = null;
-	private spotShadowHelper: THREE.CameraHelper | null = null;
 	private textureLoader: THREE.TextureLoader;
 	private initCompleted: boolean = false;
 	private videoOverlay: VideoOverlay;
@@ -87,7 +75,7 @@ export default class Flipbook {
 	private CAMERA_SIDE_GRAVITY = 4;
 	private cameraSideShift = new SlidingNumber(1, 0.2);
 	private isVerticalMode = false;
-	private swipeHandler: SwipeHandler;
+	private input: InputController;
 	private atmosphericSystem?: any;
 	public get atmospheric() { return this.atmosphericSystem; }
 	public set atmospheric(system: any) {
@@ -101,19 +89,12 @@ export default class Flipbook {
 	// if this code is running, means the scripts are already loaded
 	private scriptProgressWeight = 0.4;
 
-	private introPhase: "LOADING" | "ANIMATING" | "COMPLETED" = "LOADING";
+	private introPhase: IntroPhase = "LOADING";
 
 	constructor(params: FlipBookParams) {
 		this.containerEl = params.containerEl;
-		this.pageWidth = params.pageWidth;
-		this.pageHeight = params.pageHeight;
-		this.pageThickness = params.pageThickness || 2;
-		this.pageRootThickness = params.pageRootThickness || 4;
-		this.coverThickness = params.coverThickness || 5;
-		this.coverMarginX = params.coverMarginX || 8;
-		this.coverMarginY = params.coverMarginY || 8;
+		this.dims = resolveDimensions(params);
 		this.textureUrls = params.textureUrls;
-		this.pageEdgeColor = params.pageEdgeColor;
 		this.pageActiveAreas = params.pageActiveAreas || [];
 
 		// Video elements are created lazily by VideoOverlay.open() so nothing downloads up front
@@ -155,167 +136,38 @@ export default class Flipbook {
 			9000,
 		);
 
-		this.renderer = new THREE.WebGLRenderer();
-		// this.renderer = new THREE.WebGLRenderer({ antialias: true });
-		this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-		// this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-		// this.renderer.toneMappingExposure = 1.2;
-		// Phones report DPR 3+; rendering the scene (and its soft shadows) at that density is too heavy
-		this.renderer.setPixelRatio(this.getTargetPixelRatio(this.quality.tier));
-		this.renderer.setSize(viewport.width, viewport.height);
+		this.renderer = createRenderer(getTargetPixelRatio(this.quality.tier), viewport);
 		this.lastViewport = { ...viewport, pixelRatio: this.renderer.getPixelRatio() };
-		this.renderer.shadowMap.enabled = true;
-		this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-		this.renderer.domElement.classList.add("flipbook-canvas");
-		this.wrapperLinkEl = document.createElement("a");
-		this.wrapperLinkEl.draggable = false;
-		this.wrapperLinkEl.classList.add("wrapper-link");
-		this.wrapperLinkEl.setAttribute("target", "_blank");
-		this.wrapperLinkEl.setAttribute("rel", "noopener noreferrer");
-		this.containerEl.appendChild(this.wrapperLinkEl);
-		this.wrapperLinkEl.appendChild(this.renderer.domElement);
+		enableRendererShadows(this.renderer);
+		this.wrapperLinkEl = createWrapperLink(this.containerEl, this.renderer.domElement);
 
 		this.textureLoader = new THREE.TextureLoader(this.loadingManager);
 
 		this.raycaster = new THREE.Raycaster();
 		this.sceneMousePos = new THREE.Vector2();
 
+		const dims = this.dims;
+
 		// add pages
-		const totalPages = Math.ceil(this.textureUrls.pages.length / 2);
-		for (let i = 0; i < totalPages; i++) {
-			const isCover = i === 0 || i === totalPages - 1;
-			const width = isCover
-				? this.pageWidth + this.coverMarginX + this.coverThickness
-				: this.pageWidth;
-			const height = isCover
-				? this.pageHeight + this.coverMarginY * 2
-				: this.pageHeight;
+		this.pages.push(...createPages(dims, this.textureUrls, this.textureLoader));
 
-			const edgeTextures: Record<string, string> = {};
-			if (isCover) {
-				if (this.textureUrls.coverEdgeLR) edgeTextures.edgeLR = this.textureUrls.coverEdgeLR;
-				if (this.textureUrls.coverEdgeTB) edgeTextures.edgeTB = this.textureUrls.coverEdgeTB;
-			}
-
-			const page = new Page({
-				textureUrls: {
-					front: this.textureUrls.pages[i * 2],
-					back: this.textureUrls.pages[i * 2 + 1],
-					...edgeTextures,
-				},
-				width,
-				height,
-				thickness: isCover ? this.coverThickness : this.pageThickness,
-				rootThickness: isCover
-					? this.coverThickness
-					: this.pageRootThickness,
-				isCover,
-				isFrontCover: i === 0,
-				edgeColor: this.pageEdgeColor,
-				textureLoader: this.textureLoader,
-			});
-			this.pages.push(page);
-		}
-
-		this.ambientLight = new THREE.AmbientLight();
-		this.scene.add(this.ambientLight);
-
-		this.spotLight = new THREE.SpotLight();
-		this.spotLight.castShadow = true;
-		this.spotLight.shadow.bias = -0.0001;
-		this.scene.add(this.spotLight);
-
-		// this.controls = new OrbitControls(
-		// 	this.camera,
-		// 	this.renderer.domElement,
-		// );
+		({ ambientLight: this.ambientLight, spotLight: this.spotLight } = createLights(this.scene));
 
 		this.group = new THREE.Group();
 		this.scene.add(this.group);
 
 		// init spine
-		this.spineWidth = (this.pages.length - 2) * this.pageRootThickness;
-		this.spineZ = this.coverThickness / 2;
+		this.spineWidth = (this.pages.length - 2) * this.dims.pageRootThickness;
+		this.spineZ = this.dims.coverThickness / 2;
 
 		// init spine mesh
-		const _texture = (url?: string) => {
-			if (!url) {
-				return { color: new THREE.Color(0xF7D6DE) };
-			}
-			const texture = this.textureLoader.load(url);
-			texture.colorSpace = THREE.SRGBColorSpace;
-			return { map: texture };
-		};
-
-		const textures = {
-			spineInner: _texture(this.textureUrls.spineInner),
-			spineOuter: _texture(this.textureUrls.spineOuter),
-			spineEdgeLR: _texture(this.textureUrls.spineEdgeLR),
-			spineEdgeTB: _texture(this.textureUrls.spineEdgeTB),
-		};
-		const spineMaterials = [
-			new THREE.MeshStandardMaterial(textures.spineEdgeLR), // right face
-			new THREE.MeshStandardMaterial(textures.spineEdgeLR), // left face
-			new THREE.MeshStandardMaterial(textures.spineEdgeTB), // top face
-			new THREE.MeshStandardMaterial(textures.spineEdgeTB), // bottom face
-			new THREE.MeshStandardMaterial(textures.spineInner), // front face
-			new THREE.MeshStandardMaterial(textures.spineOuter), // back face
-		];
-		const spineGeometry = new THREE.BoxGeometry(
-			this.spineWidth,
-			this.pageHeight + this.coverMarginY * 2,
-			this.coverThickness,
-		);
-		this.spineMesh = new THREE.Mesh(spineGeometry, spineMaterials);
-		this.spineMesh.receiveShadow = true;
-		this.spineMesh.castShadow = true;
-		this.spineMesh.position.z = this.spineZ;
-		this.spineMesh.renderOrder = 99;
+		this.spineMesh = createSpineMesh(dims, this.spineWidth, this.spineZ, this.textureUrls, this.textureLoader);
 		this.group.add(this.spineMesh);
 
 		// init pages
-		let spinePlacementStart = -this.spineWidth / 2;
-		let spinePlacementShift = 0;
-		this.pages.forEach((page, index) => {
-			this.group.add(page.pivot);
+		placePages(this.pages, this.group, dims, this.spineWidth, this.spineZ);
 
-			if (page.isCover) {
-				page.pivot.position.z = this.coverThickness;
-				page.pivot.position.x =
-					(this.spineWidth / 2) * (index ? 1 : -1);
-			} else {
-				const elevationLeft =
-					spinePlacementShift + page.rootThickness / 2;
-				const elevationRight = this.spineWidth - elevationLeft;
-				const elevationMultiplier = 0.7;
-				page.setElevation(
-					elevationLeft * elevationMultiplier,
-					elevationRight * elevationMultiplier,
-				);
-
-				page.pivot.position.z = this.spineZ + this.coverThickness / 2;
-				page.pivot.position.x =
-					spinePlacementStart +
-					spinePlacementShift +
-					page.rootThickness / 2;
-				spinePlacementShift += page.rootThickness;
-			}
-		});
-
-		const deskGeometry = new THREE.PlaneGeometry(5216, 1956, 1, 1);
-		const deskMaterial = this.textureUrls.desk
-			? new THREE.MeshStandardMaterial({
-					map: (() => {
-						const t = this.textureLoader.load(this.textureUrls.desk);
-						t.colorSpace = THREE.SRGBColorSpace;
-						return t;
-					})(),
-			  })
-			: new THREE.MeshStandardMaterial({ color: 0x1F1218, roughness: 0.92 });
-		const deskMesh = new THREE.Mesh(deskGeometry, deskMaterial);
-		deskMesh.receiveShadow = true;
-		deskMesh.castShadow = true;
-		deskMesh.renderOrder = 100;
+		const deskMesh = createDeskMesh(this.textureUrls.desk, this.textureLoader);
 		this.scene.add(deskMesh);
 		this.deskMesh = deskMesh;
 
@@ -332,129 +184,50 @@ export default class Flipbook {
 		this.watchPixelRatio();
 
 		// process interactive areas
-		this.renderer.domElement.addEventListener("mousemove", this.mouseMoveHandler);
-
-		this.swipeHandler = new SwipeHandler(this.renderer.domElement);
-		this.swipeHandler.addCallback("swipeStart", () => {
-			if (this.focusedActiveArea || this.isChangingFocus) return;
-			// continuing dropped turn or shift
-			// TODO: refactor; make it more comprehendable
-			this.isTurning() && this.progress.lock();
-			!this.cameraSideShift.isSettled() && this.cameraSideShift.lock();
-		});
-		this.swipeHandler.addCallback("swipeEnd", () => {
-			this.progress.release();
-			this.cameraSideShift.release();
-		});
-		this.swipeHandler.addCallback("swipeMove", (swipe: Swipe) => {
-			if (this.focusedActiveArea || this.isChangingFocus) return;
-			this.onSwipeMove(swipe);
-		});
-
-		document.addEventListener("keydown", this.keydownHandler);
-
-		/*
-		document.addEventListener("keydown", (event: KeyboardEvent) => {
-			if (event.key === "Escape" || event.code === "Escape") {
-				if (this.introPhase === "COMPLETED") {
-					this.unfocusActiveArea();
-				}
-			} else if (event.key === "d" || event.code === "KeyD") {
-				if (this.datGui?.domElement) toggleVisibility(this.datGui.domElement);
-			} else if (event.key === "f" || event.code === "KeyF") {
-				if (this.stats?.dom) toggleVisibility(this.stats.dom);
-			}
-		});
-		*/
-
-		this.renderer.domElement.addEventListener("click", this.clickHandler);
-
-		this.wrapperLinkEl.addEventListener("dblclick", this.dblClickHandler);
-
-		this.cameraSideShift.setMin(-1); // look at the left page
-		this.cameraSideShift.setMax(1); // look at the right page
-
-		this.progress.setMin(-Infinity);
-		this.progress.setMax(Infinity);
-
-		this.progress.addCallback("settled", () => {
-			this.progress.setMin(-Infinity);
-			this.progress.setMax(Infinity);
+		this.input = new InputController({
+			containerEl: this.containerEl,
+			wrapperLinkEl: this.wrapperLinkEl,
+			canvas: this.renderer.domElement,
+			sceneMousePos: this.sceneMousePos,
+			progress: this.progress,
+			cameraSideShift: this.cameraSideShift,
+			isDisposed: () => this.disposed,
+			isIntroCompleted: () => this.introPhase === "COMPLETED",
+			hasFocusedArea: () => Boolean(this.focusedActiveArea),
+			isChangingFocus: () => this.isChangingFocus,
+			isTurning: () => this.isTurning(),
+			updateCursor: () => this.updateCursor(),
+			onBookClick: pos => { this.onBookClick(pos); },
+			onSwipeMove: swipe => applySwipeMove(this.turnState, swipe),
+			unfocusActiveArea: () => { this.unfocusActiveArea(); },
+			flipNext: () => { this.flipNext(); },
+			flipPrev: () => { this.flipPrev(); },
 		});
 
-		// update cameraSideShift
-		this.progress.addCallback(
-			"valueChange",
-			({ newValue: progress }: ValueChangeEvent) => {
-				if (this.isVerticalMode) {
-					if (this.isTurning()) {
-						const tp = progress - (this.getTurningPage() || 0);
-						this.cameraSideShift.setValue((1 - tp) * 2 - 1);
-					} else {
-						this.cameraSideShift.setValue(
-							Math.round(this.cameraSideShift.getValue()),
-						);
-					}
-				} else {
-					const bookOpenFactor = Math.min(
-						progress,
-						this.pages.length - progress,
-						1,
-					);
+		bindTurnState(this.turnState);
+	}
 
-					this.cameraSideShift.setValue(1 - bookOpenFactor);
-					if (progress + 1 > this.pages.length) {
-						this.cameraSideShift.setValue(
-							-this.cameraSideShift.getValue(),
-						);
-					}
-				}
-			},
-		);
+	private get turnState(): TurnState {
+		return {
+			progress: this.progress,
+			cameraSideShift: this.cameraSideShift,
+			pageCount: this.pages.length,
+			isVerticalMode: () => this.isVerticalMode,
+			isTurning: () => this.isTurning(),
+			isShifting: () => this.isShifting(),
+			getTurningPage: () => this.getTurningPage(),
+		};
 	}
 
 	private updateCursor() {
-		let cursor = "grab";
-		let href = "";
-		let title = "";
-
-		if (this.isChangingFocus) {
-			cursor = "default";
-		} else if (this.focusedActiveArea) {
-			if (!this.focusedActiveArea.preserveDefaultCursor) {
-				cursor = "pointer";
-			}
-		} else if (
-			(this.isTurning() || this.isShifting()) &&
-			this.swipeHandler.isPointerDown()
-		) {
-			cursor = "ew-resize";
-		} else {
-			const activeArea = this.getActiveAreaAt(this.sceneMousePos);
-
-			if (activeArea) {
-				if (!activeArea.preserveDefaultCursor) {
-					cursor = "pointer";
-				}
-				title = activeArea.title || "";
-
-				if (typeof activeArea.link === "function") {
-					href = activeArea.link();
-				} else {
-					href = activeArea.link || "";
-				}
-			}
-		}
-
-		// applying cursor, href and title
-		this.wrapperLinkEl.style.cursor = cursor;
-		this.wrapperLinkEl.title = title;
-		// setAttribute bypasses React's javascript: URL protection, so only allow web links
-		if (href && /^https?:\/\//i.test(href)) {
-			this.wrapperLinkEl.setAttribute("href", href);
-		} else {
-			this.wrapperLinkEl.removeAttribute("href");
-		}
+		applyCursor(this.wrapperLinkEl, resolveCursor({
+			isChangingFocus: this.isChangingFocus,
+			focusedActiveArea: this.focusedActiveArea,
+			isDragging: () =>
+				(this.isTurning() || this.isShifting()) &&
+				this.input.swipeHandler.isPointerDown(),
+			getHoveredArea: () => this.getActiveAreaAt(this.sceneMousePos),
+		}));
 	}
 
 	private getTurningPage(): number | null {
@@ -470,32 +243,8 @@ export default class Flipbook {
 		return !this.cameraSideShift.isSettled() && !this.isTurning();
 	}
 
-	private swipeDeltaToProgress(delta: number) {
-		return delta / -500; // TODO:
-	}
-
 	private runAnimation() {
-		if (this.disposed || this.animationFrame) return;
-		let previousTime = performance.now();
-
-		const animate = ((currentTime: number) => {
-			if (this.disposed) return;
-			let dt = Math.min((currentTime - previousTime) / 1000, 0.05);
-			previousTime = currentTime;
-			if (document.hidden) {
-				this.quality.reset();
-				this.animationFrame = requestAnimationFrame(animate);
-				return;
-			}
-			// this.stats?.begin?.();
-			this.update(dt);
-			// this.stats?.end?.();
-			this.controls?.update?.();
-
-			this.animationFrame = requestAnimationFrame(animate);
-		}).bind(this);
-
-		animate(performance.now());
+		this.loop.start();
 	}
 
 	private disposed = false;
@@ -511,121 +260,41 @@ export default class Flipbook {
 		this.watchPixelRatio();
 		this.onWindowResize();
 	};
-	private setPointerFromEvent(event: MouseEvent) {
-		const rect = this.renderer.domElement.getBoundingClientRect();
-		const width = rect.width || 1;
-		const height = rect.height || 1;
-		this.sceneMousePos.x = ((event.clientX - rect.left) / width) * 2 - 1;
-		this.sceneMousePos.y = -((event.clientY - rect.top) / height) * 2 + 1;
-	}
-	private mouseMoveHandler = (event: MouseEvent) => {
-		if (this.disposed) return;
-		this.setPointerFromEvent(event);
-		this.updateCursor();
-	};
-	private clickHandler = (event: MouseEvent) => {
-		if (this.disposed) return;
-		this.setPointerFromEvent(event);
-		this.onBookClick(this.sceneMousePos);
-	};
-	private dblClickHandler = () => {
-		if (this.disposed) return;
-		if (!document.fullscreenElement) {
-			if (this.containerEl.requestFullscreen) {
-				this.containerEl.requestFullscreen().catch(err => {
-					console.error(
-						"Failed to enter a full-screen mode",
-						err,
-					);
-				});
-			} else {
-				console.error(
-					"Fullscreen API is not supported in this browser.",
-				);
-			}
-		} else {
-			if (document.exitFullscreen) {
-				document.exitFullscreen().catch(err => {
-					console.error("Failed to exit a full-screen mode", err);
-				});
-			}
-		}
-	};
-	private keydownHandler = (event: KeyboardEvent) => {
-		if (this.disposed || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
-		const target = event.target as HTMLElement | null;
-		if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(target.tagName))) return;
-		if (this.introPhase !== "COMPLETED") return;
-
-		if (event.key === "Escape") {
-			if (this.focusedActiveArea) {
-				event.preventDefault();
-				this.unfocusActiveArea();
-			}
-		} else if (event.key === "ArrowRight" || event.key === "PageDown") {
-			event.preventDefault();
-			this.flipNext();
-		} else if (event.key === "ArrowLeft" || event.key === "PageUp") {
-			event.preventDefault();
-			this.flipPrev();
-		}
-	};
-	private animationFrame = 0;
+	private loop = new AnimationLoop({
+		isDisposed: () => this.disposed,
+		onHiddenFrame: () => this.quality.reset(),
+		onFrame: dt => {
+			this.update(dt);
+			this.controls?.update?.();
+		},
+	});
 	private loadingManager = new THREE.LoadingManager();
 	public get isReady() { return this.introPhase === "COMPLETED" && this.initCompleted; }
 	public destroy() {
 		if (this.disposed) return;
 		this.disposed = true;
-		for (const pending of this.pendingFaceTextures.values()) pending.texture?.dispose();
-		this.pendingFaceTextures.clear();
+		this.pendingFaceTextures.disposeAll();
 		this.resizeObserver?.disconnect();
 		this.resizeObserver = undefined;
 		window.removeEventListener("resize", this.resizeHandler);
 		this.pixelRatioQuery?.removeEventListener("change", this.pixelRatioHandler);
 		this.pixelRatioQuery = undefined;
-		document.removeEventListener("keydown", this.keydownHandler);
-		this.renderer.domElement.removeEventListener("mousemove", this.mouseMoveHandler);
-		this.renderer.domElement.removeEventListener("click", this.clickHandler);
-		this.wrapperLinkEl.removeEventListener("dblclick", this.dblClickHandler);
-		this.swipeHandler?.destroy();
-		cancelAnimationFrame(this.animationFrame);
-		this.animationFrame = 0;
+		this.input?.detach();
+		this.loop.stop();
 		this.progress.destroy();
 		this.cameraSideShift.destroy();
 		this.videoOverlay.destroy();
-		gsap.killTweensOf(this.camera.position);
-		gsap.killTweensOf(this.camera.quaternion);
-		gsap.killTweensOf(this.settings);
-		gsap.killTweensOf(this.spotLight);
-		gsap.killTweensOf(this.ambientLight);
-		this.tweenTargets.forEach(target => gsap.killTweensOf(target));
-		this.tweenTargets.clear();
+		killFlipbookTweens({
+			camera: this.camera,
+			settings: this.settings,
+			spotLight: this.spotLight,
+			ambientLight: this.ambientLight,
+			tweenTargets: this.tweenTargets,
+		});
 		this.atmosphericSystem?.destroy?.();
 		this.atmosphericSystem = undefined;
-		this.pageHelpers.forEach(helper => helper.destroy());
-		this.pageHelpers = [];
-		this.spotLightHelper?.dispose();
-		this.spotShadowHelper?.dispose();
-		const geometries = new Set<THREE.BufferGeometry>();
-		const materials = new Set<THREE.Material>();
-		const textures = new Set<THREE.Texture>();
-		this.scene.traverse(object => {
-			const mesh = object as THREE.Mesh;
-			if (mesh.geometry) geometries.add(mesh.geometry);
-			if (mesh.material) for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-				materials.add(material);
-				for (const value of Object.values(material)) if (value instanceof THREE.Texture) textures.add(value);
-			}
-		});
-		textures.forEach(texture => texture.dispose());
-		materials.forEach(material => material.dispose());
-		geometries.forEach(geometry => geometry.dispose());
-		this.spotLight.shadow.map?.dispose();
-		this.spotLight.shadow.map = null;
-		this.spotLight.dispose();
-		this.renderer.dispose();
-		// Release the GL context now instead of waiting for GC; browsers cap live contexts per page.
-		this.renderer.forceContextLoss();
+		disposeHelpers(this.helpers);
+		disposeGraphics(this.scene, this.spotLight, this.renderer);
 		this.wrapperLinkEl.remove();
 	}
 
@@ -636,95 +305,25 @@ export default class Flipbook {
 	}
 
 	private getViewportSize() {
-		const width = this.containerEl.clientWidth || window.innerWidth || 1;
-		const height = this.containerEl.clientHeight || window.innerHeight || 1;
-		return { width, height };
+		return getViewportSize(this.containerEl);
 	}
 
-	private getTargetPixelRatio(tier: QualityTier) {
-		return Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO[tier]);
-	}
-
-	// matchMedia only reports the DPR it was created for, so re-arm it after every change
 	private watchPixelRatio() {
-		this.pixelRatioQuery?.removeEventListener("change", this.pixelRatioHandler);
-		this.pixelRatioQuery = undefined;
-		if (typeof window.matchMedia !== "function") return;
-		const query = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
-		query.addEventListener?.("change", this.pixelRatioHandler);
-		this.pixelRatioQuery = query;
+		this.pixelRatioQuery = watchPixelRatio(this.pixelRatioQuery, this.pixelRatioHandler);
 	}
 
 	/** Whether the face is on one of the pages that can currently be seen (top pages and the one turning). */
 	public isFaceVisible(faceIndex: number): boolean {
-		const pageIndex = Math.floor(faceIndex / 2);
-		const progress = this.progress.getValue();
-		return pageIndex >= Math.floor(progress) - 1 && pageIndex <= Math.ceil(progress);
+		return isFaceOnVisiblePage(faceIndex, this.progress.getValue());
 	}
 
 	/** Drops a face back to a lightweight placeholder so its generated texture can be freed. */
 	public releaseFaceTexture(faceIndex: number, placeholderUrl: string) {
 		if (this.disposed) return;
-		const pending = this.pendingFaceTextures.get(faceIndex);
-		if (pending) {
-			this.pendingFaceTextures.delete(faceIndex);
-		}
+		this.pendingFaceTextures.delete(faceIndex);
 		const page = this.pages[Math.floor(faceIndex / 2)];
 		if (!page) return;
 		page.setSideTexture(faceIndex % 2 === 0 ? "front" : "back", placeholderUrl);
-	}
-
-	private onSwipeMove(swipe: Swipe) {
-		const deltaX = swipe.x - swipe.prevX;
-		if (!deltaX) return;
-		const progressDelta = this.swipeDeltaToProgress(deltaX);
-
-		if (!this.cameraSideShift.locked && !this.progress.locked) {
-			// start either a shift or a turn
-			if (
-				this.isVerticalMode &&
-				!this.isTurning() &&
-				(this.isShifting() ||
-					(this.cameraSideShift.getValue() === -1 &&
-						progressDelta > 0 &&
-						this.progress.getValue() < this.pages.length) ||
-					(this.cameraSideShift.getValue() === 1 &&
-						progressDelta < 0 &&
-						this.progress.getValue() > 0))
-			) {
-				// starting a shift
-				this.cameraSideShift.lock();
-			} else {
-				// starting a turn
-				this.progress.lock();
-				this.cameraSideShift.lock();
-
-				if (progressDelta > 0) {
-					this.progress.setMin(this.progress.getValue());
-					this.progress.setMax(this.progress.getValue() + 1);
-				} else {
-					this.progress.setMin(this.progress.getValue() - 1);
-					this.progress.setMax(this.progress.getValue());
-				}
-
-				// handling book beginning and ending
-				if (this.progress.minValue < 0) {
-					this.progress.setMin(0);
-					this.progress.setMax(1);
-				} else if (this.progress.maxValue > this.pages.length) {
-					this.progress.setMin(this.pages.length - 1);
-					this.progress.setMax(this.pages.length);
-				}
-			}
-		}
-
-		if (this.isTurning()) {
-			this.progress.nudge(progressDelta);
-		}
-
-		if (this.isShifting()) {
-			this.cameraSideShift.nudge(progressDelta * 2);
-		}
 	}
 
 	private update(dt: number) {
@@ -741,78 +340,10 @@ export default class Flipbook {
 			this.camera.quaternion.copy(target.rotation);
 		}
 
-		// TODO:
-		// calculating visual turn progress to timely hide shadows
-		// const topPage =
-		// 	this.pages[Math.max(Math.ceil(this.progress.getValue()) - 1, 0)];
-		// const visualProgress =
-		// 	this.progress.getValue() +
-		// 	(topPage.turnProgress - topPage.turnProgressLag) * 0.5;
-
-		const bookOpenFactor = Math.min(
-			this.progress.getValue(),
-			this.pages.length - this.progress.getValue(),
-			1,
-		);
-
-		this.pages.forEach((page, index) => {
-			// TODO:
-			// toggle shadow
-			// if (index && index < this.pages.length - 1) {
-			// 	page.mesh.castShadow = visualProgress < index + 1.9;
-			// }
-
-			let tp;
-			if (index >= this.progress.getValue()) {
-				tp = bookOpenFactor;
-			} else if (index < Math.floor(this.progress.getValue())) {
-				tp = -bookOpenFactor;
-			} else {
-				if (page.isCover) {
-					tp = index ? bookOpenFactor : -bookOpenFactor;
-				} else {
-					tp = (this.progress.getValue() % 1) * -2 + 1;
-				}
-			}
-
-			page.setTurnProgress(tp);
-
-			page.bendingEnabled =
-				this.progress.getValue() >= 1 &&
-				this.progress.getValue() <= this.pages.length - 1;
-
-			page.mesh.renderOrder = Math.abs(
-				this.progress.getValue() - 0.5 - index,
-			);
-
-			if (page.needsUpdate()) {
-				page.update(dt);
-				this.pageHelpers[index]?.update();
-			}
-		});
+		updatePages(this.pages, this.helpers.pageHelpers, this.progress, dt);
 
 		// handle book rotation
-		let bookAngle = 0;
-		if (this.progress.getValue() < 1) {
-			bookAngle = 1 - this.progress.getValue();
-		} else if (this.progress.getValue() > this.pages.length - 1) {
-			bookAngle = this.pages.length - 1 - this.progress.getValue();
-		}
-		bookAngle *= Math.PI / 2;
-		this.group.rotation.y = bookAngle;
-
-		// handle book rotation shift
-		const pivot = new THREE.Vector3(
-			this.spineWidth / 2,
-			0,
-			this.coverThickness,
-		);
-		if (bookAngle < 0) {
-			pivot.x = -pivot.x;
-		}
-		const newPoint = rotateY(new THREE.Vector3(0, 0, 0), pivot, -bookAngle);
-		this.group.position.x = newPoint.x;
-		this.group.position.z = newPoint.z;
+		updateBookRotation(this.group, this.progress.getValue(), this.pages.length, this.spineWidth, this.dims.coverThickness);
 
 		if (this.atmospheric) {
 			this.atmospheric.update(performance.now() / 1000, this.sceneMousePos);
@@ -829,7 +360,7 @@ export default class Flipbook {
 	private applyQuality(tier: QualityTier) {
 		if (this.disposed) return;
 		const viewport = this.getViewportSize();
-		this.renderer.setPixelRatio(this.getTargetPixelRatio(tier));
+		this.renderer.setPixelRatio(getTargetPixelRatio(tier));
 		this.renderer.setSize(viewport.width, viewport.height);
 		this.lastViewport = { ...viewport, pixelRatio: this.renderer.getPixelRatio() };
 		this.atmosphericSystem?.setQuality?.(EFFECT_SHARE[tier]);
@@ -842,11 +373,7 @@ export default class Flipbook {
 	}
 
 	private updateVerticalMode() {
-		const bookAspect = (this.pageWidth * 2) / this.pageHeight;
-		const viewport = this.getViewportSize();
-		const screenAspect = viewport.width / viewport.height;
-		// TODO: tweak the breakpoint
-		this.isVerticalMode = bookAspect > screenAspect;
+		this.isVerticalMode = isVerticalLayout(this.dims.pageWidth, this.dims.pageHeight, this.getViewportSize());
 		if (this.isVerticalMode) {
 			this.cameraSideShift.gravity = this.CAMERA_SIDE_GRAVITY;
 		} else {
@@ -857,16 +384,13 @@ export default class Flipbook {
 	private onWindowResize() {
 		if (this.disposed) return;
 		const viewport = this.getViewportSize();
-		const pixelRatio = this.getTargetPixelRatio(this.quality.tier);
+		const pixelRatio = getTargetPixelRatio(this.quality.tier);
 		const last = this.lastViewport;
 		// ResizeObserver also reports the initial size on observe(); nothing to do then
 		if (last.width === viewport.width && last.height === viewport.height && last.pixelRatio === pixelRatio) return;
 		this.lastViewport = { ...viewport, pixelRatio };
 		this.updateVerticalMode();
-		this.camera.aspect = viewport.width / viewport.height;
-		this.camera.updateProjectionMatrix();
-		if (this.renderer.getPixelRatio() !== pixelRatio) this.renderer.setPixelRatio(pixelRatio);
-		this.renderer.setSize(viewport.width, viewport.height);
+		resizeView(this.camera, this.renderer, viewport, pixelRatio);
 		this.render();
 	}
 
@@ -879,119 +403,19 @@ export default class Flipbook {
 			newSettings = this.settings; // ensure all updates are triggered
 		}
 
-		if (
-			newSettings.cameraDistance ||
-			newSettings.cameraAngle ||
-			newSettings.cameraFov
-		) {
-			this.restoreCamera();
-		}
+		applyCameraSettings(this.camera, this.settings, newSettings, () => { this.restoreCamera(); });
 
-		if (newSettings.cameraFov) {
-			this.camera.fov = this.settings.cameraFov;
-			this.camera.updateProjectionMatrix();
-			this.restoreCamera();
-		}
-
-		if (
-			newSettings.spotLightX ||
-			newSettings.spotLightY ||
-			newSettings.spotLightZ
-		) {
-			this.spotLight.position.set(
-				this.settings.spotLightX,
-				this.settings.spotLightY,
-				this.settings.spotLightZ,
-			);
-			this.spotLight.lookAt(new THREE.Vector3());
-
-			this.spotLightHelper?.update();
-			this.spotShadowHelper?.update();
-		}
-
-		if (newSettings.spotLightColor) {
-			this.spotLight.color = new THREE.Color(
-				this.settings.spotLightColor,
-			);
-		}
-
-		if (newSettings.spotLightIntensity) {
-			this.spotLight.intensity = this.settings.spotLightIntensity;
-		}
-
-		if (newSettings.spotLightAngle) {
-			this.spotLight.angle = this.settings.spotLightAngle;
-		}
-
-		if (newSettings.spotLightPenumbra) {
-			this.spotLight.penumbra = this.settings.spotLightPenumbra;
-		}
-
-		if (newSettings.spotLightDecay) {
-			this.spotLight.decay = this.settings.spotLightDecay;
-		}
-
-		if (newSettings.spotLightNearClip || newSettings.spotLightFarClip) {
-			this.spotLight.shadow.camera.near = this.settings.spotLightNearClip;
-			this.spotLight.shadow.camera.far = this.settings.spotLightFarClip;
-			this.spotLight.shadow.camera.updateProjectionMatrix();
-		}
-
-		if (newSettings.spotLightMapSize) {
-			this.spotLight.shadow.mapSize.x = this.settings.spotLightMapSize;
-			this.spotLight.shadow.mapSize.y = this.settings.spotLightMapSize;
-			this.spotLight.shadow.map?.dispose?.();
-			this.spotLight.shadow.map = null;
-			this.spotLight.shadow.needsUpdate = true;
-		}
-
-		if (newSettings.ambientLightColor) {
-			this.ambientLight.color = new THREE.Color(
-				this.settings.ambientLightColor,
-			);
-		}
-
-		if (newSettings.ambientLightIntensity) {
-			this.ambientLight.intensity = this.settings.ambientLightIntensity;
-		}
-
-		if (typeof newSettings.showSpotLightHelper !== "undefined") {
-			if (this.spotLightHelper && !newSettings.showSpotLightHelper) {
-				this.scene.remove(this.spotLightHelper);
-				this.spotLightHelper = null;
-			}
-			if (!this.spotLightHelper && newSettings.showSpotLightHelper) {
-				this.spotLightHelper = new THREE.SpotLightHelper(
-					this.spotLight,
-				);
-				this.scene.add(this.spotLightHelper);
-			}
-		}
-
-		if (typeof newSettings.showSpotShadowHelper !== "undefined") {
-			if (this.spotShadowHelper && !newSettings.showSpotShadowHelper) {
-				this.scene.remove(this.spotShadowHelper);
-				this.spotShadowHelper = null;
-			}
-			if (!this.spotShadowHelper && newSettings.showSpotShadowHelper) {
-				this.spotShadowHelper = new THREE.CameraHelper(
-					this.spotLight.shadow.camera,
-				);
-				this.scene.add(this.spotShadowHelper);
-			}
-		}
-
-		if (typeof newSettings.showPageCurveHelpers !== "undefined") {
-			if (!newSettings.showPageCurveHelpers) {
-				this.pageHelpers.forEach(helper => helper.destroy());
-				this.pageHelpers = [];
-			}
-			if (!this.spotShadowHelper && newSettings.showPageCurveHelpers) {
-				this.pageHelpers = this.pages.map(
-					page => new PageCurveHelper(page),
-				);
-			}
-		}
+		applyLightingSettings(
+			{
+				scene: this.scene,
+				spotLight: this.spotLight,
+				ambientLight: this.ambientLight,
+				pages: this.pages,
+				helpers: this.helpers,
+			},
+			this.settings,
+			newSettings,
+		);
 	}
 
 	public getActiveAreaAt(scenePos: THREE.Vector2) {
@@ -999,72 +423,20 @@ export default class Flipbook {
 		if (this.isTurning()) return;
 		if (this.isShifting()) return;
 
-		// determine a top pages
-		const pr = Math.round(this.progress.getValue());
-		const topPageIndices = [];
-		if (pr !== 0) topPageIndices.push(pr - 1);
-		if (pr !== this.pages.length) topPageIndices.push(pr);
-
-		// run raycast
-		this.raycaster.setFromCamera(scenePos, this.camera);
-		const intersects = this.raycaster.intersectObjects(
-			topPageIndices.map(i => this.pages[i].mesh),
-		);
-		if (!intersects.length) return;
-
-		// check if ray hits one of the top pages
-		const hoverPageIndex = topPageIndices.find(
-			i => this.pages[i].mesh === intersects[0].object,
-		);
-		if (typeof hoverPageIndex !== "number") return;
-
-		// prevent clicking bending pages
-		const hoverPage = this.pages[hoverPageIndex];
-		const hoverPageBend = Math.abs(
-			hoverPage.turnProgress - hoverPage.turnProgressLag,
-		);
-		if (hoverPageBend > 0.01) return;
-
-		// get face index
-		let hoverFaceIndex;
-		if (intersects[0].face?.materialIndex === 1) {
-			hoverFaceIndex = hoverPageIndex * 2;
-		} else if (intersects[0].face?.materialIndex === 0) {
-			hoverFaceIndex = hoverPageIndex * 2 + 1;
-		} else {
-			return;
-		}
-
-		// find active area with given coords
-		const faceX = intersects[0].uv?.x || 0;
-		const faceY = 1 - (intersects[0].uv?.y || 0);
-
-		return this.pageActiveAreas.find(
-			area =>
-				area.faceIndex === hoverFaceIndex &&
-				faceY >= area.top &&
-				faceY <= area.top + area.height &&
-				faceX >= area.left &&
-				faceX <= area.left + area.width,
+		return findActiveAreaAt(
+			this.raycaster,
+			this.camera,
+			this.pages,
+			this.progress.getValue(),
+			this.pageActiveAreas,
+			scenePos,
 		);
 	}
 
-	private pendingFaceTextures = new Map<number, { url: string; texture?: THREE.Texture }>();
+	private pendingFaceTextures = new FaceTextureQueue();
 
 	public async prepareOpeningTextures(faceCount: number): Promise<void> {
-		const uploaded = new Set<THREE.Texture>();
-		for (let faceIndex = 0; faceIndex < faceCount; faceIndex++) {
-			await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-			if (this.disposed) return;
-			const page = this.pages[Math.floor(faceIndex / 2)];
-			if (!page) continue;
-			const materials = page.mesh.material as THREE.MeshStandardMaterial[];
-			const texture = materials[faceIndex % 2 === 0 ? 1 : 0].map;
-			if (texture && !uploaded.has(texture)) {
-				this.renderer.initTexture(texture);
-				uploaded.add(texture);
-			}
-		}
+		await prepareOpeningTextures(this.pages, this.renderer, faceCount, () => this.disposed);
 	}
 
 	public isTextureWorkSafe(): boolean {
@@ -1074,22 +446,12 @@ export default class Flipbook {
 
 	public updateFaceTexture(faceIndex: number, url: string, directTexture?: THREE.Texture) {
 		if (this.disposed) return;
-		this.pendingFaceTextures.set(faceIndex, { url, texture: directTexture });
+		this.pendingFaceTextures.set(faceIndex, url, directTexture);
 	}
 
 	private flushFaceTexture() {
 		if (!this.isTextureWorkSafe()) return;
-		const next = this.pendingFaceTextures.entries().next();
-		if (next.done) return;
-		const [faceIndex, { url, texture: directTexture }] = next.value;
-		this.pendingFaceTextures.delete(faceIndex);
-		if (directTexture) this.renderer.initTexture(directTexture);
-		const pageIndex = Math.floor(faceIndex / 2);
-		const side: 'front' | 'back' = faceIndex % 2 === 0 ? 'front' : 'back';
-		const page = this.pages[pageIndex];
-		if (page) {
-			page.setSideTexture(side, url, directTexture);
-		}
+		applyNextFaceTexture(this.pendingFaceTextures, this.pages, this.renderer);
 	}
 
 	public isWatchingVideo(): boolean {
@@ -1097,20 +459,17 @@ export default class Flipbook {
 	}
 
 	public flipNext() {
-		if (this.isWatchingVideo() || this.isTurning() || this.progress.getValue() >= this.pages.length) return false;
-		const current = this.progress.getValue();
-		const target = Math.min(this.pages.length, Math.floor(current) + 1);
-
-		// Drive the turn naturally through progress sliding physics without hard locking
-		this.progress.setMin(target);
-		this.progress.setMax(target);
-		return true;
+		return this.flipTo(1);
 	}
 
 	public flipPrev() {
-		if (this.isWatchingVideo() || this.isTurning() || this.progress.getValue() <= 0) return false;
-		const current = this.progress.getValue();
-		const target = Math.max(0, Math.ceil(current) - 1);
+		return this.flipTo(-1);
+	}
+
+	private flipTo(direction: 1 | -1) {
+		if (this.isWatchingVideo() || this.isTurning()) return false;
+		const target = getFlipTarget(this.progress.getValue(), this.pages.length, direction);
+		if (target === null) return false;
 
 		// Drive the turn naturally through progress sliding physics without hard locking
 		this.progress.setMin(target);
@@ -1120,115 +479,15 @@ export default class Flipbook {
 
 	public async watchArea(
 		corners: THREE.Vector3[],
-		preset: "direct" | "page-zoom" | "page-unzoom" = "direct",
+		preset: CameraPreset = "direct",
 		duration = 0,
 	) {
 		const targetPos = this.getCameraPos(corners);
-
-		let restFinishAt = 1;
-		if (preset === "page-zoom" || preset === "page-unzoom") {
-			// all properties except z finish transition at 73% of animation
-			restFinishAt = 0.73;
-		}
-
-		let [zDuration, restDuration, restDelay] = [0, 0, 0];
-		if (duration) {
-			zDuration = duration;
-			restDuration = duration * restFinishAt;
-
-			if (preset === "page-unzoom") {
-				restDelay = duration * (1 - restFinishAt);
-			}
-		}
-
-		const ease = "power2.inOut";
-
-		if (this.disposed) return;
-		gsap.to(this.camera.position, {
-			z: targetPos.position.z,
-			duration: zDuration / 1000,
-			ease,
-		});
-
-		const animateRest = () => {
-			if (this.disposed) return;
-			gsap.to(this.camera.position, {
-				x: targetPos.position.x,
-				duration: restDuration / 1000,
-				ease,
-			});
-
-			gsap.to(this.camera.position, {
-				y: targetPos.position.y,
-				duration: restDuration / 1000,
-				ease,
-			});
-
-			gsap.to(this.camera.quaternion, {
-				x: targetPos.rotation.x,
-				y: targetPos.rotation.y,
-				z: targetPos.rotation.z,
-				w: targetPos.rotation.w,
-				duration: restDuration / 1000,
-				ease,
-			});
-		};
-
-		if (restDelay) {
-			sleep(restDelay).then(animateRest);
-		} else {
-			// synchronous update is needed to prevent camera jittering
-			animateRest();
-		}
-		await sleep(duration);
+		await tweenCamera(this.camera, targetPos, preset, duration, () => this.disposed);
 	}
 
 	public getCameraPos(corners: THREE.Vector3[]) {
-		const [TL, TR, BL, BR] = corners;
-
-		const center = new THREE.Vector3()
-			.addVectors(TL, TR)
-			.add(BL)
-			.add(BR)
-			.multiplyScalar(0.25);
-
-		// Calculate normal using cross product of diagonals
-		let v1 = new THREE.Vector3().subVectors(BL, TR);
-		let v2 = new THREE.Vector3().subVectors(BR, TL);
-		const normal = new THREE.Vector3().crossVectors(v1, v2).normalize();
-
-		const width = TL.distanceTo(TR);
-		const height = TL.distanceTo(BL);
-
-		// Calculate distance using camera's FOV and aspect ratio
-		const fovYRadians = THREE.MathUtils.degToRad(this.camera.fov);
-		const aspect = this.camera.aspect;
-		const hFOV = 2 * Math.atan(Math.tan(fovYRadians / 2) * aspect);
-
-		const distanceH = width / 2 / Math.tan(hFOV / 2);
-		const distanceV = height / 2 / Math.tan(fovYRadians / 2);
-		const distance = Math.max(distanceH, distanceV);
-
-		const targetPosition = new THREE.Vector3(
-			center.x + normal.x * distance,
-			center.y + normal.y * distance,
-			center.z + normal.z * distance,
-		);
-
-		// Calculate the quaternion for the target rotation
-		const targetQuaternion = new THREE.Quaternion();
-		const targetDirection = new THREE.Vector3()
-			.subVectors(center, targetPosition)
-			.normalize();
-		targetQuaternion.setFromUnitVectors(
-			new THREE.Vector3(0, 0, -1),
-			targetDirection,
-		);
-
-		return {
-			position: targetPosition,
-			rotation: targetQuaternion,
-		};
+		return computeCameraPos(corners, this.camera);
 	}
 
 	public async restoreCamera(duration = 0) {
@@ -1238,53 +497,16 @@ export default class Flipbook {
 	public getBaseViewRect(
 		overrideSettings: null | Partial<FlipbookSettings> = null,
 	) {
-		const pw = this.pageWidth;
-		const ph = this.pageHeight;
-		const yShift = -ph * 0.011; // 1.1% down
-
-		const cornerTL = new THREE.Vector3(-pw, ph / 2 + yShift, 0);
-		const cornerTR = new THREE.Vector3(pw, ph / 2 + yShift, 0);
-		const cornerBL = new THREE.Vector3(-pw, ph / -2 + yShift, 0);
-		const cornerBR = new THREE.Vector3(pw, ph / -2 + yShift, 0);
-
-		const corners = [cornerTL, cornerTR, cornerBL, cornerBR];
-
-		// applying transformations to the corners
-		if (this.isVerticalMode) {
-			corners.forEach(point => {
-				point.x *= 0.6;
-			});
-		}
-
-		// TODO: getBookOpenFactor
-		const bookOpenFactor = Math.min(
-			this.progress.getValue(),
-			this.pages.length - this.progress.getValue(),
-			1,
-		);
-		// compensate spine width to make book centered when it's closed
-		// TODO: it should depend on spineWidth
-		const sideShiftMultiplier = 1 + (1 - bookOpenFactor) * 0.105;
-
-		if (this.cameraSideShift) {
-			corners.forEach(point => {
-				point.x +=
-					(this.pageWidth *
-						this.cameraSideShift.getValue() *
-						sideShiftMultiplier) /
-					2;
-			});
-		}
-
-		// rotate the target rectangle
-		const cameraAngle =
-			overrideSettings?.cameraAngle || this.settings.cameraAngle;
-		const cameraDistance =
-			overrideSettings?.cameraDistance || this.settings.cameraDistance;
-		let rotationMatrix = new THREE.Matrix4().makeRotationX(cameraAngle);
-		corners.forEach(point => point.applyMatrix4(rotationMatrix));
-
-		return scaleRectangle(corners, cameraDistance);
+		return computeBaseViewRect({
+			pageWidth: this.dims.pageWidth,
+			pageHeight: this.dims.pageHeight,
+			isVerticalMode: this.isVerticalMode,
+			// TODO: getBookOpenFactor
+			bookOpenFactor: getBookOpenFactor(this.progress.getValue(), this.pages.length),
+			cameraSideShift: this.cameraSideShift,
+			settings: this.settings,
+			overrideSettings,
+		});
 	}
 
 	private async focusActiveArea(
@@ -1347,209 +569,29 @@ export default class Flipbook {
 	}
 
 	private async playIntro() {
-		if (this.disposed) return;
-		const transitionToBottomView = async (durationMs: number) => {
-			const animation = { progress: 0 };
-			this.tweenTargets.add(animation);
-			await gsap.to(animation, {
-				progress: 1,
-				duration: durationMs / 1000,
-				ease: "power2.inOut",
-				onUpdate: () => {
-					const bottomViewRect =
-						this.getBaseViewRect(bottomViewSettings);
-					this.watchArea(
-						lerpRectangles(
-							logoCorners,
-							bottomViewRect,
-							animation.progress,
-						),
-					);
-				},
-			});
+		await playIntro(this.introHost());
+	}
+
+	private introHost(): IntroHost {
+		return {
+			isDisposed: () => this.disposed,
+			tweenTargets: this.tweenTargets,
+			settings: this.settings,
+			progress: this.progress,
+			spotLight: this.spotLight,
+			ambientLight: this.ambientLight,
+			introOverlay: this.introOverlay,
+			pages: this.pages,
+			pageWidth: this.dims.pageWidth,
+			pageHeight: this.dims.pageHeight,
+			setIntroPhase: phase => { this.introPhase = phase; },
+			getBaseViewRect: overrideSettings => this.getBaseViewRect(overrideSettings),
+			watchArea: (corners, preset, duration) => this.watchArea(corners, preset, duration),
+			restoreCamera: duration => this.restoreCamera(duration),
+			applySettings: (newSettings, updateAll) => this.applySettings(newSettings, updateAll),
+			update: dt => this.update(dt),
+			runAnimation: () => this.runAnimation(),
+			updateCursor: () => this.updateCursor(),
 		};
-
-		const openFirstPage = async (durationMs: number) => {
-			const animation = { progress: 0 };
-			this.tweenTargets.add(animation);
-			this.progress.lock();
-			this.progress.setMin(0);
-			this.progress.setMax(1);
-			await gsap.to(animation, {
-				progress: 1,
-				duration: durationMs / 1000,
-				ease: "power2.inOut",
-				onUpdate: () => {
-					if (this.disposed) return;
-					this.progress.setValue(animation.progress);
-				},
-				onComplete: () => {
-					this.progress.release();
-				},
-			});
-		};
-
-		const transitionRaise = async (durationMs: number) => {
-			// temporarily apply bottom view settings and gradually raise to
-			// the base position
-			const originalSettings = { ...this.settings };
-			this.settings.cameraAngle = bottomViewSettings.cameraAngle;
-			this.settings.cameraDistance = bottomViewSettings.cameraDistance;
-
-			await gsap.to(this.settings, {
-				cameraDistance: originalSettings.cameraDistance,
-				cameraAngle: originalSettings.cameraAngle,
-				duration: durationMs / 1000,
-				ease: "power2.inOut",
-				onUpdate: () => {
-					this.restoreCamera();
-				},
-			});
-		};
-
-		const isDisposed = () => this.disposed;
-		async function animateLogoFlash(durationMs: number): Promise<void> {
-			const phase1Duration = durationMs * 0.45;
-			const phase2Duration = durationMs * 0.3;
-			const phase3Duration = durationMs * 0.25;
-
-			// Phase 1: Increase shininess to max
-			logoEl.style.transition = `filter ${phase1Duration}ms ease-out`;
-			logoEl.style.filter =
-				"drop-shadow(0 0 10px white) drop-shadow(0 0 20px white) drop-shadow(0 0 40px white)";
-
-			logoShineEl.style.transition = `opacity ${phase1Duration / 2}ms ease-out ${phase1Duration / 2}ms, filter ${phase1Duration}ms ease-out ${phase1Duration / 2}ms, transform ${phase1Duration}ms ease-out ${phase1Duration / 2}ms`;
-			logoShineEl.style.filter = "brightness(2)";
-			logoShineEl.style.opacity = "0.075";
-			logoShineEl.style.transform =
-				"translateX(-50%) translateY(-50%) scale(1.2)";
-
-			await sleep(phase1Duration);
-			if (isDisposed()) return;
-
-			// Phase 2: Maintain maximum shininess
-			await sleep(phase2Duration);
-			if (isDisposed()) return;
-
-			// Phase 3: Decrease shininess and opacity
-			logoEl.style.transition = `filter ${phase3Duration}ms ease-in, opacity ${phase3Duration}ms ease-in`;
-			logoEl.style.filter = "none";
-			logoEl.style.opacity = "0";
-
-			logoShineEl.style.transition = `opacity ${phase3Duration / 2}ms ease-in-out, filter ${phase3Duration / 2}ms ease-in-out, transform ${phase3Duration / 2}ms ease-in-out`;
-			logoShineEl.style.filter = "brightness(1)";
-			logoShineEl.style.opacity = "0";
-			logoShineEl.style.transform =
-				"translateX(-50%) translateY(-50%) scale(1)";
-
-			await sleep(phase3Duration);
-		}
-
-		const animateLightFlash = async (durationMs: number) => {
-			const intensifyDurationMs = durationMs * 0.64;
-
-			gsap.to(this.spotLight, {
-				intensity: spotLightIntensity * 2,
-				duration: intensifyDurationMs / 1000,
-				ease: "power2.inOut",
-				onComplete: () => {
-					if (this.disposed) return;
-					gsap.to(this.spotLight, {
-						intensity: spotLightIntensity,
-						duration: (durationMs - intensifyDurationMs) / 1000,
-						ease: "power2.inOut",
-					});
-				},
-			});
-
-			gsap.to(this.ambientLight, {
-				intensity: ambientLightIntensity,
-				duration: intensifyDurationMs / 1000,
-				ease: "power2.inOut",
-			});
-
-			await sleep(durationMs);
-		};
-
-		const bottomViewSettings = {
-			cameraAngle: 0.8,
-			cameraDistance: 0.85,
-		};
-
-		// remember the light values and turn them off
-		const spotLightIntensity = this.spotLight.intensity;
-		const ambientLightIntensity = this.ambientLight.intensity;
-
-		this.spotLight.intensity = 0;
-		this.ambientLight.intensity = 0;
-
-		if (!this.introOverlay || !this.introOverlay.dom.logo) {
-			this.introPhase = "COMPLETED";
-			this.update(1);
-			this.runAnimation();
-			this.applySettings(this.settings, true);
-			this.restoreCamera(1000);
-			return;
-		}
-
-		const logoEl = this.introOverlay.dom.logo;
-		const logoShineEl = this.introOverlay.dom.logoShine;
-
-		this.introPhase = "ANIMATING";
-
-		// catch the current logo opacity value
-		const currentOpacity = window.getComputedStyle(logoEl).opacity;
-		logoEl.style.opacity = currentOpacity;
-		logoEl.style.animation = "none";
-
-		// Trigger reflow to ensure the transition starts correctly
-		logoEl.offsetHeight; // Reading the offsetHeight forces reflow
-
-		logoEl.style.opacity = "1";
-
-		await sleep(500); // let logo and progress settle
-		if (this.disposed) return;
-
-		// perform initial setup
-		this.update(1);
-
-		// prepare camera for intro animation
-		const logoArea: PageArea = {
-			top: 582.5 / this.pageHeight,
-			left: 279 / this.pageWidth,
-			width: 204 / this.pageWidth,
-			height: 204 / this.pageHeight,
-		};
-		const logoCorners = scaleRectangle(
-			this.pages[0].getPageAreaCorners(logoArea),
-			1.95,
-		);
-		await this.watchArea(logoCorners);
-		if (this.disposed) return;
-
-		// run the main loop
-		this.runAnimation();
-
-		this.introOverlay.dom.progress.style.opacity = "0";
-
-		await sleep(200); // make sure all the hard work is done
-		if (this.disposed) return;
-
-		animateLightFlash(2500);
-		await animateLogoFlash(2500);
-		if (this.disposed) return;
-		transitionToBottomView(3000);
-		await sleep(2000);
-		if (this.disposed) return;
-		openFirstPage(3500);
-		await sleep(1000);
-		if (this.disposed) return;
-		await transitionRaise(4000);
-		if (this.disposed) return;
-
-		// finalize
-		this.introOverlay.dom.container.style.display = "none";
-		this.updateCursor();
-		this.introPhase = "COMPLETED";
 	}
 }
