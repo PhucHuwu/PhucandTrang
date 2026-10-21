@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -85,7 +85,7 @@ jobs:
       DIRECT_URL: postgresql://postgres:ci@localhost:5432/ci
       DATABASE_URL_UNPOOLED: postgresql://postgres:ci@localhost:5432/ci
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 20
@@ -111,7 +111,7 @@ jobs:
       BACKEND_INTERNAL_URL: http://localhost:4000/api
       NEXT_PUBLIC_ENABLE_LOCAL_BOOK_FALLBACK: 'false'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 20
