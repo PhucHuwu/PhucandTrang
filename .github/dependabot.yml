@@ -12,6 +12,9 @@ updates:
     ignore:
       - dependency-name: '*'
         update-types: ['version-update:semver-major']
+      # Pinned on purpose (see cafb18a): react-konva >= 19.3 crashes the admin page editor
+      - dependency-name: react-konva
+      - dependency-name: konva
 
   - package-ecosystem: github-actions
     directory: /
